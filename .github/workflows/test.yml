@@ -1,0 +1,72 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.10", "3.12"]
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.os }} / py${{ matrix.python-version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        run: pip install -e ".[all,dev]"
+
+      - name: Fast tests
+        run: pytest -q -m "not slow"
+
+      - name: Full solves
+        run: pytest -q -m slow
+
+      - name: Lint
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        run: ruff check src tests examples
+
+  docs:
+    runs-on: ubuntu-latest
+    name: build theory.pdf
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install TeX
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            texlive-latex-base texlive-pictures \
+            texlive-latex-recommended texlive-latex-extra \
+            texlive-fonts-recommended
+
+      - name: Build the standalone figures
+        working-directory: docs/tikz
+        run: |
+          for f in *.tex; do
+            pdflatex -interaction=nonstopmode -halt-on-error "$f"
+          done
+
+      - name: Build the theory document
+        working-directory: docs
+        run: |
+          pdflatex -interaction=nonstopmode -halt-on-error theory.tex
+          pdflatex -interaction=nonstopmode -halt-on-error theory.tex
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: documentation
+          path: |
+            docs/theory.pdf
+            docs/tikz/*.pdf
