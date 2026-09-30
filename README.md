@@ -53,7 +53,7 @@ Check the install:
 
 ```bash
 python -m dgnozzle solve --order 1
-pytest -q -m "not slow"   # ~270 unit tests, under a minute
+pytest -q -m "not slow"   # 276 unit tests, under a minute
 pytest -q                 # plus the end-to-end solves and adjoint checks
 ```
 
