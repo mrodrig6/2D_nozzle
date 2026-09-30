@@ -30,6 +30,7 @@ print(performance(result).summary())
 - [Command line](#command-line)
 - [Choosing resolution](#choosing-resolution)
 - [Backends and performance](#backends-and-performance)
+- [Known limitation: shocked operating points](#known-limitation-shocked-operating-points-do-not-converge)
 - [Verification](#verification)
 - [Troubleshooting](#troubleshooting)
 - [Relationship to the original MATLAB code](#relationship-to-the-original-matlab-code)
@@ -205,7 +206,7 @@ print(critical_ratios(2.5019).describe())
 | at `third` | design point, perfectly expanded |
 | below `third` | under-expanded |
 
-Shocked cases need `limiter='barth-jespersen'` and `scheme='ssprk3'`.
+**Shocked cases (between the second and first critical ratios) do not currently converge** — see [Known limitation](#known-limitation-shocked-operating-points-do-not-converge).
 
 ---
 
@@ -407,6 +408,45 @@ Two things make it fast, and two make it robust. None of them change the answer
 > artefact of two defects since fixed: convergence measured *relative to the
 > first residual* (which tightens the target as the guess improves), and
 > `p`-continuation reporting only its final stage's cost.
+
+---
+
+### Known limitation: shocked operating points do not converge
+
+Between the **first** and **second** critical pressure ratios — a normal shock
+standing in the diverging section — the pseudo-time march does **not** reach a
+steady state. The residual falls by roughly an order of magnitude and then
+parks:
+
+| settings | residual floor (scaled) |
+|---|---|
+| `p=0`, `refine=0` | 6.1e-2 |
+| `p=0`, `refine=1` | 4.9e-2 |
+| `p=0`, `refine=2` | 5.6e-2 |
+| `p=1`, `refine=0`, `barth-jespersen` + `ssprk3` | 1.5 |
+| `p=1`, `refine=1`, `barth-jespersen` + `ssprk3` | 2.6 |
+
+The `p=0` floor is **mesh-independent**, so this is not shock under-resolution.
+The solver reports these runs as `converged=False` with a message, and does not
+present the numbers as trustworthy — but it cannot currently produce a converged
+shock-in-nozzle solution, and `p>=1` with the Barth–Jespersen limiter is worse
+than `p=0` rather than better.
+
+**What still works:** everything shock-free — the design point, over-expanded
+and under-expanded operation (`back_pressure_ratio` below the second critical
+ratio), the whole area-ratio design space, and all sensitivity and optimisation
+work. Those are the cases the solver is verified on.
+
+**For shock physics**, use `dgnozzle.solve_quasi1d`, which solves the
+one-dimensional problem exactly, including the shock position:
+
+```python
+from dgnozzle import solve_quasi1d, NozzleGeometry, FlowConditions
+sol = solve_quasi1d(NozzleGeometry(contour="smooth"),
+                    FlowConditions(back_pressure_ratio=0.70))
+print(sol.summary())
+# quasi-1D: shock-in-nozzle, shock x = 0.5084 m (M1 = 1.929), M_exit = 0.3270
+```
 
 ---
 

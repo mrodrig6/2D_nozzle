@@ -92,41 +92,79 @@ table. Where do they start to disagree, and why?
 **Question.** Show that once the nozzle is choked, mass flow is independent of
 back pressure.
 
+Sweep only the **shock-free** range — below the second critical ratio — because
+shocked points do not converge (see *Limitations* at the end of this guide):
+
 ```python
-table = sweep(back_pressure_ratio=np.linspace(0.05, 0.99, 20),
-              area_ratio=2.5, contour="smooth", order=1,
-              limiter="barth-jespersen", scheme="ssprk3")
+from dgnozzle import critical_ratios
+crit = critical_ratios(2.5)
+table = sweep(back_pressure_ratio=np.linspace(0.05, crit.second * 0.95, 12),
+              area_ratio=2.5, contour="smooth", order=1)
+print(table.table(("mass_flow_in", "exit_mach", "thrust_coefficient")))
 ```
 
-**What to report.** `mass_flow_in` against `back_pressure_ratio`, with the three
-critical ratios marked. Identify the exact point where the curve goes flat and
-compare it to `critical_ratios(...).first`.
+**What to report.** `mass_flow_in` against `back_pressure_ratio`. Every point
+here is choked, so the curve should be *flat to within discretisation error* —
+quantify that error and say whether the flatness is convincing.
 
-**Watch out.** Shocked cases need `limiter='barth-jespersen'` and
-`scheme='ssprk3'`. Without a limiter the `p=1` solution overshoots into negative
-pressure at the shock, and the solver will (correctly) refuse to call that
-converged.
+**Then extend it with theory.** `solve_quasi1d` covers the whole range
+including the shocked part, so use it to show where the mass flow *would* start
+to respond:
+
+```python
+from dgnozzle import solve_quasi1d, NozzleGeometry, FlowConditions
+for pb in (0.999, 0.99, 0.97, 0.9, 0.5, 0.15):
+    s = solve_quasi1d(NozzleGeometry(contour="smooth", area_ratio=2.5),
+                      FlowConditions(back_pressure_ratio=pb))
+    print(f"{pb:.3f}  mdot={s.mass_flow:.6f}  {s.regime.value}")
+```
+
+Compare the flat part against your DG numbers.
 
 ---
 
-## Exercise 3 — Track a shock
+## Exercise 3 — Track a shock, and find out why the solver will not
 
-**Question.** Where does the normal shock stand, and how does its position
-respond to back pressure?
+**Question.** Where does a normal shock stand, and how does its position respond
+to back pressure?
+
+Quasi-1D theory answers this exactly:
 
 ```python
-from dgnozzle.plotting import plot_field, plot_centreline
-result = solve_nozzle(back_pressure_ratio=0.70, order=1, refine=1,
-                      contour="smooth", limiter="barth-jespersen",
-                      scheme="ssprk3")
-plot_field(result, "mach")
-plot_centreline(result)     # DG against quasi-1D, with the theoretical shock marked
+from dgnozzle import solve_quasi1d, NozzleGeometry, FlowConditions
+geom = NozzleGeometry(contour="smooth", area_ratio=2.5)
+for pb in (0.9, 0.7, 0.5):
+    s = solve_quasi1d(geom, FlowConditions(back_pressure_ratio=pb))
+    print(f"pb/pt={pb}: shock at x={s.shock_x:.4f}, M1={s.shock_mach:.3f}, "
+          f"M_exit={s.exit_mach:.3f}")
 ```
 
-**What to report.** The shock position from your DG solution against the
-quasi-1D prediction, for three back pressures. Quasi-1D assumes a *normal* shock
-spanning the channel. Look at the Mach field — is the computed shock actually
-normal? What does it look like near the wall?
+**What to report.** Shock position and upstream Mach number against back
+pressure, and the total-pressure loss across the shock. Explain why a nozzle is
+never *designed* to run in this regime.
+
+**Now try the DG solver on the same point** and watch it fail:
+
+```python
+r = solve_nozzle(back_pressure_ratio=0.70, order=0, refine=1,
+                 contour="smooth", max_iterations=40000)
+print(r.converged, r.message)
+import matplotlib.pyplot as plt
+from dgnozzle.plotting import plot_convergence
+plot_convergence(r)     # the residual falls, then parks
+plt.show()
+```
+
+**What to report.** The residual history, and the level it parks at for
+`refine=0`, `1` and `2`. The floor is essentially mesh-independent — so this is
+*not* a resolution problem. Two-dimensionality is the thing quasi-1D theory
+cannot see: a normal shock in a diverging duct is not obviously a steady 2D
+structure. Take a position on whether the solver is failing to find a steady
+solution, or whether there is no steady solution to find. Say what evidence
+would settle it.
+
+This is a real open issue in the code, not a contrived exercise. See
+*Limitations*.
 
 ---
 
@@ -222,7 +260,7 @@ it is the difference between an optimisation result and an optimisation claim.
 | exploring, sweeping | `order=1, refine=0` | ~0.5 s |
 | a number for a report | `order=2, geometry_order=2, refine=1` | ~10 s |
 | a convergence study | `contour='smooth', geometry_order=2, refine=0,1,2` | minutes |
-| anything with a shock | `+ limiter='barth-jespersen', scheme='ssprk3'` | slower |
+| a shocked operating point | not currently possible — see *Limitations* | — |
 
 Sweeps warm-start automatically, so a 20-point sweep costs far less than 20
 solves.
@@ -241,6 +279,28 @@ Read the message. Every failure names both cause and remedy.
 | "cell-average repairs" | `cfl` is too large |
 | "non-positive wall height" | your geometry is invalid — run `check_contour` first |
 | "not monotone" (warning) | the wall bulges; reduce `theta_initial_deg` |
+
+---
+
+## Limitations
+
+**Shocked operating points do not converge.** For `back_pressure_ratio` between
+the second and first critical ratios, the residual falls about an order of
+magnitude and then parks:
+
+| settings | residual floor (scaled) |
+|---|---|
+| `p=0`, `refine=0/1/2` | 6.1e-2 / 4.9e-2 / 5.6e-2 |
+| `p=1` + `barth-jespersen` + `ssprk3`, `refine=0/1` | 1.5 / 2.6 |
+
+The `p=0` floor is mesh-independent, and `p>=1` with a limiter is *worse* than
+`p=0`. The solver reports these as `converged=False` and does not pass the
+numbers off as trustworthy, but it cannot currently compute them. Use
+`solve_quasi1d` for shock physics.
+
+Everything shock-free is verified and converges cleanly: the design point,
+over-expanded and under-expanded operation, the whole area-ratio design space,
+and all sensitivity and optimisation work.
 
 ---
 

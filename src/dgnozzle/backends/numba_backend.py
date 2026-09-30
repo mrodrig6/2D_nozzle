@@ -94,13 +94,22 @@ class NumbaBackend(Backend):
         kind = self.opts.limiter
         if kind == "none" or self.ops.ref.order == 0:
             return U
+
+        n_bj = 0
         if kind == "barth-jespersen":
-            U = lim.barth_jespersen_limiter(U, self.ops, self.flow, xp=np)
+            limited = lim.barth_jespersen_limiter(U, self.ops, self.flow, xp=np)
+            # Count BJ activity as well as positivity activity.  Reporting only
+            # the latter made a run whose residual was limit-cycling on the BJ
+            # limiter show `limiter active on ~0.00 elem/call`, which pointed the
+            # diagnosis in exactly the wrong direction.
+            n_bj = int((np.abs(limited - U).max(axis=(1, 2)) > 0.0).sum())
+            U = limited
+
         out, n_scaled, n_repair = nk.positivity_limit(
             _c(U), self._phi_vol, self._phi_face, self._face_side, self._mean_weights,
             self._gamma, 1e-8, self._rho_floor, self._p_floor, 12,
         )
-        self.n_limited += int(n_scaled)
+        self.n_limited += max(int(n_scaled), n_bj)
         self.n_mean_repaired += int(n_repair)
         self.n_limit_calls += 1
         return out
