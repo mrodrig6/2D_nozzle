@@ -226,6 +226,12 @@ print(table.table())
 table.to_csv("sweep.csv")
 ```
 
+![Area-ratio sweep: thrust coefficient and exit Mach against quasi-1D theory](docs/figures/area_ratio_sweep.png)
+
+Thrust **peaks and then falls** — past the matched condition the nozzle
+over-expands and the extra area costs more than the extra exit Mach number buys.
+That trade is the point of Exercise 1 in the lab guide.
+
 Sweeps **warm start** from the previous point automatically. Measured on a
 7-point area-ratio sweep that is 40% fewer iterations and 1.8× less wall time.
 Two parameters give a full grid:

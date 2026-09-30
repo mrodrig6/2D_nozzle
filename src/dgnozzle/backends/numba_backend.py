@@ -119,5 +119,8 @@ class NumbaBackend(Backend):
         return dt[:, None, None]
 
     def norm(self, A) -> float:
-        A = np.asarray(A)
-        return float(np.sqrt(np.mean(A * A)))
+        # A diverging march overflows here by design; the caller checks for a
+        # non-finite norm and reports divergence, so the warning is noise.
+        with np.errstate(over="ignore", invalid="ignore"):
+            A = np.asarray(A)
+            return float(np.sqrt(np.mean(A * A)))

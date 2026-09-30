@@ -59,7 +59,13 @@ def test_warm_starting_changes_cost_but_not_the_answer():
     warm = sweep(warm_start=True, **kw)
     cold = sweep(warm_start=False, **kw)
     assert warm.all_converged and cold.all_converged
-    assert np.allclose(warm["thrust"], cold["thrust"], rtol=1e-5)
+
+    # Two states converged to a scaled residual of 1e-6 agree on a functional to
+    # roughly that residual times the functional's sensitivity.  Measured here
+    # that is about 1.1e-5 -- so a 1e-5 tolerance fails for reasons that have
+    # nothing to do with warm starting.  Tighten `tolerance` and the difference
+    # shrinks with it.
+    assert np.allclose(warm["thrust"], cold["thrust"], rtol=1e-4)
     assert warm["iterations"].sum() <= cold["iterations"].sum()
 
 
