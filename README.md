@@ -432,6 +432,33 @@ present the numbers as trustworthy — but it cannot currently produce a converg
 shock-in-nozzle solution, and `p>=1` with the Barth–Jespersen limiter is worse
 than `p=0` rather than better.
 
+**What the residual is doing.** Localising it at `p=0`, `refine=1`,
+`p_b/p_t = 0.70` (12,000 steps, no limiter):
+
+| where | share of squared residual |
+|---|---|
+| `x ∈ [0.2, 0.3)` | **85.1%** |
+| `x ∈ [0.3, 0.4)` | 8.3% |
+| everywhere else | < 2% per band |
+| outflow elements | **0.1%** |
+| inflow elements | 0.0% |
+
+This **rules out the boundary conditions.** The outflow plane carries a tenth of
+a percent of the residual, and its normal Mach number is subsonic at every
+quadrature point (max 0.75) with none near sonic — so the subsonic/supersonic
+branch switch in the outflow condition is not chattering. The residual instead
+concentrates in one narrow axial band, spread across the *full channel height*,
+which is where the captured shock sits.
+
+Two further observations point the same way. The DG shock settles near
+`x ≈ 0.25` while quasi-1D theory puts it at `x = 0.508`; and the exit plane shows
+**reverse flow** (minimum normal Mach −0.22), a recirculation that a
+one-dimensional model cannot represent at all. A normal shock in a diverging
+duct is not obviously a steady two-dimensional structure — in inviscid flow it
+tends to bifurcate — so it is quite possible there is no steady solution here to
+converge to. Settling that needs a time-accurate computation, which this solver
+does not do.
+
 **What still works:** everything shock-free — the design point, over-expanded
 and under-expanded operation (`back_pressure_ratio` below the second critical
 ratio), the whole area-ratio design space, and all sensitivity and optimisation

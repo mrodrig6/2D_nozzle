@@ -848,6 +848,44 @@ Distinguishing ``the solver cannot converge it'' from ``there is nothing to
 converge to'' requires a time-accurate computation, which this solver does not
 do.
 
+\paragraph{Where the residual lives.}
+Localising it at $p=0$, ref $=1$, $p_b/p_t = 0.70$ (12\,000 steps, no limiter):
+
+\begin{table}[H]
+  \centering
+  \small
+  \begin{tabular}{lr}
+    \toprule
+    Region & Share of squared residual \\
+    \midrule
+    $x \in [0.2, 0.3)$ & \textbf{85.1\%} \\
+    $x \in [0.3, 0.4)$ & 8.3\% \\
+    every other axial band & $< 2\%$ each \\
+    \midrule
+    outflow elements & \textbf{0.1\%} \\
+    inflow elements  & 0.0\% \\
+    \bottomrule
+  \end{tabular}
+  \caption{The residual floor is not a boundary effect.}
+  \label{tab:shockloc}
+\end{table}
+
+This rules out the boundary conditions.  The outflow plane carries a tenth of a
+percent of the residual, and its normal Mach number is subsonic at every
+quadrature point (maximum $0.75$), with none within $0.15$ of sonic --- so the
+branch switch of Eq.~\eqref{eq:outflow} is not chattering.  The residual instead
+concentrates in one narrow axial band, spread across the full channel height,
+which is where the captured shock sits.
+
+Two further observations point the same way.  The computed shock settles near
+$x \approx 0.25$ while quasi-1D theory places it at $x = 0.508$; and the exit
+plane carries \emph{reverse flow}, with a minimum normal Mach number of $-0.22$
+--- a recirculation that a one-dimensional model cannot represent at all.  Taken
+with the mesh independence of the floor, the evidence favours the third
+explanation above: that there is no steady two-dimensional solution at this
+operating point to converge to.  Confirming it would need a time-accurate
+computation, which this solver does not perform.
+
 The solver reports these runs as not converged, with the residual level and the
 diagnostic message, and does not present their integral quantities as
 trustworthy.  Everything shock-free converges cleanly and is verified in

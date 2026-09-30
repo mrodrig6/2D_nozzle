@@ -294,7 +294,11 @@ magnitude and then parks:
 | `p=1` + `barth-jespersen` + `ssprk3`, `refine=0/1` | 1.5 / 2.6 |
 
 The `p=0` floor is mesh-independent, and `p>=1` with a limiter is *worse* than
-`p=0`. The solver reports these as `converged=False` and does not pass the
+`p=0`. Localising the residual shows 85% of it in the single axial band
+`x ∈ [0.2, 0.3)` — where the shock sits — and only 0.1% at the outflow, which
+rules out the boundary conditions. The exit plane also shows reverse flow
+(minimum normal Mach −0.22): a 2D recirculation quasi-1D theory cannot
+represent. The solver reports these as `converged=False` and does not pass the
 numbers off as trustworthy, but it cannot currently compute them. Use
 `solve_quasi1d` for shock physics.
 
