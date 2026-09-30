@@ -194,9 +194,17 @@ class SolverOptions:
         is robustness, not speed.  ``'uniform'`` reproduces the legacy
         ``M = 0.95`` freestream start.
     p_continuation
-        Solve at ``p = 0`` first and interpolate upward one order at a time.
-        Each stage warm-starts the next, which is cheaper than starting the
-        target order cold.
+        Solve at ``p = 0`` first and re-project upward one order at a time.
+
+        Off by default, on measurement.  Re-projection is exact, so it never
+        changes the answer -- but it is not cheaper: across ``p = 1`` and
+        ``p = 2`` at two refinement levels it cost 2-28% more wall time than
+        solving the target order directly, because the quasi-1D initial
+        condition has already removed most of the transient that the ``p = 0``
+        stage would otherwise remove.
+
+        Turn it on as a *fallback*: it converges cases a direct high-order solve
+        cannot start, such as ``p = 2`` from a uniform initial condition.
     check_interval
         Iterations between convergence tests.  Also the chunk size handed to the
         backend, so it is what the JAX backend fuses into one compiled loop.
@@ -218,7 +226,7 @@ class SolverOptions:
     scheme: str = "rk4"
     limiter: str = "positivity"
     initial_condition: str = "quasi1d"
-    p_continuation: bool = True
+    p_continuation: bool = False
     check_interval: int = 50
     print_interval: int = 500
     divergence_factor: float = 1e4

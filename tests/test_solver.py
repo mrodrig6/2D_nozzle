@@ -110,6 +110,22 @@ def test_initial_condition_does_not_change_the_answer():
     assert results["quasi1d"][0] == pytest.approx(results["uniform"][0], rel=1e-4), results
 
 
+def test_p_continuation_reports_total_cost():
+    """A continuation run must not look cheaper than a direct solve by hiding
+    the iterations its low-order stages spent."""
+    cont = solve_nozzle(order=2, p_continuation=True, **BASE)
+    direct = solve_nozzle(order=2, p_continuation=False, **BASE)
+    assert cont.converged and direct.converged
+    # the concatenated history must cover every reported iteration
+    assert cont.history.iterations[-1] == cont.iterations
+    assert cont.history.wall_time > 0.0
+    # Continuation runs at least one extra low-order stage, so its total must
+    # exceed the direct solve's.  An earlier version reported only the final
+    # stage, which made it look (wrongly) like the cheaper route.
+    assert cont.iterations > direct.iterations
+    assert performance(cont).thrust == pytest.approx(performance(direct).thrust, rel=1e-4)
+
+
 def test_p_continuation_reaches_the_same_answer():
     with_cont = solve_nozzle(order=2, p_continuation=True, **BASE)
     without = solve_nozzle(order=2, p_continuation=False, **BASE)
@@ -145,8 +161,11 @@ def test_convergence_is_independent_of_the_initial_guess():
     for ic, res in results.items():
         assert res.converged, f"{ic}: {res.message}"
         assert res.residual_scaled <= 1e-6
+    # Two states converged to a scaled residual of 1e-6 agree on a functional to
+    # roughly that residual times the functional's sensitivity -- about 1e-5 here,
+    # not to machine precision.
     a, b = (performance(r).thrust for r in results.values())
-    assert a == pytest.approx(b, rel=1e-5)
+    assert a == pytest.approx(b, rel=1e-4)
 
 
 def test_refinement_reduces_the_entropy_error():

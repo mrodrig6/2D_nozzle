@@ -52,8 +52,14 @@ Check the install:
 
 ```bash
 python -m dgnozzle solve --order 1
-pytest -q          # 250+ tests, about a minute
+pytest -q -m "not slow"   # ~270 unit tests, under a minute
+pytest -q                 # plus the end-to-end solves and adjoint checks
 ```
+
+The `slow` marker covers the tests that run a real flow solve — including the
+finite-difference gradient checks, which are two extra solves per design
+variable. Run those before trusting a change to the physics; the fast suite is
+enough while iterating.
 
 There is **nothing to compile and no binary to download**. Numba compiles the
 kernels on first use (a few seconds, cached afterwards).
@@ -335,12 +341,12 @@ Timings on 4 cores, converged to a relative residual of 1e-6:
 
 | `p` | `refine` | elements | DOF | iterations | time |
 |---|---|---|---|---|---|
-| 0 | 0 | 140 | 140 | 851 | **0.2 s** |
-| 1 | 0 | 140 | 420 | 1601 | **0.5 s** |
-| 2 | 0 | 140 | 840 | 2551 | **1.3 s** |
-| 1 | 1 | 560 | 1680 | 2251 | **1.5 s** |
-| 1 | 2 | 2240 | 6720 | 7651 | **17 s** |
-| 2 | 1 | 560 | 3360 | 9051 | **10 s** |
+| 0 | 0 | 140 | 140 | 851 | **0.20 s** |
+| 1 | 0 | 140 | 420 | 1751 | **0.59 s** |
+| 2 | 0 | 140 | 840 | 3301 | **1.8 s** |
+| 1 | 1 | 560 | 1680 | 2501 | **1.9 s** |
+| 2 | 1 | 560 | 3360 | 6301 | **7.3 s** |
+| 1 | 2 | 2240 | 6720 | 6051 | **12 s** |
 
 For comparison, the original MATLAB code documented ~30 s for the first row and
 "several minutes" for `p=1, refine=1`.
@@ -367,22 +373,39 @@ python -m dgnozzle bench -p 1 --refine 1
 
 They agree to a relative 1e-10, which the test suite enforces.
 
-Four things make it fast, none of which change the answer:
+Two things make it fast, and two make it robust. None of them change the answer
+— and the distinction is measured, not assumed.
+
+**Faster:**
 
 - **Vectorised, gather-only assembly.** No Python loop over elements or edges,
   and no scatter-add — so the loops parallelise without atomics and the same
   source runs under all three backends.
-- **Quasi-1D initial condition.** The shock is roughly in place and the nozzle
-  already choked before iteration one. This buys robustness rather than raw
-  speed: on the reference case it saves ~15% of the iterations at `p=0` and ~3%
-  at `p=1`, but at `p=2` without `p`-continuation a uniform start *diverges*
-  where it converges.
-- **`p`-continuation.** Solve at `p=0`, re-project upward. Re-projection is
-  exact, so this removes iterations without adding error — `p=2` costs 2551
-  iterations with it and 3251 without.
-- **A limiter fast path.** On a smooth solution nothing violates positivity and
-  the expensive pressure bisection is skipped entirely. Without it the limiter
-  costs ~20× a residual evaluation and dominates the solve.
+- **A limiter fast path.** On a smooth solution nothing violates positivity, so
+  the pressure bisection is skipped entirely. This is not a micro-optimisation:
+  the limiter runs once per Runge–Kutta stage, and in naive vectorised form it
+  cost ~20× a residual evaluation and dominated the whole solve. Moving it into
+  a kernel with a zero-allocation fast path took one RK4 step from 3.92 ms to
+  0.34 ms.
+
+**More robust, at a small cost:**
+
+- **Quasi-1D initial condition** (on by default). The shock is roughly in place
+  and the nozzle already choked before iteration one. It saves only ~15% of the
+  iterations at `p=0` and ~3% at `p=1` — but at `p=2` a uniform start *diverges*
+  where this converges.
+- **`p`-continuation** (off by default). Solve at `p=0` and re-project upward.
+  Re-projection is exact, so it cannot change the answer — but it costs 2–28%
+  *more* wall time than a direct solve, because the quasi-1D start has already
+  removed the transient it exists to remove. Turn it on as a fallback: it
+  converges `p=2` from a uniform initial condition, which a direct solve does
+  not.
+
+> Both of the last two were documented here as large speed-ups until they were
+> actually measured. The iteration counts that seemed to support that were an
+> artefact of two defects since fixed: convergence measured *relative to the
+> first residual* (which tightens the target as the guess improves), and
+> `p`-continuation reporting only its final stage's cost.
 
 ---
 

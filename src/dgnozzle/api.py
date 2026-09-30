@@ -14,17 +14,28 @@ workflow requires touching it.
 
 ``p``-continuation
 ------------------
-By default a run solves at ``p = 0`` first, then re-projects up one order at a
-time to the requested order, warm-starting each stage from the last.  The
-low-order stages are cheap and remove most of the transient, so the expensive
-high-order stage starts close to its answer.  Re-projection is exact (the coarse
-space sits inside the fine one), so this changes the cost and not the result.
+With ``p_continuation=True`` a run solves at ``p = 0`` first, then re-projects up
+one order at a time, warm-starting each stage from the last.  Re-projection is
+exact -- the coarse space sits inside the fine one -- so it cannot change the
+answer.
+
+It is **off by default**, because measurement says it is not a speed-up: it cost
+2-28% more wall time than a direct solve in every case that converged either
+way, the quasi-1D initial condition having already removed the transient the
+``p = 0`` stage exists to remove.  Its value is as a fallback for a high-order
+solve that will not start at all.
+
+When it is on, the returned :class:`~dgnozzle.solver.SolveResult` reports the
+**total** cost across all stages -- iterations, wall time and a concatenated
+residual history.  Reporting only the final stage, as an earlier version did,
+makes a continuation run look cheaper than a direct solve, which is exactly
+backwards.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import numpy as np
@@ -35,7 +46,7 @@ from .geometry import NozzleGeometry, check_contour
 from .mesh import MeshTopology, build_nozzle_mesh
 from .operators import Operators, build_operators
 from .quasi1d import Quasi1DSolution, solve_quasi1d
-from .solver import SolveResult, solve_steady
+from .solver import SolveHistory, SolveResult, solve_steady
 
 #: Keyword shortcuts accepted by :func:`solve_nozzle`, grouped by target object.
 _GEOMETRY_KEYS = (
@@ -287,6 +298,12 @@ def solve_nozzle(
 
     result: SolveResult | None = None
     U = U0
+    # p-continuation runs several marches; the reported cost must be their sum,
+    # not just the final stage's, or a continuation run looks cheaper than it is
+    # and cannot be compared against a direct solve.
+    total_iterations = 0
+    total_time = 0.0
+    combined = SolveHistory()
     for order in orders:
         ops = cs.operators_at(order)
         stage_opts = opts
@@ -303,11 +320,24 @@ def solve_nozzle(
         )
         U = result.U
         prev_ops = ops  # noqa: F841
+        for it, res in zip(result.history.iterations, result.history.residual, strict=True):
+            combined.iterations.append(total_iterations + it)
+            combined.residual.append(res)
+        total_iterations += result.iterations
+        total_time += result.history.wall_time
         if not result.converged and order != target:
             if verbose:
                 print(f"  (stage p={order} stopped: {result.message}; continuing)")
 
     assert result is not None
+    if len(orders) > 1:
+        combined.wall_time = total_time
+        result = replace(
+            result,
+            iterations=total_iterations,
+            history=combined,
+            discretization=disc,
+        )
     if verbose:
         print(f"  {result.summary()}")
         if result.message:

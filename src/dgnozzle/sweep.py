@@ -14,16 +14,21 @@ successive points stay adjacent.
 
 **Process parallelism.**  Optional, and a genuine trade-off rather than a free
 win: the Numba kernels are already thread-parallel across elements, so running
-several solves at once oversubscribes the machine unless each worker is pinned to
-one thread.  ``parallel=n`` does exactly that, and disables warm starting (which
-cannot cross a process boundary).  It pays off for many small solves; a sweep of
-a few large ones is better left serial.
+several solves at once oversubscribes the machine unless each worker is pinned
+to one thread.  ``parallel=n`` does exactly that -- via
+``numba.set_num_threads``, which works at runtime, rather than via the
+``NUMBA_NUM_THREADS`` environment variable, which a worker reads too late to
+matter.  The distinction is not academic: Numba's threading layer spin-waits, so
+unpinned workers thrash rather than merely failing to speed up.
+
+``parallel`` also disables warm starting, which cannot cross a process boundary.
+It pays off for many small solves; a sweep of a few large ones is better left
+serial.
 """
 
 from __future__ import annotations
 
 import itertools
-import os
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -233,8 +238,30 @@ def _solve_point(
     return res, perf
 
 
+def _pin_worker_to_one_thread() -> None:  # pragma: no cover - runs in a subprocess
+    """Restrict each sweep worker to a single Numba thread.
+
+    This must be done through ``numba.set_num_threads``, not by setting
+    ``NUMBA_NUM_THREADS``: the environment variable is only read when Numba's
+    threading layer initialises, and by the time a worker starts, Numba has
+    already been imported (and, under ``fork``, already initialised in the
+    parent).  Setting the variable in the child is silently ignored.
+
+    Getting this wrong is expensive rather than merely suboptimal.  Numba's
+    threading layer spin-waits, so N workers each spawning N threads on an
+    N-core machine do not run N times faster or even at parity -- they thrash.
+    Measured here, two 4-thread processes on 4 cores ran a solve ~34x slower
+    than one process alone.
+    """
+    try:
+        import numba
+
+        numba.set_num_threads(1)
+    except Exception:
+        pass
+
+
 def _worker(args):  # pragma: no cover - runs in a subprocess
-    os.environ.setdefault("NUMBA_NUM_THREADS", "1")
     point, fixed, geometry, flow, discretization, options, backend = args
     res, perf = _solve_point(
         point, fixed, geometry, flow, discretization, options, backend, None
@@ -357,7 +384,9 @@ def sweep(
             point = {n: float(axes[i][j]) for i, (n, j) in enumerate(zip(names, idx, strict=True))}
             flat_points[flat_index(idx)] = point
             jobs.append((point, fixed, geometry, flow, discretization, options, backend))
-        with ProcessPoolExecutor(max_workers=int(parallel)) as pool:
+        with ProcessPoolExecutor(
+            max_workers=int(parallel), initializer=_pin_worker_to_one_thread
+        ) as pool:
             for k, (idx, out) in enumerate(zip(order, pool.map(_worker, jobs), strict=True)):
                 point, metrics, ok, msg, geom_f, flow_f, _ = out
                 fi = flat_index(idx)

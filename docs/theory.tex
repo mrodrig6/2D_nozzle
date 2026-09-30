@@ -904,22 +904,40 @@ the identical code runs under NumPy, Numba and JAX.
   \caption{Execution backends.}
 \end{table}
 
-\subsection{Cost reductions that change no answer}
+\subsection{Cost and robustness measures, none of which change the answer}
 
 \begin{itemize}\itemsep2pt
-  \item \textbf{Quasi-1D initial condition} --- the shock is roughly in place and
-    the nozzle already choked.  A modest iteration saving, but it converges
-    cases where a uniform start diverges.
-  \item \textbf{$p$-continuation} --- solve at $p=0$, re-project upward one order
-    at a time.  Re-projection is exact, because the coarse space sits inside the
-    fine one.
+  \item \textbf{Quasi-1D initial condition} (on by default) --- the shock is
+    roughly in place and the nozzle already choked.  The iteration saving is
+    small (about 15\% at $p=0$, 3\% at $p=1$); what it buys is convergence at
+    $p=2$, where a uniform start diverges outright.
+  \item \textbf{$p$-continuation} (off by default) --- solve at $p=0$,
+    re-project upward one order at a time.  Re-projection is exact, because the
+    coarse space sits inside the fine one, so it cannot change the answer.  It is
+    \emph{not} a speed-up: measured, it costs 2--28\% more wall time than a
+    direct solve, the quasi-1D start having already removed the transient the
+    $p=0$ stage exists to remove.  Its value is as a fallback --- it converges
+    $p=2$ from a uniform initial condition, which a direct solve does not.
   \item \textbf{Warm-started sweeps} --- the mesh topology is invariant under
     design changes, so the previous point's field is always a valid start.
   \item \textbf{Limiter fast path} --- on a smooth solution no element violates
-    positivity, and the expensive pressure bisection is skipped entirely.
-    Without this the limiter costs about twenty times a residual evaluation and
-    dominates the solve.
+    positivity, so the pressure bisection is skipped entirely.  This is the
+    single largest saving in the code: the limiter runs once per Runge--Kutta
+    stage, and in naive vectorised form it cost about twenty times a residual
+    evaluation and dominated the solve.  Moving it into a kernel with a
+    zero-allocation fast path took one RK4 step from 3.92\,ms to 0.34\,ms.
 \end{itemize}
+
+\begin{quote}
+\textbf{On measuring these honestly.}  The first two were documented as large
+speed-ups until they were measured.  The iteration counts that appeared to
+support that were an artefact of two defects, both since fixed: convergence
+tested \emph{relative to the first residual}, which tightens the target as the
+initial guess improves and so penalises a good starting field; and
+$p$-continuation reporting only its final stage's iteration count, which hid the
+cost of the low-order stages that preceded it.  A performance claim that has not
+survived an attempt to measure it is not a performance claim.
+\end{quote}
 
 %% =========================================================================
 \section{Summary of corrections to the legacy solver}

@@ -52,7 +52,12 @@ def _solver_args(p: argparse.ArgumentParser) -> None:
     g.add_argument("--scheme", default="rk4", choices=("rk4", "ssprk3"))
     g.add_argument("--limiter", default="positivity",
                    choices=("none", "positivity", "barth-jespersen"))
-    g.add_argument("--no-p-continuation", action="store_true")
+    g.add_argument(
+        "--p-continuation",
+        action="store_true",
+        help="solve at p=0 and re-project upward; a fallback for a high-order "
+             "solve that will not start, not a speed-up",
+    )
     g.add_argument("-q", "--quiet", action="store_true")
 
 
@@ -76,7 +81,7 @@ def _collect(args) -> dict:
         max_iterations=args.max_iterations,
         scheme=args.scheme,
         limiter=args.limiter,
-        p_continuation=not args.no_p_continuation,
+        p_continuation=args.p_continuation,
     )
     if args.theta_initial_deg is not None:
         out["theta_initial_deg"] = args.theta_initial_deg
