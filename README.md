@@ -1,4 +1,4 @@
-# dgnozzle
+# 2D Discontinuous Galerkin nozzle code
 
 A 2D discontinuous Galerkin solver for the compressible Euler equations, built
 for **nozzle design studies**.
