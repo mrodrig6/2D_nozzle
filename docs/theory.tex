@@ -85,8 +85,7 @@ $R = 0.4$ and $\gamma = 1.4$ the stagnation speed of sound and density are
   \qquad
   \rho_t = \frac{\gamma p_t}{a_t^{2}} = 2.5 .
 \end{equation}
-These are the units of the original MATLAB solver, so results are directly
-comparable.
+Every reported quantity is in these units unless stated otherwise.
 
 %% =========================================================================
 \section{Governing equations}
@@ -255,8 +254,8 @@ a $C^1$ throat.  This is the most convenient family for gradient-based shape
 optimisation, because $w_1$ and $w_2$ are bounded, dimensionless, and act
 locally.
 
-\paragraph{\code{'analytic'} --- the legacy verification contour.}
-The fixed shape of the original MATLAB solver,
+\paragraph{\code{'analytic'} --- a closed-form verification contour.}
+A fixed shape, smooth everywhere,
 \begin{equation}
   t(x) = \pi \ln\!\bigl(1 + (e^{2}-1)\,x/L\bigr),
   \qquad
@@ -481,10 +480,11 @@ then follows from the isentropic relations and total enthalpy
 $H_b = a_t^{2}/(\gamma-1)$.
 
 \begin{quote}
-\textbf{Root selection.}  The legacy implementation always took
-$(-B + \sqrt{B^{2}-4AC})/2A$.  That is the physical root only while $A > 0$; when
-the leading coefficient changes sign --- which happens for weak inflow --- it
-returns a negative Mach number and the boundary state becomes meaningless.
+\textbf{Root selection.}  Taking $(-B + \sqrt{B^{2}-4AC})/2A$ unconditionally
+is correct only while $A > 0$.  When the leading coefficient changes sign ---
+which happens for weak inflow --- that root is negative and the boundary state
+becomes meaningless.  The smallest non-negative root is the physical branch in
+every case.
 \end{quote}
 
 \subsection{Outflow}
@@ -506,10 +506,9 @@ The two branches are selected by the local normal Mach number, so a shock
 crossing the exit plane during the transient is handled without special cases.
 
 \begin{quote}
-\textbf{The legacy solver had no back pressure.}  Its outflow condition always
-extrapolated, so the \code{p\_back\_ratio} input never reached the flow.  Every
-operating point with a shock in the nozzle --- that is, most of the interesting
-ones --- was therefore unreachable.
+\textbf{Both branches are needed.}  Extrapolating unconditionally would leave
+the back pressure with no effect on the flow at all, and with it every operating
+point whose exit is subsonic --- which is to say every shocked one.
 \end{quote}
 
 %% =========================================================================
@@ -555,15 +554,16 @@ not.
   = \sqrt{\frac{1}{4N}\sum \left(M^{-1}\vect{R}\right)^{2}} .
 \end{equation}
 The choice of denominator matters more than it looks.  Testing the
-\emph{unnormalised} residual against a fixed threshold --- what the legacy solver
-did --- makes ``converged'' mean different things on different meshes and at
-different operating points.  But testing it \emph{relative to the first
-iteration} is no better: it demands a tighter absolute residual the better the
-initial guess is, so improving the initial condition makes the solver appear
-slower and two runs started differently cannot be compared at all.  A fixed
-physical scale, $\rho_t a_t / L$, is independent of both the mesh and the
-starting field.  The legacy solver additionally tested the \emph{fourth}
-Runge--Kutta stage's rate, which is not the residual at any state it holds.
+\emph{unnormalised} residual against a fixed threshold makes ``converged'' mean
+different things on different meshes and at different operating points.  But
+testing it \emph{relative to the first iteration} is no better: it demands a
+tighter absolute residual the better the initial guess is, so improving the
+initial condition makes the solver appear slower and two runs started
+differently cannot be compared at all.  A fixed physical scale,
+$\rho_t a_t / L$, is independent of both the mesh and the starting field.  One
+further trap: the residual must be measured at a state the solver actually
+holds, not at an intermediate Runge--Kutta stage, whose rate is not the residual
+anywhere.
 
 %% =========================================================================
 \section{Limiting}
@@ -691,12 +691,11 @@ reported, together with
 \end{equation}
 
 \begin{quote}
-\textbf{The legacy normalisation was wrong for any modified geometry.}  It
-divided by a hard-coded throat height $h = 0.13989434$ --- the throat of the
-original contour --- so every thrust coefficient computed at a different
-\code{area\_ratio} or \code{throat\_x} used the wrong reference length.  It also
-integrated the wall pressure over every face tagged $-2$, which in that mesh
-included the symmetry axis.
+\textbf{The throat height must come from the geometry.}  Dividing by a fixed
+value silently mis-normalises every coefficient computed at a different
+\code{area\_ratio} or \code{throat\_x}.  For the same reason the wall integral
+runs over the contoured wall alone: folding the symmetry axis into it is
+harmless only while that axis stays horizontal.
 \end{quote}
 
 \subsection{Entropy error}
@@ -1031,48 +1030,6 @@ $p$-continuation reporting only its final stage's iteration count, which hid the
 cost of the low-order stages that preceded it.  A performance claim that has not
 survived an attempt to measure it is not a performance claim.
 \end{quote}
-
-%% =========================================================================
-\section{Summary of corrections to the legacy solver}
-
-\begin{table}[H]
-  \centering
-  \small
-  \begin{tabular}{p{4.6cm}p{11.0cm}}
-    \toprule
-    Issue & Consequence \\
-    \midrule
-    Diverging-contour rescale used constants evaluated at the wrong parameter
-      values &
-      The default \code{'smooth'} contour reached an exit half-height of
-      $4.34$\,m instead of $0.350$\,m, and went \emph{negative} just past the
-      throat --- inverted elements. \\
-    Outflow always extrapolated &
-      \code{p\_back\_ratio} was dead; no shocked operating point was reachable. \\
-    Inflow quadratic root selection &
-      Returned a negative Mach number where the leading coefficient changed sign. \\
-    Hard-coded throat height in the thrust normalisation &
-      Wrong $c_F$ for any geometry but the original. \\
-    Wall integral included the symmetry axis &
-      Harmless for a horizontal axis, wrong in general. \\
-    \code{extrapolate} read the new order as the old one &
-      Order continuation indexed past the end of its input; the mesh also changed
-      between calls, so element counts disagreed. \\
-    \code{postprocess()} took no arguments but was called with two; loaded
-      \code{.mat} files that were never written &
-      Post-processing could not run at all. \\
-    Dunavant degree-3 rule (negative weight) &
-      Risked an indefinite mass matrix and a negative sum-of-squares integral. \\
-    Unnormalised convergence test on the fourth RK stage; no iteration cap &
-      ``Converged'' meant different things on different meshes; a diverging run
-      never stopped. \\
-    Negative Roe sound speed raised an error &
-      A recoverable transient aborted the whole run. \\
-    \bottomrule
-  \end{tabular}
-  \caption{Defects found in the MATLAB implementation and fixed here.}
-  \label{tab:fixes}
-\end{table}
 
 %% =========================================================================
 \section*{References}

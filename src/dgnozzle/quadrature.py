@@ -1,11 +1,12 @@
 """Quadrature rules for the reference triangle, square and unit interval.
 
-All rules returned here have **strictly positive weights**.  This matters:
-the legacy MATLAB ``quad2d.m`` used the Dunavant degree-3 rule, whose first
-weight is ``-0.28125``.  A negative weight can destroy the positive
-definiteness of the elemental mass matrix and makes the entropy-error integral
-(a sum of squares) capable of going negative.  Every rule below is verified
-against exact monomial integrals in ``tests/test_quadrature.py``.
+All rules returned here have **strictly positive weights**, which is a
+requirement rather than a nicety: several standard symmetric triangle rules
+carry a negative weight (the Dunavant degree-3 rule's first weight is
+``-0.28125``), and a negative weight can destroy the positive definiteness of
+the elemental mass matrix and let the entropy-error integral -- a sum of squares
+-- come out negative.  Every rule below is verified against exact monomial
+integrals in ``tests/test_quadrature.py``.
 
 Conventions
 -----------

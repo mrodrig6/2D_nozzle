@@ -17,9 +17,9 @@ Why this is fast
 Two things:
 
 1. **No Python-level loop over elements or edges.**  Every step is a batched
-   ``einsum``.  The legacy MATLAB residual ran three nested interpreted loops
-   (elements, then edges, then quadrature points) and rebuilt ``squeezephil``
-   with a further pair of scalar loops on *every* edge of *every* call.
+   ``einsum``.  Looping over elements, then edges, then quadrature points in
+   interpreted code -- and rebuilding the per-edge basis tables on every call --
+   costs orders of magnitude more than the arithmetic itself.
 2. **Pure gather, never scatter.**  Because ``operators.face_edge`` maps each
    ``(element, local face)`` to exactly one global edge, the face integrals are
    collected by indexing rather than by ``np.add.at``/``scatter_add``.  Gathers
@@ -152,8 +152,8 @@ def local_time_step(wave_sum, ops: Operators, order: int, cfl: float, xp=np):
                      \frac{2\,A_e}{\sum_f s_f\, l_f}
 
     The ``1/(2p+1)`` factor is the standard order-dependent restriction for
-    explicit DG.  (The legacy code used ``1/(p+1)``, which is optimistic at
-    ``p >= 1``.)
+    explicit DG.  A ``1/(p+1)`` scaling is optimistic at ``p >= 1`` and will
+    eventually go unstable there.
     """
     denom = xp.maximum(wave_sum, ph.FLOOR)
     return cfl / (2 * order + 1) * 2.0 * ops.elem_area / denom

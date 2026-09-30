@@ -16,18 +16,14 @@ so the gap between them is a free, physically meaningful measure of
 discretisation error -- it goes to zero under refinement and is reported as
 :attr:`Performance.thrust_imbalance`.
 
-Three corrections relative to the legacy ``postcalc.m``
--------------------------------------------------------
-1. The throat height was hard-coded as ``h = 0.13989434``.  That is the throat of
-   the *original* contour, so every thrust coefficient computed for any other
-   ``area_ratio`` or ``throat_x`` was normalised by the wrong length.  Here it
-   comes from the geometry.
-2. The wall integral ran over every face tagged ``-2``, which in that mesh meant
-   the symmetry axis as well as the contoured wall.  (It happened to do no damage
-   because ``n_x = 0`` on the axis, but it would break for any inclined axis.)
-   Wall and axis now carry separate tags.
-3. ``pdotn`` and ``s_r`` grew inside the quadrature loops instead of being
-   preallocated.
+Two things worth stating explicitly
+-----------------------------------
+1. The throat height in the thrust normalisation comes from the geometry, never
+   from a constant.  Hard-coding it silently mis-normalises every coefficient
+   computed at a different ``area_ratio`` or ``throat_x``.
+2. The wall integral runs over the contoured wall alone.  The symmetry axis
+   carries its own tag even though it shares the inviscid flux, because folding
+   it into the wall integral is harmless only while the axis stays horizontal.
 
 Reported thrust is for the **full planar nozzle per unit depth** -- twice the
 half-channel that is actually meshed.

@@ -13,18 +13,18 @@ Convergence is measured on the **rate of change**,
 scaled by the problem's own physical magnitude :math:`\rho_t a_t / L`.
 
 That scaling is deliberate, and the third choice tried here.  Testing the
-*unnormalised* residual against a fixed threshold -- what the legacy solver did
--- makes "converged" mean different things on different meshes and at different
-operating points.  But testing it *relative to the first iteration* is no better:
-it demands a tighter absolute residual the better the initial guess is, so
-improving the initial condition makes the solver look slower and two runs
-started differently cannot be compared at all.  A fixed physical scale is
-independent of both the mesh and the starting field.
+*unnormalised* residual against a fixed threshold makes "converged" mean
+different things on different meshes and at different operating points.  But
+testing it *relative to the first iteration* is no better: it demands a tighter
+absolute residual the better the initial guess is, so improving the initial
+condition makes the solver look slower and two runs started differently cannot
+be compared at all.  A fixed physical scale is independent of both the mesh and
+the starting field.
 
-Two further defects of the legacy march are fixed here: it tested the *fourth*
-Runge-Kutta stage's rate, which is not the residual at any state the solver
-holds, and it had no iteration cap, so a diverging run span forever instead of
-reporting the problem.
+Two related traps are worth naming.  The residual must be measured at a state
+the solver actually holds -- not at an intermediate Runge-Kutta stage, whose
+rate is not the residual anywhere.  And the march needs an iteration cap, so
+that a diverging run reports the problem instead of running forever.
 """
 
 from __future__ import annotations

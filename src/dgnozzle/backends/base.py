@@ -8,10 +8,9 @@ makes cross-backend agreement testable to round-off.
 Schemes
 -------
 ``rk4``
-    The classical four-stage method, as in the legacy solver.  The local time
-    step is frozen at the first stage, which is standard for a pseudo-time march
-    to steady state -- the intermediate stages are not meant to be
-    time-accurate.
+    The classical four-stage method.  The local time step is frozen at the first
+    stage, which is standard for a pseudo-time march to steady state -- the
+    intermediate stages are not meant to be time-accurate.
 
 ``ssprk3``
     Three-stage strong-stability-preserving. Each stage is a convex combination

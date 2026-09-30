@@ -40,7 +40,7 @@ def _disc_args(p: argparse.ArgumentParser) -> None:
     g.add_argument("-p", "--order", type=int, default=1, help="polynomial order p")
     g.add_argument("-Q", "--geometry-order", type=int, default=1, help="geometry order Q")
     g.add_argument("-r", "--refine", type=int, default=0, help="refinement level")
-    g.add_argument("--x-spacing", default="throat", choices=("throat", "legacy", "uniform"))
+    g.add_argument("--x-spacing", default="throat", choices=("throat", "inlet", "uniform"))
 
 
 def _solver_args(p: argparse.ArgumentParser) -> None:

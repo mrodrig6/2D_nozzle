@@ -7,8 +7,7 @@ Reference geometry
 ------------------
 ``tri``   vertices ``(0,0), (1,0), (0,1)``; local edge ``f`` is the edge
           *opposite* vertex ``f``, traversed from vertex ``(f+1) % 3`` to vertex
-          ``(f+2) % 3``.  This reproduces the edge numbering of the legacy
-          MATLAB code.
+          ``(f+2) % 3``.
 ``quad``  vertices ``(0,0), (1,0), (1,1), (0,1)``; local edge ``f`` runs from
           vertex ``f`` to vertex ``(f+1) % 4``.
 
@@ -228,7 +227,7 @@ def quadrature_degree(kind: str, solution_order: int, geometry_order: int) -> tu
     The volume integrand ``grad(phi) . F`` is degree ``2p`` in the solution for
     an affine element; a curved element of geometry order ``Q`` adds
     ``2 (Q - 1)`` from the metric terms, and the mass matrix needs ``2p``.  One
-    extra degree is carried for safety, matching the legacy ``2p + 1 + 2(Q-1)``.
+    extra degree is carried for safety, giving ``2p + 1 + 2(Q-1)``.
     """
     p = solution_order
     q = geometry_order

@@ -16,9 +16,9 @@ differentiable.
 
 Robustness
 ----------
-The legacy MATLAB code raised ``error 'negative roe-averaged speed of sound'``
-and aborted the run.  That is the wrong response in a pseudo-time march, where a
-transient excursion is normal and recoverable.  Here density and pressure are
+A transient excursion to a negative density or a negative Roe-averaged sound
+speed is normal and recoverable in a pseudo-time march, so aborting on one
+throws away a run that would have converged.  Here density and pressure are
 floored at :data:`FLOOR` inside the flux evaluation, which keeps the march
 finite; the solver separately monitors the *unfloored* state and reports when
 the floor was active, so a genuinely bad solution is never silently accepted.
@@ -199,11 +199,10 @@ def inflow_flux(
 
     where :math:`\hat{d}` is the prescribed inflow direction.
 
-    The legacy code always took ``(-b + sqrt(disc)) / 2a``.  That is the
-    physical root only while ``a > 0``; when the leading coefficient changes
-    sign -- which happens for weak inflow -- it returns a negative Mach number
-    and the boundary state becomes nonsense.  Here the smallest non-negative
-    root is selected instead, which is the physical branch in every case.
+    The smallest non-negative root is the physical branch.  Taking
+    ``(-b + sqrt(disc)) / 2a`` unconditionally is correct only while ``a > 0``:
+    when the leading coefficient changes sign -- which happens for weak inflow --
+    that root is negative and the boundary state becomes meaningless.
     """
     at2 = gamma * Rgas * Tt  # stagnation speed of sound squared
     at = np.sqrt(at2)
@@ -272,10 +271,9 @@ def outflow_flux(U, nx, ny, gamma: float, *, p_back: float, xp=np) -> FluxResult
     transient harmless.
 
     .. note::
-       The legacy MATLAB solver **always** extrapolated.  Its ``p_back_ratio``
-       input was therefore dead: no back pressure ever reached the flow, so
-       over-expanded and shock-in-nozzle operating points could not be computed
-       at all.
+       Extrapolating unconditionally -- ignoring the subsonic branch -- would
+       leave the back pressure with no effect on the flow at all, and with it
+       every operating point whose exit is subsonic.
     """
     rho, u, v, p, _ = primitives(U, gamma, xp=xp)
     a = xp.sqrt(gamma * p / rho)

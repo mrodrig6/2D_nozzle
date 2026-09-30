@@ -44,10 +44,11 @@ def test_line_rule_is_exact(degree):
 @pytest.mark.parametrize("degree", range(0, 16))
 @pytest.mark.parametrize("kind", ["tri", "quad"])
 def test_all_weights_are_positive(kind, degree):
-    """The legacy Dunavant degree-3 rule had a weight of -0.28125.
+    """Several standard triangle rules carry a negative weight.
 
-    A negative weight can make the elemental mass matrix indefinite and lets the
-    entropy-error integral, a sum of squares, come out negative.
+    The Dunavant degree-3 rule's first weight is -0.28125.  A negative weight can
+    make the elemental mass matrix indefinite and lets the entropy-error
+    integral, a sum of squares, come out negative.
     """
     rule = qd.volume_rule(kind, degree)
     assert np.all(rule.weights > 0.0)
