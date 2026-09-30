@@ -37,23 +37,45 @@ def coordinate_lists(geom: NozzleGeometry, n: int = 61) -> tuple[str, str]:
     return up, lo
 
 
+#: How many coordinate lists the figure is expected to contain.
+#: Two upper (the shaded half-domain and the upper wall) and one lower wall.
+EXPECTED_UPPER = 2
+EXPECTED_LOWER = 1
+
+
+def _substitute(text: str, new_coords: str, sign: str, expected: int, what: str) -> str:
+    """Replace every ``plot coordinates`` list of one sign, verifying the count.
+
+    The count check is the important part.  The lists are matched by the sign of
+    their first ``y`` value, which is the only thing distinguishing the upper
+    wall from its mirror image in the source.  If a contour change moved that
+    value so the pattern stopped matching, a silent no-op would leave the figure
+    stale while ``git diff`` stayed clean -- so the CI job that regenerates and
+    diffs this file would pass on an out-of-date figure.  Failing loudly here is
+    what makes that check trustworthy.
+    """
+    pattern = re.compile(r"plot coordinates \{\(0\.0000," + sign + r"[0-9][^}]*\}")
+    text, count = pattern.subn("plot coordinates {" + new_coords + "}", text)
+    if count != expected:
+        raise SystemExit(
+            f"make_tikz: expected {expected} {what} coordinate list(s) in "
+            f"{TARGET.name}, matched {count}. The figure source has changed "
+            f"shape; update EXPECTED_{what.upper()} and the pattern together."
+        )
+    return text
+
+
 def main() -> int:
     geom = NozzleGeometry(contour="bell", area_ratio=2.5019, throat_x=0.1388)
-    up, lo = coordinate_lists(geom)
+    upper, lower = coordinate_lists(geom)
     text = TARGET.read_text()
 
-    # the upper list appears twice (shading and wall), the lower once
-    n_up = len(re.findall(r"plot coordinates \{\(0\.0000,", text))
     print(f"contour: {geom.describe()}")
-    print(f"rewriting {n_up} upper and 1 lower coordinate list(s) in {TARGET.name}")
-
-    def replace_nth(src: str, new: str, wanted_sign: str) -> str:
-        pattern = re.compile(r"plot coordinates \{\(0\.0000," + wanted_sign + r"[^}]*\}")
-        return pattern.sub("plot coordinates {" + new + "}", src)
-
-    text = replace_nth(text, up, r"1")
-    text = replace_nth(text, lo, r"-1")
+    text = _substitute(text, upper, r"", EXPECTED_UPPER, "upper")
+    text = _substitute(text, lower, r"-", EXPECTED_LOWER, "lower")
     TARGET.write_text(text)
+    print(f"rewrote {EXPECTED_UPPER} upper and {EXPECTED_LOWER} lower "
+          f"coordinate list(s) in {TARGET.name}")
     print("done -- recompile with: cd docs/tikz && pdflatex nozzle_geometry.tex")
     return 0
 
