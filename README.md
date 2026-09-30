@@ -30,6 +30,7 @@ print(performance(result).summary())
 - [Command line](#command-line)
 - [Choosing resolution](#choosing-resolution)
 - [Backends and performance](#backends-and-performance)
+- [Choking, as a check on the solver](#choking-as-a-check-on-the-solver)
 - [Known limitation: shocked operating points](#known-limitation-shocked-operating-points-do-not-converge)
 - [Verification](#verification)
 - [Troubleshooting](#troubleshooting)
@@ -89,12 +90,12 @@ print(performance(result).summary())
 ```
 
 ```
-converged in 1601 iterations (0.54 s, numba): residual 9.860e-07 scaled
-  (5.73e-07 of initial); min rho 3.0174e-01, min p 5.1730e-02
+converged in 1701 iterations (0.63 s, numba): residual 9.169e-07 scaled
+  (1.80e-06 of initial); min rho 3.0174e-01, min p 5.1730e-02
 
 thrust        0.045825  (c_F = 0.163785, 90.09% of ideal)
   wall form   0.045344  (imbalance 1.05e-02)
-mass flow     in 0.301381, out 0.301776  (imbalance 1.31e-03)
+mass flow     in 0.301380, out 0.301775  (imbalance 1.31e-03)
 exit          M = 2.4490, p/p_t = 0.06661
 entropy error 3.7307e-03
 ```
@@ -230,7 +231,9 @@ table.to_csv("sweep.csv")
 
 Thrust **peaks and then falls** — past the matched condition the nozzle
 over-expands and the extra area costs more than the extra exit Mach number buys.
-That trade is the point of Exercise 1 in the lab guide.
+On this sweep the optimum is at `area_ratio = 3.25` (`c_F = 0.176`), and thrust
+efficiency drops from 0.956 to 0.869 across the range. That trade is the point of
+Exercise 1 in the lab guide.
 
 Sweeps **warm start** from the previous point automatically. Measured on a
 7-point area-ratio sweep that is 40% fewer iterations and 1.8× less wall time.
@@ -414,6 +417,16 @@ Two things make it fast, and two make it robust. None of them change the answer
 > artefact of two defects since fixed: convergence measured *relative to the
 > first residual* (which tightens the target as the guess improves), and
 > `p`-continuation reporting only its final stage's cost.
+
+---
+
+### Choking, as a check on the solver
+
+![Mass flow across the choked range](docs/figures/choked_mass_flow.png)
+
+Once the nozzle is choked, mass flow must not depend on back pressure at all.
+Across the whole shock-free range the computed spread is **2.1e-8** — a check the
+solver was never tuned to pass, and a good one to have students reproduce.
 
 ---
 
