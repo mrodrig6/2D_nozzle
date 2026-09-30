@@ -1,0 +1,115 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.10", "3.12"]
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.os }} / py${{ matrix.python-version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      # JAX is installed separately, and only where it has official wheels.
+      # Putting it in the same install as everything else would kill the whole
+      # Windows job at the install step, before a single test ran -- and the
+      # suite does not need it: test_sensitivity.py importorskips jax,
+      # test_geometry.py's AD test carries the `jax` marker that conftest skips,
+      # and test_backends.py asks available_backends() first.
+      - name: Install
+        run: pip install -e ".[fast,plot,dev]"
+
+      - name: Install JAX (Linux and macOS only)
+        if: runner.os != 'Windows'
+        run: pip install "jax[cpu]>=0.4.20"
+
+      - name: Report which backends are active
+        run: python -c "from dgnozzle.backends import available_backends; print(available_backends())"
+
+      - name: Fast tests
+        run: pytest -q -m "not slow"
+
+      # The slow tests are 42 end-to-end solves, including finite-difference
+      # gradient checks that cost two extra flow solves per design variable.
+      # They exercise physics, not platform behaviour, so one job is enough --
+      # running them six times over buys no extra signal and a lot of minutes.
+      - name: Full solves and adjoint checks
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        run: pytest -q -m slow --durations=10
+
+      - name: Lint
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        run: ruff check src tests examples docs
+
+  docs:
+    runs-on: ubuntu-latest
+    name: build theory.pdf
+    steps:
+      - uses: actions/checkout@v4
+
+      # apt-get update first: a stale index gives 404s on the texlive packages.
+      - name: Install TeX
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            texlive-latex-base texlive-pictures \
+            texlive-latex-recommended texlive-latex-extra \
+            texlive-fonts-recommended
+
+      # texlive-latex-extra supplies standalone.cls, which every figure needs.
+      - name: Build the standalone figures
+        working-directory: docs/tikz
+        run: |
+          for f in *.tex; do
+            pdflatex -interaction=nonstopmode -halt-on-error "$f"
+          done
+
+      - name: Build the theory document
+        working-directory: docs
+        run: |
+          pdflatex -interaction=nonstopmode -halt-on-error theory.tex
+          pdflatex -interaction=nonstopmode -halt-on-error theory.tex
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: documentation
+          path: |
+            docs/theory.pdf
+            docs/tikz/*.pdf
+
+  figures:
+    runs-on: ubuntu-latest
+    name: check the geometry figure is in sync
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install -e ".[fast,plot]"
+
+      # The nozzle wall in the TikZ figure is generated from the solver's own
+      # contour code.  If someone changes the contour families and forgets to
+      # regenerate, the documented geometry silently stops matching the code.
+      - name: Regenerate and diff
+        run: |
+          python docs/make_tikz.py
+          git diff --exit-code docs/tikz/nozzle_geometry.tex \
+            || { echo "::error::docs/tikz/nozzle_geometry.tex is stale -- run 'python docs/make_tikz.py' and commit"; exit 1; }

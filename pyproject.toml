@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dgnozzle"
+version = "1.0.0"
+description = "2D discontinuous Galerkin Euler solver for planar nozzle design studies"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["cfd", "discontinuous-galerkin", "euler", "nozzle", "aerospace", "adjoint"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+]
+
+[project.optional-dependencies]
+fast = ["numba>=0.58"]
+jax = ["jax>=0.4.20"]
+plot = ["matplotlib>=3.7"]
+# everything a student needs for the lab
+all = ["numba>=0.58", "jax>=0.4.20", "matplotlib>=3.7"]
+dev = ["pytest>=7.4", "pytest-cov", "ruff"]
+
+[project.scripts]
+dgnozzle = "dgnozzle.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+    "slow: tests that run a full solve (deselect with -m 'not slow')",
+    "jax: tests that need JAX",
+    "numba: tests that need Numba",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E741"]
