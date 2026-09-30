@@ -62,29 +62,26 @@ def _solver_args(p: argparse.ArgumentParser) -> None:
 
 
 def _collect(args) -> dict:
-    out = dict(
-        contour=args.contour,
-        area_ratio=args.area_ratio,
-        throat_x=args.throat_x,
-        theta_exit_deg=args.theta_exit_deg,
-        bezier_w1=args.bezier_w1,
-        bezier_w2=args.bezier_w2,
-        back_pressure_ratio=args.back_pressure_ratio,
-        gamma=args.gamma,
-        element=args.element,
-        order=args.order,
-        geometry_order=args.geometry_order,
-        refine=args.refine,
-        x_spacing=args.x_spacing,
-        cfl=args.cfl,
-        tolerance=args.tolerance,
-        max_iterations=args.max_iterations,
-        scheme=args.scheme,
-        limiter=args.limiter,
-        p_continuation=args.p_continuation,
+    """Gather the solver keywords a subcommand's parser actually defined.
+
+    Read with ``getattr`` and a default rather than by attribute access: not
+    every subcommand registers every argument group.  ``geometry`` runs no flow
+    solve, so it declares no discretisation or solver options, and reaching for
+    ``args.element`` there raises ``AttributeError`` before the command does any
+    work.  Only keys the parser supplied are returned, so a subcommand never
+    passes along a setting the user had no way to give it.
+    """
+    defined = vars(args)
+    names = (
+        "contour", "area_ratio", "throat_x", "theta_exit_deg",
+        "bezier_w1", "bezier_w2", "back_pressure_ratio", "gamma",
+        "element", "order", "geometry_order", "refine", "x_spacing",
+        "cfl", "tolerance", "max_iterations", "scheme", "limiter",
+        "p_continuation",
     )
-    if args.theta_initial_deg is not None:
-        out["theta_initial_deg"] = args.theta_initial_deg
+    out = {name: defined[name] for name in names if name in defined}
+    if defined.get("theta_initial_deg") is not None:
+        out["theta_initial_deg"] = defined["theta_initial_deg"]
     return out
 
 
