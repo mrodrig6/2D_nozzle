@@ -13,8 +13,12 @@ What to notice
   the definition of choking, and it is visible in the table.
 * Between the second and first critical ratios a normal shock stands in the
   diverging section, and it moves downstream as the back pressure falls.
-* Shocked cases need `limiter='barth-jespersen'` and `scheme='ssprk3'`.  With no
-  limiter the p=1 solution overshoots into negative pressure.
+* The shocked points are run at **p=0**, and that is deliberate.  A shock inside
+  the nozzle does not converge at p>=1 in this solver: the march leaves the
+  physical state and the solver stops it.  Watch for the `FAILED at ...` lines
+  below -- they are the honest output, not a bug in your setup.  See the "Known
+  limitation" section of the README for the measurements behind that, and use
+  `solve_quasi1d` when you want shock physics rather than a 2D field.
 """
 
 from __future__ import annotations
@@ -36,9 +40,9 @@ def main() -> None:
         back_pressure_ratio=np.linspace(0.05, 0.97, 24),
         area_ratio=area_ratio,
         contour="smooth",
-        order=1,
-        refine=0,
-        limiter="barth-jespersen",   # a shock at p>=1 needs this
+        order=0,                     # a shock in the nozzle does not converge
+                                     # at p>=1 -- see the docstring above
+        refine=1,
         scheme="ssprk3",             # SSP stages match the positivity limiter
         max_iterations=200_000,
     )

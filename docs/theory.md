@@ -656,9 +656,97 @@ constraint is quadratic and bracketed by bisection. On a smooth solution
 $\theta_e = 1$ everywhere and the limiter is exactly inactive, so full accuracy
 is retained.
 
-**Barth–Jespersen.** Additionally bounds the solution by the neighbouring cell
-averages, damping the oscillations themselves rather than only their
-consequences, at the cost of clipping genuine extrema.
+**Superbee (Roe).** A TVD slope limiter: it additionally bounds the element's
+own increment toward each neighbour by what the jump in cell averages across
+that face admits, damping the oscillations themselves rather than only their
+consequences. Writing $d_f$ for the element's increment toward face $f$ and
+$a_f$ for the jump in cell averages across it,
+
+```math
+\theta_e = \min_{f,\,s} \min\!\left(1,\
+  \frac{\mathrm{superbee}(a_{f,s},\, d_{f,s})}{d_{f,s}}\right),
+\qquad
+\mathrm{superbee}(a, b) = \mathrm{maxmod}\bigl(
+  \mathrm{minmod}(2a, b),\ \mathrm{minmod}(a, 2b)\bigr),
+```
+
+equivalently $\phi(r) = \max\bigl(0, \min(2r, 1), \min(r, 2)\bigr)$ with
+$r = a/b$. Of the second-order TVD limiters Superbee is the most
+*compressive* — it sits on the upper edge of Sweby's TVD region, where `minmod`
+sits on the lower one, permitting twice the neighbour jump where `minmod`
+permits one. That keeps a captured shock sharp, and it also makes Superbee the
+most willing of the family to switch on.
+
+Three details decide whether it is usable.
+
+*One scalar factor, not one per component.* The minimum runs over the four
+conserved components $s$ as well as the faces, so a single number scales the
+whole element. That is a matter of admissibility, not tidiness. The set
+$\{\rho > 0,\ p > 0\}$ is **convex**, so
+$\bar{\mathbf{U}}_e + \theta(\mathbf{U}_{e,i} - \bar{\mathbf{U}}_e)$ is a convex
+combination of two admissible states and is itself admissible for every
+$\theta \in [0,1]$. A per-component factor leaves that segment — it pairs a
+strongly limited density with a barely limited energy — and can land outside the
+set even though both endpoints are inside it. Measured on the shocked case at
+`cfl=0.3`, a per-component factor drove the *cell average* non-physical 10,246
+times and the march to `NaN`; the scalar factor needed no repairs at all and
+held the minimum pressure positive throughout.
+
+
+*Boundary faces are not limited against.* An element is its own neighbour across
+a domain boundary, so the jump there is identically zero; limiting against it
+would drive $\theta_e$ to zero in exactly the elements carrying the wall and the
+exit plane, which is where thrust is integrated.
+
+*The TVB threshold.* A face whose increment is small enough to be smooth data
+rather than an oscillation is left alone, following Cockburn and Shu. Their
+threshold is $M h^2$, with $M$ a bound on a second derivative; this code uses the
+dimensionless equivalent
+
+```math
+|d_{f,s}| \le M\, \frac{A_e}{A_\Omega}\, \max_{e'} |\bar{u}_{e',s}|
+\quad\Longrightarrow\quad
+\text{component } s \text{ is not limited across } f ,
+```
+
+so that one `tvb_constant` $= M$ covers any geometry, any non-dimensionalisation
+and any refinement level. The element's share of the domain area stands in for
+$(h/L)^2$, so the threshold still shrinks as $h^2$ under refinement, which is
+what makes the limiter vanish in the limit and recovers the TVB argument. The
+state scale is the largest cell average of that component *anywhere in the
+domain*, not the element's own — the transverse momentum passes through zero on
+the nozzle axis, and a local scale would therefore drive the threshold to zero on
+precisely the elements where the field is smoothest.
+
+The threshold is not optional. Without it a TVD limiter stays marginally active
+at every smooth extremum, clipping it on some iterations and not others, and a
+limiter that switches on and off between iterations parks the residual at a fixed
+level instead of converging. Measured at the shock-free design point, $M = 0$
+leaves 77 of 140 elements of an *already converged* field being clipped and the
+residual parks at $3.1$ instead of reaching $10^{-6}$. This is the same failure
+mode that made the Barth–Jespersen limiter this replaced *worse than no slope
+limiter at all*, by more than an order of magnitude on the shocked case.
+
+The shipped default is $M = 50$, and it is the smallest value that works.
+Scanned over the design, over-expanded and under-expanded points, at
+$(p, \texttt{refine})$ of $(1,0)$, $(1,1)$ and $(2,0)$: $M = 10$ fails all nine,
+$M = 20$ fails the three at $\texttt{refine}=1$, and $M = 50$ converges all nine.
+
+It is worth being honest about what that costs, because it is the central
+difficulty of this whole section. At $M = 50$ the slope limiter is nearly
+inactive *even at a shock*: 200 steps into a shocked run it touches 0 of 140
+elements at $p_b/p_t = 0.50$ and 2 of 140 at $0.70$, where $M = 0$ touches 72 and
+92. For this problem the window in which one TVB constant both leaves a smooth
+steady solution alone and still bites on a shock is **empty**. Lower $M$ and the
+limiter chatters and the residual parks; raise it and the limiter stops acting.
+That is a property of asking a TVD limiter — designed for a time-accurate march,
+where a little chatter is harmless — to coexist with a *steady* pseudo-time march
+whose whole purpose is to drive a residual to zero. It is the reason shocked
+operating points do not converge at $p \ge 1$, and it is not something a
+different choice of TVD limiter function would fix. A shock-capturing method that
+does converge in steady state — artificial viscosity with a smooth sensor, or a
+subcell WENO reconstruction — would be a change of method, not a change of
+limiter.
 
 **When a limiter cannot help.** If the *cell average* itself becomes
 non-physical, no scaling can repair it — at $\theta = 0$ the solution *is* that
@@ -1019,21 +1107,6 @@ the identical code runs under NumPy, Numba and JAX.
   condition, which a direct solve does not.
 - **Warm-started sweeps** — the mesh topology is invariant under design changes,
   so the previous point's field is always a valid start.
-- **FAS multigrid** (off by default) — a V-cycle over either a $p$-hierarchy on
-  the same mesh or an $h$-hierarchy of refinement levels. The transfers are
-  exact projection pairs and the cycle leaves a converged state untouched, so
-  the answer is the single-grid answer; what it does not do is save time.
-  Measured at the same $\mathrm{CFL}$ it buys 1.1–1.3×, costs more than plain
-  stepping at $p = 2$, $\mathrm{ref} = 1$, and at some settings stops
-  converging; compared at each method's own best $\mathrm{CFL}$, plain stepping
-  wins outright. The reason is in the march: its iteration count is exactly
-  inversely proportional to $\Delta t$, so the slow mode is the acoustic
-  transit of the nozzle rather than a spectrum of spatial wavenumbers — which is
-  the error a coarse grid is good at removing. Raising the coarse-level work
-  from 8 smoothing steps to 40 does not change the fine-level cycle count at
-  all, which says the same thing. The second half of the explanation is that
-  RK4 tuned for the largest stable step is a poor *smoother*: the residual falls
-  by about 0.92 per cycle where textbook multigrid expects 0.1–0.3.
 - **Limiter fast path** — on a smooth solution no element violates positivity,
   so the pressure bisection is skipped entirely. This is the single largest
   saving in the code: the limiter runs once per Runge–Kutta stage, and in naive
@@ -1042,8 +1115,7 @@ the identical code runs under NumPy, Numba and JAX.
   RK4 step from 3.92 ms to 0.34 ms.
 
 > **On measuring these honestly.** The first two were documented as large
-> speed-ups until they were measured, and multigrid was estimated at 2–8× before
-> it was built and measured at 1.1–1.3×. The iteration counts that appeared to
+> speed-ups until they were measured. The iteration counts that appeared to
 > support that were an artefact of two defects, both since fixed: convergence
 > tested *relative to the first residual*, which tightens the target as the
 > initial guess improves and so penalises a good starting field; and
@@ -1064,13 +1136,22 @@ the identical code runs under NumPy, Numba and JAX.
 4. X. Zhang and C.-W. Shu, "On positivity-preserving high order discontinuous
    Galerkin schemes for compressible Euler equations on rectangular meshes",
    *J. Comput. Phys.* **229**, 8918–8934, 2010.
-5. T. J. Barth and D. C. Jespersen, "The design and application of upwind
-   schemes on unstructured meshes", AIAA Paper 89-0366, 1989.
-6. D. A. Dunavant, "High degree efficient symmetrical Gaussian quadrature rules
+5. P. L. Roe, "Characteristic-based schemes for the Euler equations",
+   *Ann. Rev. Fluid Mech.* **18**, 337–365, 1986. (The Superbee limiter; see
+   also P. L. Roe, "Some contributions to the modelling of discontinuous
+   flows", *Lectures in Applied Mathematics* **22**, 163–193, 1985.)
+6. B. Cockburn and C.-W. Shu, "TVB Runge-Kutta local projection discontinuous
+   Galerkin finite element method for conservation laws II: general framework",
+   *Math. Comp.* **52**, 411–435, 1989. (The TVB threshold, and the generalised
+   slope limiter for DG.)
+7. P. K. Sweby, "High resolution schemes using flux limiters for hyperbolic
+   conservation laws", *SIAM J. Numer. Anal.* **21**, 995–1011, 1984. (The TVD
+   region Superbee bounds from above.)
+8. D. A. Dunavant, "High degree efficient symmetrical Gaussian quadrature rules
    for the triangle", *Int. J. Numer. Meth. Engng.* **21**, 1129–1148, 1985.
-7. G. V. R. Rao, "Exhaust nozzle contour for optimum thrust", *Jet Propulsion*
+9. G. V. R. Rao, "Exhaust nozzle contour for optimum thrust", *Jet Propulsion*
    **28**, 377–382, 1958.
-8. M. B. Giles and N. A. Pierce, "An introduction to the adjoint approach to
-   design", *Flow, Turbulence and Combustion* **65**, 393–415, 2000.
-9. A. H. Shapiro, *The Dynamics and Thermodynamics of Compressible Fluid Flow*,
-   Ronald Press, 1953.
+10. M. B. Giles and N. A. Pierce, "An introduction to the adjoint approach to
+    design", *Flow, Turbulence and Combustion* **65**, 393–415, 2000.
+11. A. H. Shapiro, *The Dynamics and Thermodynamics of Compressible Fluid Flow*,
+    Ronald Press, 1953.

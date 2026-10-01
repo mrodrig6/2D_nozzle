@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 from dgnozzle import NozzleGeometry, build_case
+from dgnozzle import initialize as ini
 from dgnozzle import limiter as lim
 from dgnozzle.config import FlowConditions
 
@@ -26,14 +27,14 @@ def smooth_state(case):
     return U
 
 
-@pytest.mark.parametrize("kind", ["positivity", "barth-jespersen"])
+@pytest.mark.parametrize("kind", ["positivity", "superbee"])
 def test_limiter_is_inactive_on_a_smooth_state(case, smooth_state, kind):
     """Accuracy preservation: a limiter that fires on smooth flow destroys the order."""
     out = lim.apply_limiter(smooth_state, case.operators, case.flow, kind)
     assert np.abs(out - smooth_state).max() == 0.0
 
 
-@pytest.mark.parametrize("kind", ["positivity", "barth-jespersen"])
+@pytest.mark.parametrize("kind", ["positivity", "superbee"])
 def test_limiter_restores_positivity(case, smooth_state, kind):
     ops, flow = case.operators, case.flow
     U = smooth_state.copy()
@@ -47,7 +48,7 @@ def test_limiter_restores_positivity(case, smooth_state, kind):
     assert diag.min_pressure > 0.0
 
 
-@pytest.mark.parametrize("kind", ["positivity", "barth-jespersen"])
+@pytest.mark.parametrize("kind", ["positivity", "superbee"])
 def test_limiter_is_conservative(case, smooth_state, kind):
     """Scaling the deviation from the mean must leave the mean untouched."""
     ops, flow = case.operators, case.flow
@@ -79,17 +80,130 @@ def test_limiter_is_a_no_op_at_p0():
     assert lim.apply_limiter(U, case.operators, case.flow, "positivity") is U
 
 
-def test_barth_jespersen_bounds_by_neighbour_averages(case, smooth_state):
-    """A spike must be pulled back into the range of its neighbours' means."""
+def test_superbee_bounds_the_slope_by_the_neighbour_jump(case, smooth_state):
+    """The limited increment must be what Superbee allows, face by face.
+
+    This is the pure TVD property, so it is tested with ``tvb_constant = 0``.
+    The shipped default deliberately *exempts* increments below the TVB
+    threshold from this bound -- that exemption is the subject of
+    :func:`test_the_tvb_threshold_switches_the_limiter_off`, and asserting the
+    bound with it switched on would be asserting the opposite of what the
+    threshold is for.
+    """
     ops, flow = case.operators, case.flow
-    U = smooth_state.copy()
-    U[50, :, 0] = 20.0  # a cell far outside its neighbourhood
-    out = lim.barth_jespersen_limiter(U, ops, flow)
-    probes = lim.probe_values(out, ops)
+    rng = np.random.default_rng(3)
+    U = smooth_state + 0.4 * rng.standard_normal(smooth_state.shape)
+
+    out = lim.superbee_limiter(U, ops, flow, tvb_constant=0.0)
     means = lim.cell_means(out, ops)
     nb = ops.topology.edges.face_neighbour
-    upper = np.maximum(means, means[nb].max(axis=1))[:, 0]
-    assert np.all(probes[..., 0].max(axis=1) <= upper + 1e-9)
+    interior = nb != np.arange(ops.n_elem)[:, None]
+
+    jump = means[nb] - means[:, None, :]
+    dev = lim.face_trace_means(out, ops) - means[:, None, :]
+    allowed = lim.superbee(jump, dev)
+    # on an interior face the surviving increment may not exceed what Superbee
+    # admits for that jump; a slack of 1e-9 covers the single scaling factor
+    assert np.all(
+        np.abs(dev[interior]) <= np.abs(allowed[interior]) + 1e-9
+    )
+
+
+def test_superbee_scales_every_component_by_the_same_factor(case, smooth_state):
+    """The limited state must stay on the segment from ``U`` to its cell mean.
+
+    This is what keeps the slope limiter from handing the positivity limiter an
+    inadmissible state.  ``{rho > 0, p > 0}`` is convex, so any point on that
+    segment is admissible when both ends are; a per-component factor leaves the
+    segment and can land outside.  Measured, a per-component factor drove the
+    cell average non-physical 10,246 times on the shocked case where the scalar
+    factor needed no repairs at all.
+    """
+    ops, flow = case.operators, case.flow
+    rng = np.random.default_rng(11)
+    U = smooth_state + 0.5 * rng.standard_normal(smooth_state.shape)
+
+    out = lim.superbee_limiter(U, ops, flow, tvb_constant=0.0)
+    ubar = lim.cell_means(U, ops)
+    dev, dev_lim = U - ubar[:, None, :], out - ubar[:, None, :]
+
+    # recover theta from every entry with a deviation worth dividing by, and
+    # check they all agree -- element by element, across modes and components
+    big = np.abs(dev) > 1e-8
+    assert big.sum() > 100, "test is vacuous"
+    ratio = np.where(big, dev_lim / np.where(big, dev, 1.0), np.nan)
+    for e in range(ops.n_elem):
+        vals = ratio[e][big[e]]
+        if vals.size:
+            assert np.ptp(vals) < 1e-10, f"element {e} scaled unevenly"
+
+    # and the limiter must actually have been doing something
+    assert np.nanmin(ratio) < 0.999
+
+
+def test_superbee_is_more_compressive_than_minmod(case, smooth_state):
+    """Superbee's whole character: it permits twice what minmod does.
+
+    Both sit on the edges of Sweby's TVD region -- minmod on the lower, Superbee
+    on the upper -- so Superbee must never limit *more* than minmod, and on a
+    steep face it must limit strictly less.
+    """
+    rng = np.random.default_rng(5)
+    a = rng.standard_normal(2000)
+    b = rng.standard_normal(2000)
+    sb = lim.superbee(a, b)
+    mm = lim._minmod(a, b)
+    same_sign = a * b > 0
+    assert np.all(np.abs(sb[same_sign]) >= np.abs(mm[same_sign]) - 1e-12)
+    assert np.all(np.sign(sb[same_sign]) == np.sign(mm[same_sign]))
+    # opposite signs: both must kill the increment outright
+    assert np.all(sb[~same_sign] == 0.0)
+    # and the textbook values
+    assert lim.superbee(np.array(1.0), np.array(3.0)) == pytest.approx(2.0)
+    assert lim._minmod(np.array(1.0), np.array(3.0)) == pytest.approx(1.0)
+
+
+def test_the_tvb_threshold_switches_the_limiter_off(case, smooth_state):
+    """With a large enough ``M`` nothing is limited, which is the point of it.
+
+    A pure TVD limiter stays marginally active at smooth extrema, clipping them
+    on some iterations and not others; that is what parks a steady residual in a
+    limit cycle.
+    """
+    ops, flow = case.operators, case.flow
+    rng = np.random.default_rng(7)
+    U = smooth_state + 0.2 * rng.standard_normal(smooth_state.shape)
+
+    active = lim.superbee_limiter(U, ops, flow, tvb_constant=0.0)
+    assert np.abs(active - U).max() > 1e-6, "nothing to limit; test is vacuous"
+
+    off = lim.superbee_limiter(U, ops, flow, tvb_constant=1e9)
+    # not bit-identical: the limiter still evaluates `ubar + 1 * (U - ubar)`,
+    # which round-trips through the cell average.  Round-off, not limiting.
+    assert np.abs(off - U).max() < 1e-14 * np.abs(U).max()
+
+
+def test_superbee_leaves_a_linear_field_alone(case):
+    """A TVD limiter must not touch a field it has no reason to touch.
+
+    On a globally linear field every interior jump agrees in sign and magnitude
+    with the element's own increment, so Superbee admits it in full.  What makes
+    this the sharp test is the *boundary*: ``face_neighbour`` reports an element
+    as its own neighbour there, so the jump across a boundary face is identically
+    zero.  Limiting against it would drive theta to zero in precisely the
+    elements that carry the wall and the exit plane -- a silent, severe loss of
+    accuracy exactly where thrust is integrated -- and every boundary element
+    would come back flattened.
+    """
+    ops, flow = case.operators, case.flow
+    xy = np.asarray(ops.xy_vol)
+    base = np.array([2.0, 0.6, 0.05, 5.0])
+    slope = np.array([0.7, -0.3, 0.2, 1.1])
+    values = base + slope * (xy[..., 0] - 0.5)[..., None]
+    U = ini.project(values, ops)
+
+    out = lim.superbee_limiter(U, ops, flow)
+    assert np.abs(out - U).max() < 1e-12 * np.abs(U).max()
 
 
 @pytest.mark.numba

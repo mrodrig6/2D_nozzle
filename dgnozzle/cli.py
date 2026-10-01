@@ -55,16 +55,9 @@ def _solver_args(p: argparse.ArgumentParser) -> None:
     g.add_argument("--max-iterations", type=int, default=200_000)
     g.add_argument("--scheme", default="rk4", choices=("rk4", "ssprk3"))
     g.add_argument("--limiter", default="positivity",
-                   choices=("none", "positivity", "barth-jespersen"))
-    g.add_argument(
-        "--multigrid", default="none", choices=("none", "p", "h"),
-        help="FAS multigrid acceleration: 'p' coarsens the order, 'h' the mesh "
-             "(measured at 1.1-1.3x, and slower at some settings -- see the README)",
-    )
-    g.add_argument("--mg-pre", type=int, default=3, help="pre-smoothing steps per level")
-    g.add_argument("--mg-post", type=int, default=3, help="post-smoothing steps per level")
-    g.add_argument("--mg-coarse", type=int, default=20,
-                   help="smoothing steps on the coarsest level")
+                   choices=("none", "positivity", "superbee"))
+    g.add_argument("--tvb-constant", type=float, default=50.0,
+                   help="Cockburn-Shu TVB threshold M for limiter=superbee")
     g.add_argument(
         "--p-continuation",
         action="store_true",
@@ -90,7 +83,7 @@ def _collect(args) -> dict:
         "bezier_w1", "bezier_w2", "back_pressure_ratio", "gamma",
         "element", "order", "geometry_order", "refine", "x_spacing",
         "cfl", "tolerance", "max_iterations", "scheme", "limiter",
-        "p_continuation", "multigrid", "mg_pre", "mg_post", "mg_coarse",
+        "p_continuation", "tvb_constant",
     )
     out = {name: defined[name] for name in names if name in defined}
     if defined.get("theta_initial_deg") is not None:

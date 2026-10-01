@@ -27,7 +27,10 @@ class NumpyBackend(Backend):
     def limit(self, U):
         if self.opts.limiter == "none" or self.ops.ref.order == 0:
             return U
-        out = lim.apply_limiter(U, self.ops, self.flow, self.opts.limiter, xp=np)
+        out = lim.apply_limiter(
+            U, self.ops, self.flow, self.opts.limiter,
+            tvb_constant=self.opts.tvb_constant, xp=np,
+        )
         self.n_limit_calls += 1
         changed = np.abs(out - U).max(axis=(1, 2)) > 0.0
         self.n_limited += int(changed.sum())

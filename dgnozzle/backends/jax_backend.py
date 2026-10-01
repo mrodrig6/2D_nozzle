@@ -76,7 +76,10 @@ class JaxBackend(Backend):
         return asm.apply_inverse_mass(R, self.ops, xp=self.jnp)
 
     def limit(self, U):
-        return lim.apply_limiter(U, self.ops, self.flow, self.opts.limiter, xp=self.jnp)
+        return lim.apply_limiter(
+            U, self.ops, self.flow, self.opts.limiter,
+            tvb_constant=self.opts.tvb_constant, xp=self.jnp,
+        )
 
     def time_step(self, wave_sum):
         dt = asm.local_time_step(

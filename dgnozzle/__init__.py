@@ -36,9 +36,6 @@ Layout
 :mod:`~dgnozzle.backends`  ``numba`` / ``numpy`` / ``jax`` execution
 :mod:`~dgnozzle.limiter`   positivity and slope limiting
 :mod:`~dgnozzle.solver`    the pseudo-time march
-:mod:`~dgnozzle.multigrid` FAS multigrid acceleration of that march (off by
-                           default -- see the module docstring for what it is
-                           and is not worth)
 :mod:`~dgnozzle.quasi1d`   exact quasi-1D theory, for reference and for the
                            initial condition
 :mod:`~dgnozzle.postprocess` thrust, entropy error, line-outs

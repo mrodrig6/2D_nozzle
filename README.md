@@ -34,9 +34,8 @@ print(performance(result).summary())
   - [Where the time goes](#where-the-time-goes)
   - [What made it faster](#what-made-it-faster)
   - [The time step](#the-time-step)
-  - [Multigrid, and why it is off](#multigrid-and-why-it-is-off)
 - [Choking, as a check on the solver](#choking-as-a-check-on-the-solver)
-- [Known limitation: shocked operating points](#known-limitation-shocked-operating-points-do-not-converge)
+- [Known limitation: shocked operating points](#known-limitation-shocked-operating-points)
 - [Verification](#verification)
 - [Troubleshooting](#troubleshooting)
 
@@ -360,7 +359,7 @@ print(critical_ratios(2.5019).describe())
 | at `third` | design point, perfectly expanded |
 | below `third` | under-expanded |
 
-**Shocked cases (between the second and first critical ratios) do not currently converge** — see [Known limitation](#known-limitation-shocked-operating-points-do-not-converge).
+**Shocked cases (between the second and first critical ratios) mostly do not converge** — `p=0` sometimes does, `p>=1` diverges; see [Known limitation](#known-limitation-shocked-operating-points).
 
 ---
 
@@ -669,59 +668,6 @@ scaling used beyond the measured orders.
 > limit, so a change that moves the real limit fails the build instead of
 > quietly invalidating the table.
 
-### Multigrid, and why it is off
-
-An FAS multigrid cycle is implemented over two hierarchies — `multigrid='p'`
-coarsens the polynomial order on the same mesh, `'h'` coarsens the mesh one
-refinement level at a time. Both are correct: the transfers are exact projection
-pairs to round-off, a converged state is a fixed point of the cycle, and the
-converged answer is the single-grid answer. **Neither is faster, so both are off
-by default.**
-
-Wall time, `smooth` contour, best *converged* cycle settings found, compared at
-the same `cfl`:
-
-| `p` | `refine` | plain | `multigrid='p'` | `multigrid='h'` |
-|---|---|---|---|---|
-| 1 | 0 | 0.15 s | 0.14 s (1.07×) | no coarse level |
-| 1 | 1 | 0.58 s | 0.45 s (1.29×) | 0.52 s (1.11×) |
-| 2 | 0 | 0.48 s | 0.40 s (1.21×) | no coarse level |
-| 2 | 1 | 1.95 s | 3.35 s (**0.58×**) | 2.51 s (**0.78×**) |
-| 1 | 2 | 2.29 s | 1.73 s (1.32×) | 1.94 s (1.18×) |
-
-"Converged" is doing work in that sentence. At `p=2, refine=1` every setting
-with `mg_pre=2` **fails to converge** — the coarse correction pushes cell
-averages non-physical and the limiter starts repairing them — and the three
-settings that failed were also the three fastest, which is exactly the trap a
-wall-time table invites. The solver reports them as `converged=False`, and only
-`mg_pre=3` gets there, 1.7× slower than plain stepping. Below roughly 80% of the
-default `cfl` the cycle stops converging at every order tested — too small a
-step leaves the smoother unable to take out the error the coarse correction
-injects.
-
-And compared at each method's *own* best `cfl`, plain stepping wins outright: at
-`p=1, refine=1` it reaches 0.39 s where the best cycle manages 0.45 s.
-
-The reason is visible in the march itself. Its iteration count is *exactly*
-inversely proportional to the time step, which says the slow mode is the acoustic
-transit of the nozzle rather than a spectrum of spatial wavenumbers — and
-low-wavenumber spatial error is precisely what a coarse grid is good at removing.
-Raising the coarse-level work from 8 smoothing steps to 40 bears that out: the
-coarse level converges completely and the fine-level cycle count does not move,
-so the error multigrid removes is not the error that is left. The other half is
-the smoother: RK4 tuned for the largest stable step damps high wavenumbers
-poorly, and the residual falls by only about 0.92 per cycle where textbook
-multigrid expects 0.1–0.3. A smoother designed for damping is the missing piece,
-and a separate piece of work.
-
-It is kept, off, because it is correct and tested, because the measurement is
-worth having written down, and because it is what anything better would be built
-on. Estimated beforehand at 2–8×; measured at 1.1–1.3×. If you want to try it:
-
-```bash
-./dg2d.sh solve p=2 ref=1 mg=p mg_pre=3 mg_post=3 mg_coarse=20
-```
-
 ### What makes it fast, and what makes it robust
 
 None of these change the answer — and the distinction is measured, not assumed.
@@ -748,14 +694,13 @@ None of these change the answer — and the distinction is measured, not assumed
   converges `p=2` from a uniform initial condition, which a direct solve does
   not.
 
-> **On measuring these honestly.** Four things in this section were documented or
-> estimated as large speed-ups before anyone measured them: the quasi-1D start,
-> `p`-continuation, warm-started sweeps, and multigrid. The first three were
-> corrected a release ago; multigrid was estimated at 2–8× and came in at
-> 1.1–1.3×. The two that *did* pay — the kernel work and the time step — were
-> estimated at 25–40% and 60–90%, and came in at 1.7–2.3× and 1.1–2.1×. The
-> estimates were wrong in both directions, which is the argument for the
-> measurement rather than for the estimate.
+> **On measuring these honestly.** Three things in this section were documented
+> as large speed-ups before anyone measured them — the quasi-1D start,
+> `p`-continuation and warm-started sweeps — and all three were corrected. The
+> two that *did* pay, the kernel work and the time step, were estimated at
+> 25–40% and 60–90% and came in at 1.7–2.3× and 1.1–2.1×. The estimates were
+> wrong in both directions, which is the argument for measuring rather than for
+> estimating better.
 
 ---
 
@@ -769,26 +714,49 @@ solver was never tuned to pass, and a good one to have students reproduce.
 
 ---
 
-### Known limitation: shocked operating points do not converge
+### Known limitation: shocked operating points
 
 Between the **first** and **second** critical pressure ratios — a normal shock
-standing in the diverging section — the pseudo-time march does **not** reach a
-steady state. The residual falls by roughly an order of magnitude and then
-parks:
+standing in the diverging section — the pseudo-time march generally does **not**
+reach a steady state. Measured at `AR=2.5` with `ssprk3`, `geometry_order=2` and
+a 12,000-iteration cap, where the shocked band is `0.435 < p_b/p_t < 0.961`:
 
-| settings | residual floor (scaled) |
-|---|---|
-| `p=0`, `refine=0` | 6.1e-2 |
-| `p=0`, `refine=1` | 4.9e-2 |
-| `p=0`, `refine=2` | 5.6e-2 |
-| `p=1`, `refine=0`, `barth-jespersen` + `ssprk3` | 1.5 |
-| `p=1`, `refine=1`, `barth-jespersen` + `ssprk3` | 2.6 |
+| settings | `p_b/p_t=0.50` | `0.70` | `0.85` |
+|---|---|---|---|
+| `p=0`, `refine=0` | 5.8e-2 | 2.7e-2 | **converged** |
+| `p=0`, `refine=1` | **converged** | 1.4e-1 | **converged** |
+| `p=0`, `refine=2` | 1.4e-2 | 5.7e-2 | 6.4e-2 |
+| `p=1`, `refine=0`, `superbee` | 7.4e-1 | diverges | diverges |
+| `p=1`, `refine=1`, `superbee` | diverges | diverges | diverges |
+| `p=2`, `refine=0`, `superbee` | diverges | diverges | diverges |
 
-The `p=0` floor is **mesh-independent**, so this is not shock under-resolution.
-The solver reports these runs as `converged=False` with a message, and does not
-present the numbers as trustworthy — but it cannot currently produce a converged
-shock-in-nozzle solution, and `p>=1` with the Barth–Jespersen limiter is worse
-than `p=0` rather than better.
+Two things in that table are worth being precise about.
+
+**At `p=0` it is a stall, and sometimes not even that.** The floor does not fall
+with refinement, so this is not shock under-resolution. But three of the nine
+`p=0` entries now reach the tolerance, which they did not before the time step
+was recalibrated — the same point that parks at 1.1e-1 under the old fixed
+`cfl=1` parks at 2.7e-2 now. So `p=0` in the shocked band is worth *trying*:
+check `converged` and believe the answer when it is `True`.
+
+**At `p >= 1` it is a divergence, and that is not new.** The march leaves the
+physical state entirely and the solver stops it and says so. This is not
+something the Superbee limiter introduced: on the previous revision the same
+point at `p=1` with the positivity limiter alone went to `NaN` after 551 steps
+with 12,959 cell-average repairs. The Barth–Jespersen limiter that Superbee
+replaced did keep it bounded — at a residual of 2.9 (`refine=0`) and 4.6
+(`refine=1`), which is *two orders of magnitude worse than `p=0`*. It bought
+boundedness by flattening the solution, not a solution. Superbee is better
+behaved than either on the way down — at `cfl=0.3` it needs **zero**
+cell-average repairs where the positivity limiter alone needed 12,959 — but
+better-behaved divergence is still divergence. Reducing `cfl` does not rescue
+it (`0.3`, `0.5` and `0.7` all diverge), so this is not a time-step problem
+either.
+
+The solver reports every non-converged run above as `converged=False` with a
+message and does not present the numbers as trustworthy. For a shock in the
+nozzle, use `p=0` and check `converged`, or `solve_quasi1d` for the shock physics
+itself.
 
 **What the residual is doing.** Localising it at `p=0`, `refine=1`,
 `p_b/p_t = 0.70` (12,000 steps, no limiter):

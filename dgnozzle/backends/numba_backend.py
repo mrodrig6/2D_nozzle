@@ -23,8 +23,8 @@ per Runge-Kutta stage, so four times per iteration; its cheap sufficient screen
 (see :func:`._numba_kernels.positivity_limit`) is what keeps the inactive case,
 which is every iteration of a smooth run, from costing a seventh of the step.
 
-The Barth-Jespersen limiter stays in vectorised NumPy: it is opt-in, wanted only
-for shocked cases, and needs neighbour averages that do not fit the same
+The Superbee slope limiter stays in vectorised NumPy: it is opt-in, wanted only
+for shocked cases, and needs neighbour cell averages, which do not fit the same
 in-place element-local pattern.
 """
 
@@ -161,8 +161,6 @@ class NumbaBackend(Backend):
             self._phi_face, self._face_edge, self._face_side, self._face_sign,
             self._edge_length, self._gamma, self._inv_mass, True, out, self._wave,
         )
-        if self.rate_source is not None:
-            out -= self.rate_source
 
     def _dt_into(self) -> np.ndarray:
         nk.local_dt(
@@ -178,21 +176,24 @@ class NumbaBackend(Backend):
         if kind == "none" or self.ops.ref.order == 0:
             return
 
-        n_bj = 0
-        if kind == "barth-jespersen":
-            limited = lim.barth_jespersen_limiter(U, self.ops, self.flow, xp=np)
-            # Count BJ activity as well as positivity activity.  Reporting only
-            # the latter made a run whose residual was limit-cycling on the BJ
-            # limiter show `limiter active on ~0.00 elem/call`, which pointed the
-            # diagnosis in exactly the wrong direction.
-            n_bj = int((np.abs(limited - U).max(axis=(1, 2)) > 0.0).sum())
+        n_slope = 0
+        if kind == "superbee":
+            limited = lim.superbee_limiter(
+                U, self.ops, self.flow, tvb_constant=self.opts.tvb_constant, xp=np
+            )
+            # Count slope-limiter activity as well as positivity activity.
+            # Reporting only the latter made a run whose residual was
+            # limit-cycling on the slope limiter show `limiter active on ~0.00
+            # elem/call`, which pointed the diagnosis in exactly the wrong
+            # direction.
+            n_slope = int((np.abs(limited - U).max(axis=(1, 2)) > 0.0).sum())
             U[...] = limited
 
         n_scaled, n_repair = nk.positivity_limit(
             U, self._phi_vol, self._phi_face, self._face_side, self._mean_weights,
             self._gamma, 1e-8, self._rho_floor, self._p_floor, 12, self._lebesgue,
         )
-        self.n_limited += max(int(n_scaled), n_bj)
+        self.n_limited += max(int(n_scaled), n_slope)
         self.n_mean_repaired += int(n_repair)
         self.n_limit_calls += 1
 

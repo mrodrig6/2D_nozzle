@@ -80,7 +80,7 @@ translate() {
             p|order)                              key=order ;;
             Q|geometry_order|geometry-order)      key=geometry-order ;;
             ref|refine)                           key=refine ;;
-            mg|multigrid)                         key=multigrid ;;
+            M|tvb|tvb_constant|tvb-constant)      key=tvb-constant ;;
             ar|area_ratio|area-ratio)             key=area-ratio ;;
             pb|back_pressure|back_pressure_ratio) key=back-pressure-ratio ;;
             *)                                    key=${key//_/-} ;;
@@ -185,8 +185,8 @@ Arguments are 'name=value', using the same names as the Python API:
   ./$SELF run sensitivity
 
 Aliases: p=order, Q=geometry_order, ref=refine, ar=area_ratio,
-pb=back_pressure_ratio, mg=multigrid.  Ordinary --flags work too, so anything
-'python -m dgnozzle --help' documents is still available.
+pb=back_pressure_ratio, M=tvb_constant.  Ordinary --flags work too, so
+anything 'python -m dgnozzle --help' documents is still available.
 
 Cases:
 $(list_cases)

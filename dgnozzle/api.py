@@ -65,7 +65,7 @@ _DISC_KEYS = (
 _OPTS_KEYS = (
     "cfl", "tolerance", "max_iterations", "scheme", "limiter",
     "initial_condition", "p_continuation", "print_interval", "divergence_factor",
-    "multigrid", "mg_pre", "mg_post", "mg_coarse", "mg_levels",
+    "tvb_constant",
 )
 
 
@@ -304,7 +304,6 @@ def solve_nozzle(
     # and cannot be compared against a direct solve.
     total_iterations = 0
     total_time = 0.0
-    total_work = 0
     combined = SolveHistory()
     for order in orders:
         ops = cs.operators_at(order)
@@ -327,7 +326,6 @@ def solve_nozzle(
             combined.residual.append(res)
         total_iterations += result.iterations
         total_time += result.history.wall_time
-        total_work += result.work_equivalent
         if not result.converged and order != target:
             if verbose:
                 print(f"  (stage p={order} stopped: {result.message}; continuing)")
@@ -338,7 +336,6 @@ def solve_nozzle(
         result = replace(
             result,
             iterations=total_iterations,
-            work_equivalent=total_work,
             history=combined,
             discretization=disc,
         )

@@ -196,9 +196,35 @@ class SolverOptions:
         strong-stability-preserving, better behaved with limiters).
     limiter
         ``'none'``, ``'positivity'`` (Zhang-Shu scaling, cheap and enough to
-        keep the march alive) or ``'barth-jespersen'`` (also damps shock
-        oscillations).  Ignored at ``p = 0``, which cannot oscillate within an
-        element.
+        keep the march alive) or ``'superbee'`` (Roe's TVD slope limiter with
+        the Cockburn-Shu TVB threshold, which also damps shock oscillations).
+        Ignored at ``p = 0``, which cannot oscillate within an element.
+    tvb_constant
+        The ``M`` of the Cockburn-Shu TVB threshold, used by ``'superbee'``: a
+        face whose increment is below ``M (A_e/A_Omega) max|u_s|`` is left
+        unlimited, which stops a TVD limiter toggling on and off at smooth
+        extrema.  Only read when ``limiter='superbee'``.
+
+        The default of ``50`` is measured, not guessed, and it is the *minimum*
+        that works.  At a shock-free point the slope limiter has to be idle on
+        the converged field or the residual cannot reach the tolerance: at
+        ``M = 0`` (the pure TVD limiter) 77 of 140 elements of an already
+        converged field are still being clipped and the residual parks at
+        ``3.1`` instead of ``10^-6``.  Scanned over the design, over-expanded
+        and under-expanded points at ``(p, refine)`` of ``(1,0)``, ``(1,1)``
+        and ``(2,0)``, ``M = 10`` fails all nine, ``M = 20`` fails the three at
+        ``refine = 1``, and ``M = 50`` converges all nine.
+
+        Be aware of what that buys and what it costs.  At ``M = 50`` the slope
+        limiter is nearly inactive even *at a shock*: 200 steps into a shocked
+        run it touches 0 of 140 elements at ``p_b/p_t = 0.50`` and 2 of 140 at
+        ``0.70``, where ``M = 0`` touches 72 and 92.  The window in which this
+        limiter both leaves a smooth steady solution alone and still bites on a
+        shock is, for this problem, empty.  That is a property of asking a TVD
+        limiter to coexist with a steady pseudo-time march, not of Superbee:
+        lower ``M`` and the limiter chatters and the residual parks; raise it and
+        the limiter stops acting.  Shocked points do not converge at ``p >= 1``
+        for this reason among others -- see the README.
     initial_condition
         ``'quasi1d'`` projects the quasi-one-dimensional solution for this
         geometry and back pressure.  Measured against a uniform start on the
@@ -219,23 +245,6 @@ class SolverOptions:
 
         Turn it on as a *fallback*: it converges cases a direct high-order solve
         cannot start, such as ``p = 2`` from a uniform initial condition.
-    multigrid
-        ``'none'``, ``'p'`` or ``'h'``.  Accelerates the march with an FAS
-        multigrid cycle instead of plain stepping; see
-        :mod:`dgnozzle.multigrid`.  ``'p'`` coarsens the polynomial order on the
-        same mesh and needs ``order >= 1``; ``'h'`` coarsens the mesh one
-        refinement level at a time and needs ``refine >= 1``.  Either silently
-        falls back to plain stepping when no coarse level exists.
-
-        A multigrid run reports ``iterations`` as **V-cycles**, which are not
-        comparable with single-grid steps; ``work_equivalent`` on the result is
-        the comparable number.
-    mg_pre, mg_post
-        Smoothing steps before and after the coarse-level visit, per level.
-    mg_coarse
-        Smoothing steps on the coarsest level, where they are cheapest.
-    mg_levels
-        Cap on the number of levels; ``0`` uses every level available.
     check_interval
         Iterations between convergence tests.  Also the chunk size handed to the
         backend, so it is what the JAX backend fuses into one compiled loop.
@@ -252,15 +261,11 @@ class SolverOptions:
     """
 
     cfl: float | None = None
-    multigrid: str = "none"
-    mg_pre: int = 2
-    mg_post: int = 2
-    mg_coarse: int = 8
-    mg_levels: int = 0
     tolerance: float = 1e-6
     max_iterations: int = 200_000
     scheme: str = "rk4"
     limiter: str = "positivity"
+    tvb_constant: float = 50.0
     initial_condition: str = "quasi1d"
     p_continuation: bool = False
     check_interval: int = 50
@@ -284,18 +289,12 @@ class SolverOptions:
             raise ValueError(f"stall_ratio must lie in (0, 1), got {self.stall_ratio}")
         if self.scheme not in ("rk4", "ssprk3"):
             raise ValueError(f"scheme must be 'rk4' or 'ssprk3', got {self.scheme!r}")
-        if self.limiter not in ("none", "positivity", "barth-jespersen"):
+        if self.tvb_constant < 0.0:
+            raise ValueError(f"tvb_constant must be non-negative, got {self.tvb_constant}")
+        if self.limiter not in ("none", "positivity", "superbee"):
             raise ValueError(
-                f"limiter must be 'none', 'positivity' or 'barth-jespersen', got {self.limiter!r}"
+                f"limiter must be 'none', 'positivity' or 'superbee', got {self.limiter!r}"
             )
-        if self.multigrid not in ("none", "p", "h"):
-            raise ValueError(
-                f"multigrid must be 'none', 'p' or 'h', got {self.multigrid!r}"
-            )
-        if min(self.mg_pre, self.mg_post, self.mg_coarse) < 1:
-            raise ValueError("mg_pre, mg_post and mg_coarse must each be at least 1")
-        if self.mg_levels < 0:
-            raise ValueError("mg_levels must be non-negative")
         if self.initial_condition not in ("quasi1d", "uniform"):
             raise ValueError(
                 f"initial_condition must be 'quasi1d' or 'uniform', got {self.initial_condition!r}"

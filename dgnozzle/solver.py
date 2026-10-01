@@ -81,18 +81,6 @@ class SolveResult:
     the solution is being held physical by the limiter rather than resolved."""
     mean_repairs: int = 0
     """Times a cell average had to be floored. Non-zero means cfl was too large."""
-    multigrid: str = "none"
-    """Which hierarchy accelerated the march, if any."""
-    work_equivalent: int = 0
-    r"""Fine-level-equivalent smoothing steps.
-
-    With multigrid, :attr:`iterations` counts V-cycles, which say nothing about
-    cost -- a cycle does ``mg_pre + mg_post`` fine steps plus the coarse levels'
-    work.  This is that total, each level weighted by its size relative to the
-    finest, so it is directly comparable with a single-grid run's iteration
-    count.  Zero when multigrid is off, where :attr:`iterations` already is the
-    work.
-    """
 
     @property
     def residual_relative(self) -> float:
@@ -108,9 +96,8 @@ class SolveResult:
 
     def summary(self) -> str:
         state = "converged" if self.converged else "NOT CONVERGED"
-        unit = "V-cycles" if self.multigrid != "none" else "iterations"
         base = (
-            f"{state} in {self.iterations} {unit} "
+            f"{state} in {self.iterations} iterations "
             f"({self.history.wall_time:.2f} s, {self.backend}): "
             f"residual {self.residual_scaled:.3e} scaled "
             f"({self.residual_relative:.2e} of initial); "
@@ -120,11 +107,6 @@ class SolveResult:
             base += f"; limiter active on ~{self.limiter_activity:.2f} elem/call"
         if self.mean_repairs:
             base += f"; {self.mean_repairs} cell-average repairs (cfl too large)"
-        if self.multigrid != "none":
-            base += (
-                f"\n  {self.multigrid}-multigrid: {self.work_equivalent} "
-                "fine-level-equivalent steps"
-            )
         return base
 
 
@@ -184,7 +166,7 @@ def march(
         if not np.isfinite(res):
             message = (
                 f"residual became non-finite after {done} iterations; reduce cfl "
-                "(try 0.5) or enable limiter='barth-jespersen'"
+                "(try 0.5) or enable limiter='superbee'"
             )
             break
         if res <= opts.tolerance * scale:
@@ -256,33 +238,7 @@ def solve_steady(
     say).  Most callers want :func:`dgnozzle.api.solve_nozzle` instead.
     """
     opts = opts or SolverOptions()
-
-    # A multigrid hierarchy stands in for the backend during the march: it
-    # exposes the same `run(U, n, scheme)` and reports the same residual, so
-    # nothing below here -- convergence test, stall detector, diagnostics --
-    # needs to know which one it has.  The finest level's backend is the one
-    # everything else uses, so it is taken from the hierarchy rather than built
-    # twice (each one owns a preallocated working set).
-    mg_kind = opts.multigrid
-    stepper = None
-    if mg_kind != "none":
-        from . import multigrid as mgrid
-
-        levels = mgrid.build_hierarchy(
-            mg_kind, ops, flow, geom, disc, opts,
-            backend=backend, max_levels=opts.mg_levels,
-        )
-        if len(levels) < 2:
-            # order 0 for 'p', refine 0 for 'h': nothing to coarsen onto
-            mg_kind = "none"
-        else:
-            bk = levels[0].backend
-            stepper = mgrid.CycleStepper(
-                levels, pre=opts.mg_pre, post=opts.mg_post, coarse=opts.mg_coarse
-            )
-    if stepper is None:
-        bk = get_backend(backend, ops, flow, opts)
-        stepper = bk
+    bk = get_backend(backend, ops, flow, opts)
 
     if U0 is None:
         U = ini.initial_state(ops, flow, geom, opts.initial_condition, xp=np)
@@ -297,13 +253,7 @@ def solve_steady(
     U = bk.asarray(U)
 
     scale = asm.residual_scale(flow, geom.length)
-    if mg_kind != "none":
-        # one "iteration" is one V-cycle, so the convergence test has to run far
-        # more often than the 50-step chunk a plain march uses
-        # print_interval=0 means silent and must stay silent
-        every = max(opts.print_interval // 50, 1) if opts.print_interval else 0
-        opts = opts.replace(check_interval=1, print_interval=every)
-    U, hist, conv, iters, res, res0, msg = march(U, stepper, opts, scale, progress=progress)
+    U, hist, conv, iters, res, res0, msg = march(U, bk, opts, scale, progress=progress)
 
     U_np = np.asarray(bk.to_numpy(U))
     diag = lim.diagnose(U_np, ops, flow)
@@ -331,8 +281,6 @@ def solve_steady(
         message=msg,
         min_density=diag.min_density,
         min_pressure=diag.min_pressure,
-        limiter_activity=stepper.limiter_activity(),
-        mean_repairs=int(stepper.n_mean_repaired),
-        multigrid=mg_kind,
-        work_equivalent=int(getattr(stepper, "work", 0)),
+        limiter_activity=bk.limiter_activity(),
+        mean_repairs=int(bk.n_mean_repaired),
     )

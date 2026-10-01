@@ -149,9 +149,8 @@ class Operators:
     """The geometry nodes these operators were built from.
 
     Kept so that a second operator set can be built on the *same* mesh at a
-    different polynomial order -- which is what ``p``-continuation and
-    ``p``-multigrid both need -- without the caller having to carry the
-    coordinates alongside.
+    different polynomial order -- which is what ``p``-continuation needs --
+    without the caller having to carry the coordinates alongside.
     """
 
     # volume
