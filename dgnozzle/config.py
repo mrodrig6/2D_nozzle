@@ -24,12 +24,6 @@ from typing import Any
 
 BACKENDS = ("numba", "numpy", "jax")
 
-#: Default ``cfl``, as a fraction of the measured stability limit for the order
-#: and scheme in use (see :data:`dgnozzle.assembly.STABILITY_LIMIT`).  The scan
-#: behind those limits covers two contours at one back pressure, which is not a
-#: stability proof, so the default keeps a 30% margin on it.
-DEFAULT_CFL = 0.7
-
 
 @dataclass(frozen=True)
 class FlowConditions:
@@ -173,19 +167,21 @@ class SolverOptions:
     Parameters
     ----------
     cfl
-        Step size as a **fraction of the stability limit** for the polynomial
-        order and scheme in use, so ``cfl = 1`` sits at the measured edge of
-        stability and the default keeps a 30% margin there whatever ``p`` is.
-        The limits are in :data:`dgnozzle.assembly.STABILITY_LIMIT`, measured by
-        bisection rather than taken from a textbook bound.
+        Courant number in its usual sense: a multiplier on the order-dependent
+        stable step,
 
-        This is a change of units from the step
-        ``dt = cfl * 2 A_e / ((2p + 1) * sum_f s_f l_f)`` used previously, under
-        which the same ``cfl`` meant 62% of the stable step at ``p = 0`` but only
-        38% at ``p = 1`` -- so a value tuned at one order was meaningless at
-        another, and the default left most of a factor of two unused above
-        ``p = 0``.  A script passing an explicit ``cfl`` above 1 is now past the
-        limit instead of comfortably inside it.
+        ``dt_e = cfl / (2p + 1) * 2 A_e / sum_f s_f l_f``
+
+        with ``1/(2p+1)`` the standard restriction for explicit DG.
+
+        ``None``, the default, means
+        :func:`dgnozzle.assembly.recommended_cfl` -- 70% of the largest ``cfl``
+        measured to converge at this order and scheme, so the *margin* is 30%
+        whatever ``p`` is.  That matters because the textbook restriction is
+        over-conservative above ``p = 0``: a fixed ``cfl = 1`` sits at 62% of the
+        stable step at ``p = 0`` but only 38% at ``p = 1``, which left most of a
+        factor of two unused.  :data:`dgnozzle.assembly.STABILITY_LIMIT` has the
+        measured limits.
     tolerance
         Convergence threshold on the residual norm, measured against the
         problem's own physical scale ``rho_t a_t / L`` rather than against the
@@ -255,7 +251,7 @@ class SolverOptions:
         without this the run would spend its whole budget on a limit cycle.
     """
 
-    cfl: float = DEFAULT_CFL
+    cfl: float | None = None
     multigrid: str = "none"
     mg_pre: int = 2
     mg_post: int = 2
@@ -274,7 +270,7 @@ class SolverOptions:
     stall_ratio: float = 0.98
 
     def __post_init__(self) -> None:
-        if self.cfl <= 0.0:
+        if self.cfl is not None and self.cfl <= 0.0:
             raise ValueError(f"cfl must be positive, got {self.cfl}")
         if self.tolerance <= 0.0:
             raise ValueError(f"tolerance must be positive, got {self.tolerance}")

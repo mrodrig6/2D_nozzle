@@ -53,7 +53,7 @@ jobs:
 
       - name: Lint
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        run: ruff check src tests examples docs
+        run: ruff check dgnozzle tests examples docs
 
   docs:
     runs-on: ubuntu-latest

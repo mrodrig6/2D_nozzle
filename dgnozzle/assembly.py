@@ -144,25 +144,27 @@ def residual(U, ops: Operators, flow: FlowConditions, xp=np) -> ResidualResult:
     return ResidualResult(R, wave_speed_sum(speed, ops, xp=xp))
 
 
-#: Largest ``cfl`` -- in the units of this module, so already the coefficient
-#: multiplying ``2 A_e / sum_f s_f l_f`` -- at which the march still converged,
-#: by polynomial order.  Measured by bisection to about 3%, over the ``bell``
-#: and ``smooth`` contours at refinement levels 0 and 1; the two contours agreed
-#: to within a bisection step at every order, and the tighter refinement level is
-#: the one recorded.  ``tests/test_solver.py`` re-checks that a step at
-#: ``cfl = 1`` stays finite, so a change that eats the margin fails the suite.
+#: Largest ``cfl`` -- in the traditional sense below, so a multiplier on
+#: :math:`1/(2p+1)` -- at which the march still converged, by polynomial order.
+#: Measured by bisection to about 3%, over the ``bell`` and ``smooth`` contours
+#: at refinement levels 0 and 1; the two contours agreed to within a bisection
+#: step at every order, and the tighter refinement level is the one recorded.
 #:
-#: These are *limits*, not recommendations: the shipped default keeps a 30%
-#: margin on them, see :data:`dgnozzle.config.DEFAULT_CFL`.
+#: These are *limits*.  They are what makes the textbook ``1/(2p+1)``
+#: restriction visibly over-conservative above ``p = 0``: ``cfl = 1`` sits at 62%
+#: of the stable step at ``p = 0`` but only 38% at ``p = 1`` and 40% at
+#: ``p = 2``, so the same ``cfl`` means a different safety margin at every order.
+#: :data:`RECOMMENDED_CFL` is what the solver actually defaults to.
 STABILITY_LIMIT: dict[str, tuple[float, ...]] = {
-    "rk4": (1.625, 0.875, 0.500),
-    "ssprk3": (1.437, 0.779, 0.448),
+    "rk4": (1.625, 2.625, 2.500),
+    "ssprk3": (1.437, 2.337, 2.240),
 }
 
-#: Beyond the measured orders, fall back to ``K / (p + 1)``.  That scaling fits
-#: the measurements better than the textbook ``1/(2p+1)``: the stable coefficient
-#: falls as 1 : 0.54 : 0.31 across ``p = 0, 1, 2``, against 1 : 0.5 : 0.33 for
-#: ``1/(p+1)`` and 1 : 0.33 : 0.2 for ``1/(2p+1)``.  ``K`` is the smallest the
+#: Beyond the measured orders, fall back to ``K (2p+1)/(p+1)``.  In terms of the
+#: *step* rather than the ``cfl`` number, the stable coefficient falls as
+#: 1 : 0.54 : 0.31 across ``p = 0, 1, 2``, which ``1/(p+1)`` (1 : 0.5 : 0.33)
+#: fits far better than ``1/(2p+1)`` (1 : 0.33 : 0.2) -- so in ``cfl`` units the
+#: limit *grows* with order by ``(2p+1)/(p+1)``.  ``K`` is the smallest the
 #: measurements support, so the fallback is conservative where it is used.
 #:
 #: SSP-RK3 comes out at 0.885, 0.890 and 0.897 times RK4 at the three measured
@@ -171,10 +173,14 @@ STABILITY_LIMIT: dict[str, tuple[float, ...]] = {
 #: columns.
 STABILITY_FALLBACK: dict[str, float] = {"rk4": 1.5, "ssprk3": 1.32}
 
+#: Fraction of the measured stability limit that :func:`recommended_cfl` takes.
+#: A scan over two contours at one back pressure is a measurement, not a
+#: stability proof, so the shipped default keeps 30% in hand.
+CFL_MARGIN = 0.7
 
 
 def stability_limit(order: int, scheme: str = "rk4") -> float:
-    """The measured stable step coefficient for this order and scheme."""
+    """The largest ``cfl`` measured to converge at this order and scheme."""
     try:
         table = STABILITY_LIMIT[scheme]
     except KeyError:
@@ -183,28 +189,41 @@ def stability_limit(order: int, scheme: str = "rk4") -> float:
         ) from None
     if order < len(table):
         return table[order]
-    return STABILITY_FALLBACK[scheme] / (order + 1)
+    return STABILITY_FALLBACK[scheme] * (2 * order + 1) / (order + 1)
 
 
-def step_coefficient(order: int, cfl: float, scheme: str = "rk4") -> float:
+def recommended_cfl(order: int, scheme: str = "rk4") -> float:
+    """The ``cfl`` the solver uses when none is given.
+
+    Order-dependent *because* ``cfl`` keeps its traditional meaning: one number
+    cannot carry the same safety margin at every order, and the margin is the
+    thing worth holding constant.  Under the textbook ``1/(2p+1)`` restriction
+    ``cfl = 1`` sat at 62% of the stable step at ``p = 0`` and 38% at ``p = 1``,
+    which is why the old fixed default left most of a factor of two unused above
+    ``p = 0``.
+    """
+    return CFL_MARGIN * stability_limit(order, scheme)
+
+
+def step_coefficient(order: int, cfl: float | None, scheme: str = "rk4") -> float:
     r"""The scalar in :math:`\Delta t_e = c\,2 A_e / \sum_f s_f l_f`.
 
-    ``cfl`` is a *fraction of the stability limit* for this order and scheme, so
-    ``cfl = 1`` sits at the measured edge of stability and ``cfl = 0.7`` -- the
-    default -- keeps a 30% margin, whatever ``p`` is and whichever scheme runs.
+    ``cfl`` has its traditional meaning -- a multiplier on the order-dependent
+    stable step,
 
-    .. note::
-       This is a change of units.  The step used to be
-       :math:`\mathrm{cfl}/(2p+1) \cdot 2A_e/\sum_f s_f l_f`, which made the same
-       ``cfl`` mean very different fractions of the stable step at different
-       orders: measured, ``cfl = 1`` sat at 62% of the limit at ``p = 0`` but
-       only 38% at ``p = 1`` and 40% at ``p = 2``.  The old default was therefore
-       leaving most of a factor of two on the floor at every order above zero,
-       and a value a user had tuned at one order was meaningless at another.
-       A script that passed an explicit ``cfl`` above 1 will now be past the
-       stability limit rather than comfortably inside it.
+    .. math::
+        \Delta t_e = \frac{\mathrm{cfl}}{2p+1}\,
+                     \frac{2 A_e}{\sum_f s_f \ell_f},
+
+    with :math:`1/(2p+1)` the standard restriction for explicit DG.  ``None``
+    means :func:`recommended_cfl`, which is where the measurements enter: the
+    textbook restriction is over-conservative above ``p = 0``, so the default
+    ``cfl`` rises with order to hold the *margin* constant at 30% instead of
+    letting it swing between 38% and 62%.
     """
-    return cfl * stability_limit(order, scheme)
+    if cfl is None:
+        cfl = recommended_cfl(order, scheme)
+    return cfl / (2 * order + 1)
 
 
 def local_time_step(

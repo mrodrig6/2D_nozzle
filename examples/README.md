@@ -28,8 +28,7 @@ Each is self-contained, prints what it is doing, and writes a PNG into the
 directory you ran it from. They are meant to be copied and edited: changing a
 geometry in one of these is the normal way to start a study.
 
-Running them directly works too, if you have the package installed or `src/` on
-your `PYTHONPATH`:
+Running them directly works too, from the repository root:
 
 ```bash
 python examples/02_sweep.py

@@ -3,8 +3,8 @@
 # dg2d.sh -- one entry point for the 2D DG nozzle code.
 #
 # The point of this script is that nothing has to be set up first.  It finds a
-# Python, puts `src/` on the import path if the package is not installed, and
-# runs what you asked for from wherever you happen to be:
+# Python, puts the repository on the import path if the package is not installed,
+# and runs what you asked for from wherever you happen to be:
 #
 #     ./dg2d.sh run sweep
 #     ./dg2d.sh solve area_ratio=3.0 back_pressure_ratio=0.12 order=1
@@ -40,13 +40,15 @@ find_python() {
 
 die() { printf '%s: %s\n' "$SELF" "$*" >&2; exit 2; }
 
-# An installed package wins; otherwise src/ goes on the path, so the code runs
-# straight out of a clone with no install step and no need to cd anywhere.
-# This is deliberately not an error: `install` is a convenience, not a
-# prerequisite.
+# An installed package wins; otherwise the repository root goes on the path, so
+# the code runs straight out of a clone with no install step and from any working
+# directory.  This is deliberately not an error: `install` is a convenience, not
+# a prerequisite.  The package sits at the root, so `python -m dgnozzle` already
+# works when you are standing in the clone -- this is what makes it work when
+# you are not.
 setup_import_path() {
     if ! "$PY" -c 'import dgnozzle' >/dev/null 2>&1; then
-        export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+        export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
     fi
     if ! "$PY" -c 'import dgnozzle' >/dev/null 2>&1; then
         printf '%s: cannot import dgnozzle.  ' "$SELF" >&2
@@ -192,8 +194,8 @@ $(list_cases)
 Environment
   DG2D_PYTHON        the interpreter to use (default: python3, then python)
 
-No install is required: if dgnozzle is not importable, src/ is put on
-PYTHONPATH automatically.  Documentation is in docs/ -- start with
+No install is required: if dgnozzle is not importable, the repository root is
+put on PYTHONPATH automatically.  Documentation is in docs/ -- start with
 docs/theory.md for the formulation and docs/lab_guide.md for the exercises.
 EOF
 }

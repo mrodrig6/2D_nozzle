@@ -54,7 +54,7 @@ cd dg
 
 ```
 python   3.12.3  (/usr/bin/python3)
-dgnozzle 1.0.0  (/home/you/dg/src/dgnozzle)
+dgnozzle 1.0.0  (/home/you/dg/dgnozzle)
 backends numba, numpy, jax
   yes  numba        the fast solver
   yes  jax          gradients and sensitivity
@@ -62,9 +62,11 @@ backends numba, numpy, jax
   yes  scipy        optimisation
 ```
 
-**There is no install step and nothing to compile.** `dg2d.sh` finds your
-Python, puts `src/` on the import path if the package is not installed, and
-works from any directory. It uses whatever environment you have loaded — set
+**There is no install step and nothing to compile.** The package sits at the
+repository root, so `python -m dgnozzle ...` works as soon as you are standing in
+the clone. `dg2d.sh` adds that it works from *any* directory, puts the repository
+on the import path when the package is not installed, and gives you shorter
+arguments. It uses whatever environment you have loaded — set
 `DG2D_PYTHON=python3.12` to pin a different one.
 
 If `check` reports a `NO`, that optional piece is missing. Add them all with:
@@ -184,8 +186,13 @@ enough while iterating.
 Everything goes through one function. Give it the design you want; leave the
 rest alone.
 
+**Save this as `mydesign.py`**, anywhere you like:
+
 ```python
-from dgnozzle import solve_nozzle, performance
+#!/usr/bin/env python3
+"""My first nozzle: one design point, solved and reported."""
+
+from dgnozzle import performance, solve_nozzle
 
 result = solve_nozzle(
     contour="smooth",           # wall family
@@ -194,31 +201,68 @@ result = solve_nozzle(
     back_pressure_ratio=0.15,   # p_back / p_total — sets the operating point
     order=1,                    # polynomial order p
     refine=0,                   # mesh refinement level
+    verbose=False,              # let this script do the talking
 )
 
+assert result.converged, result.message
 print(result.summary())
+print()
 print(performance(result).summary())
 ```
 
+**Then run it:**
+
+```bash
+./dg2d.sh run mydesign.py
 ```
-converged in 951 iterations (0.18 s, numba): residual 6.408e-07 scaled
+
+`run` takes a path as happily as it takes a case name, and it puts the package
+on the import path for you — so this works from any directory and with nothing
+installed. If you would rather invoke Python yourself, that works too, from the
+repository root or after `./dg2d.sh install`:
+
+```bash
+python mydesign.py
+```
+
+**And you should see:**
+
+```
+converged in 951 iterations (0.16 s, numba): residual 6.408e-07 scaled
   (1.25e-06 of initial); min rho 3.0174e-01, min p 5.1730e-02
 
-thrust        0.045825  (c_F = 0.163785, 90.09% of ideal)
+thrust        0.045825  (c_F = 0.163784, 90.09% of ideal)
   wall form   0.045344  (imbalance 1.05e-02)
 mass flow     in 0.301380, out 0.301775  (imbalance 1.31e-03)
 exit          M = 2.4490, p/p_t = 0.06661
 entropy error 3.7307e-03
 ```
 
-Always check `result.converged` before trusting the numbers. When it is
-`False`, `result.message` says what went wrong and what to do about it.
+Read it as: the march reached a steady state in 951 iterations; thrust is
+0.0458 and the nozzle is at 90% of its ideal, the two independent thrust
+integrals disagree by 1% (that gap is your discretisation error, and it falls
+when you raise `refine`); mass in and out agree to 0.1%; the exit is at Mach
+2.45.
+
+**The `assert` is not decoration.** A solver that has not converged still hands
+you numbers, and they will be wrong. `result.message` then says what went wrong
+and what to do about it — so make that assertion the first line of every script
+you write.
 
 > **On convergence.** The residual is measured against the problem's own
 > physical scale `ρ_t a_t / L`, not against the first iteration's residual. A
 > relative criterion would demand a tighter absolute residual the better your
 > initial guess is — making a good starting field look *slower* than a bad one,
 > and making two runs started differently incomparable.
+
+### Next: change something
+
+The point of the file is that you now edit it. Raise `area_ratio` to 3.5 and
+rerun; the exit Mach number climbs and the thrust coefficient does not, because
+past the matched condition the nozzle over-expands. That trade is Exercise 1 of
+[the lab guide](docs/lab_guide.md), and [the three
+workflows](#what-students-do-with-it) below are the same file grown into a
+sweep, a gradient and an optimisation.
 
 ### Plotting
 
@@ -464,7 +508,7 @@ convergence study and a back-pressure sweep. `./dg2d.sh list` names them.
 | `geometry_order` (`Q`) | `1` straight-sided, `2` curved. `Q=2` represents the curved wall ~125× more accurately at the same element count. |
 | `refine` | uniform refinement; each level multiplies elements by 4. |
 | `element` | `'tri'` (default) or `'quad'`. |
-| `cfl` | step size as a fraction of the measured stability limit; `0.7` by default, see [the time step](#the-time-step). |
+| `cfl` | Courant number, `cfl/(2p+1)` times the geometric step. The default is order-dependent — see [the time step](#the-time-step). |
 
 Solve times on 4 cores of a 2.1 GHz Xeon, default `bell` contour, converged to
 `1e-6` on the scaled residual, with the Numba kernels already compiled:
@@ -538,11 +582,11 @@ smallest size to 32 M at the largest.
 
 ### What made it faster
 
-Three changes, measured in two groups. Running at the `cfl` that reproduces the
-*old* time step exactly separates the groups: the iteration count then matches
-the old table to the digit, so whatever wall time has moved is the kernel work
-and the rest is the time step. The two kernel changes landed together and are
-not separated from each other here.
+Three changes, measured in two groups. Running at `cfl=1.0` — the old default,
+and still the same time step under the same definition — separates the groups:
+the iteration count then matches the old table to the digit, so whatever wall
+time has moved is the kernel work and the rest is the larger default step. The
+two kernel changes landed together and are not separated from each other here.
 
 | `p` | `refine` | before | kernels only | time step as well |
 |---|---|---|---|---|
@@ -576,35 +620,54 @@ turned out not to be:
 
 ### The time step
 
-`cfl` is now a **fraction of the measured stability limit** for the order and
-scheme in use, so it means the same thing everywhere and the default carries a
-known margin. The limits come from a bisection scan of the largest `cfl` that
-still converges, over the `bell` and `smooth` contours at refinement levels 0
-and 1 — the two contours agreed to within a bisection step at every order:
+`cfl` means what it always means — a multiplier on the order-dependent stable
+step:
 
-| `p` | RK4 | SSP-RK3 | old `1/(2p+1)` | old default as a fraction of the limit |
-|---|---|---|---|---|
-| 0 | 1.625 | 1.437 | 1.000 | 62% |
-| 1 | 0.875 | 0.779 | 0.333 | 38% |
-| 2 | 0.500 | 0.448 | 0.200 | 40% |
-
-That is the defect the calibration fixes: the textbook `1/(2p+1)` restriction is
-roughly right at `p=0` and leaves 60% of the stable step unused above it, so a
-`cfl` someone had tuned at one order meant something else at another. The decay
-with order is close to `1/(p+1)` (measured `1 : 0.54 : 0.31`, against `1 : 0.5 :
-0.33`), which is the fallback beyond `p=2`. SSP-RK3 comes out at a near-constant
-0.89 × RK4, which is a useful check on both columns.
-
-**The default is `cfl=0.7`** — a 30% margin, because a scan over two contours at
-one back pressure is a measurement, not a stability proof. If you want the rest,
-`cfl=0.9` converged everywhere tested; the solver says plainly when it does not:
-
-```bash
-./dg2d.sh sweep area_ratio 2.0 4.0 9 p=1 cfl=0.9
+```
+dt_e = cfl / (2p + 1) * 2 A_e / sum_f s_f l_f
 ```
 
-> **This is a change of units.** A script that passed an explicit `cfl` above 1
-> is now past the stability limit rather than comfortably inside it.
+with `1/(2p+1)` the standard restriction for explicit DG. What changed is the
+*default*, because that restriction is a bound and measurement says it is much
+tighter than it needs to be above `p=0`. Bisecting the largest `cfl` at which
+the march still converges, over the `bell` and `smooth` contours at refinement
+levels 0 and 1 (the two agreeing to within a bisection step at every order):
+
+| `p` | RK4 | SSP-RK3 | `cfl=1` as a fraction of the RK4 limit |
+|---|---|---|---|
+| 0 | 1.625 | 1.437 | 62% |
+| 1 | 2.625 | 2.337 | 38% |
+| 2 | 2.500 | 2.240 | 40% |
+
+So one fixed `cfl` carries a different safety margin at every order, and the old
+default of `1.0` left most of a factor of two unused above `p=0`. **The default
+is now order-dependent** — 70% of the measured limit, so the *margin* is a
+constant 30% while the definition stays conventional:
+
+| `p` | default `cfl`, RK4 | default `cfl`, SSP-RK3 |
+|---|---|---|
+| 0 | 1.14 | 1.01 |
+| 1 | 1.84 | 1.64 |
+| 2 | 1.75 | 1.57 |
+
+Pass `cfl` explicitly and it means exactly what the formula says — nothing
+rescales it:
+
+```bash
+./dg2d.sh solve p=1 cfl=2.2          # 84% of the measured limit, your call
+./dg2d.sh solve p=1 cfl=1.0          # the old default, if you want to compare
+```
+
+Read as a coefficient on the geometric step rather than as a `cfl` number, the
+stable value falls as `1 : 0.54 : 0.31` across `p = 0, 1, 2`, which `1/(p+1)`
+fits (`1 : 0.5 : 0.33`) and `1/(2p+1)` does not (`1 : 0.33 : 0.2`). That is the
+scaling used beyond the measured orders.
+
+> **A measurement, not a proof.** Two contours at one back pressure is a scan,
+> not a stability analysis, which is why the default keeps 30% in hand rather
+> than sitting on the limit. The test suite marches 400 steps at each tabulated
+> limit, so a change that moves the real limit fails the build instead of
+> quietly invalidating the table.
 
 ### Multigrid, and why it is off
 
@@ -631,8 +694,10 @@ with `mg_pre=2` **fails to converge** — the coarse correction pushes cell
 averages non-physical and the limiter starts repairing them — and the three
 settings that failed were also the three fastest, which is exactly the trap a
 wall-time table invites. The solver reports them as `converged=False`, and only
-`mg_pre=3` gets there, 1.7× slower than plain stepping. Below `cfl≈0.55` the
-cycle stops converging at every order tested.
+`mg_pre=3` gets there, 1.7× slower than plain stepping. Below roughly 80% of the
+default `cfl` the cycle stops converging at every order tested — too small a
+step leaves the smoother unable to take out the error the coarse correction
+injects.
 
 And compared at each method's *own* best `cfl`, plain stepping wins outright: at
 `p=1, refine=1` it reaches 0.39 s where the best cycle manages 0.45 s.
@@ -803,7 +868,7 @@ defect, and the reason to use `smooth` for convergence work.
 
 | Symptom | What it means |
 |---|---|
-| `No module named dgnozzle` | You ran `python -m dgnozzle` directly. The package lives under `src/`, so it is not importable from a clone — use `./dg2d.sh`, which puts it on the path for you, or `./dg2d.sh install`. |
+| `No module named dgnozzle` | You ran `python -m dgnozzle` from somewhere other than the clone. Either `cd` into it, use `./dg2d.sh`, which works from anywhere, or `./dg2d.sh install`. |
 | `dg2d.sh: Permission denied` | `chmod +x dg2d.sh`, or run it as `bash dg2d.sh ...`. |
 | `dg2d.sh: no python3 on PATH` | Load your Python environment first, or set `DG2D_PYTHON` to the interpreter you want. |
 | *"the residual has stalled … That is a limit cycle"* | The mesh cannot resolve a shock or strong expansion. **`refine=+1`** usually fixes it. |

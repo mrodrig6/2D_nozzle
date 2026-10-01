@@ -47,9 +47,10 @@ each method's *own* best ``cfl``, plain stepping wins outright.  The README
 carries the full table.
 
 It also has a stability floor.  ``mg_pre = mg_post = 1`` diverges outright, and
-below ``cfl`` of roughly 0.55 the cycle stops converging at every order tested --
-too little smoothing leaves the coarse correction injecting error the smoother
-cannot take back out.  At ``p = 2, refine = 1`` even ``mg_pre = 2`` fails,
+below roughly 80% of the default ``cfl`` the cycle stops converging at every
+order tested -- too little smoothing, or too small a step, leaves the coarse
+correction injecting error the smoother cannot take back out.  At
+``p = 2, refine = 1`` even ``mg_pre = 2`` fails,
 repairing cell averages as the correction pushes them non-physical, and the
 settings that failed were the *fastest* ones: a wall-time table that does not
 also check :attr:`~dgnozzle.solver.SolveResult.converged` will recommend them.

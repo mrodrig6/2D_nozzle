@@ -46,7 +46,11 @@ def _disc_args(p: argparse.ArgumentParser) -> None:
 def _solver_args(p: argparse.ArgumentParser) -> None:
     g = p.add_argument_group("solver")
     g.add_argument("--backend", default="numba", choices=("numba", "numpy", "jax"))
-    g.add_argument("--cfl", type=float, default=1.0)
+    g.add_argument(
+        "--cfl", type=float, default=None,
+        help="Courant number: cfl/(2p+1) times the geometric step. The default "
+             "is 70%% of the largest value measured to converge at this order",
+    )
     g.add_argument("--tolerance", type=float, default=1e-6)
     g.add_argument("--max-iterations", type=int, default=200_000)
     g.add_argument("--scheme", default="rk4", choices=("rk4", "ssprk3"))

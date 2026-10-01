@@ -43,13 +43,13 @@ converging–diverging nozzle. *Planar* means the channel is two-dimensional and
 of unit depth, not axisymmetric. One consequence matters throughout: the
 one-dimensional *area* is the channel height, so
 
-$$
+```math
 A(x) = 2\,y_{\mathrm{wall}}(x),
 \qquad
 \frac{A_{\mathrm{exit}}}{A_{\mathrm{throat}}}
 = \frac{y_{\mathrm{wall}}(L)}{y_{\mathrm{throat}}}
 \equiv \mathrm{AR}.
-$$
+```
 
 Isentropic tables may be used directly, because the area–Mach relation depends
 on $A/A^{*}$ and not on the cross-section's shape.
@@ -65,26 +65,33 @@ $\mathbf{U}$, $\mathbf{F}$, $\mathbf{n}$; Greek symbols take bold italic,
 $\boldsymbol{\psi}$, because `\mathbf` has no effect on a Greek glyph. Velocity
 is the vector $\mathbf{v}$, and its components are the scalars $v_x$ and $v_y$:
 
-$$
+```math
 \mathbf{v} = (v_x,\ v_y)^{T},
 \qquad
 v_n = \mathbf{v}\cdot\mathbf{n} = v_x n_x + v_y n_y,
 \qquad
 \mathbf{v}_t = \mathbf{v} - v_n \mathbf{n}.
-$$
+```
 
-The code follows the same convention: `vx`, `vy`, `vn`, `vt`.
+The code follows the same convention: `vx`, `vy`, `vn`, `vt`. A subscript $n$ on
+a flux means the same projection, $\mathbf{F}_n = \mathbf{F} n_x + \mathbf{G} n_y$.
+
+Everything bold here is Latin or Greek, deliberately. A bold calligraphic
+letter for the flux pair would read well in print, but
+`\boldsymbol{\mathcal{F}}` renders *unbold* on GitHub: KaTeX accepts it, finds
+no bold calligraphic glyph in its fonts, and silently drops the weight — so the
+projected flux is written out instead.
 
 ### Non-dimensionalisation
 
 The reference state is the inlet reservoir. With $p_t = 1$, $T_t = 1$,
 $R = 0.4$ and $\gamma = 1.4$ the stagnation speed of sound and density are
 
-$$
+```math
 a_t = \sqrt{\gamma R T_t} = 0.74833,
 \qquad
 \rho_t = \frac{\gamma p_t}{a_t^{2}} = 2.5 .
-$$
+```
 
 Every reported quantity is in these units unless stated otherwise.
 
@@ -94,15 +101,15 @@ Every reported quantity is in these units unless stated otherwise.
 
 The two-dimensional Euler equations in conservative form are
 
-$$
+```math
 \frac{\partial \mathbf{U}}{\partial t}
 + \frac{\partial \mathbf{F}}{\partial x}
 + \frac{\partial \mathbf{G}}{\partial y} = \mathbf{0},
-$$
+```
 
 with
 
-$$
+```math
 \mathbf{U} =
 \begin{pmatrix} \rho \\ \rho v_x \\ \rho v_y \\ \rho E \end{pmatrix},
 \qquad
@@ -111,38 +118,37 @@ $$
 \qquad
 \mathbf{G} =
 \begin{pmatrix} \rho v_y \\ \rho v_x v_y \\ \rho v_y^{2} + p \\ \rho v_y H \end{pmatrix}.
-$$
+```
 
 The system is closed by the ideal-gas relation and the definition of total
 enthalpy,
 
-$$
+```math
 p = (\gamma - 1)\left(\rho E - \tfrac{1}{2}\rho\,|\mathbf{v}|^{2}\right),
 \qquad
 H = E + \frac{p}{\rho},
 \qquad
 a = \sqrt{\frac{\gamma p}{\rho}} .
-$$
+```
 
 It is convenient to write the flux projected onto a direction
 $\mathbf{n} = (n_x, n_y)$,
 
-$$
-\boldsymbol{\mathcal{F}}\cdot\mathbf{n}
+```math
+\mathbf{F}_n(\mathbf{U})
 \;\equiv\; \mathbf{F} n_x + \mathbf{G} n_y
 =
 \begin{pmatrix}
   \rho v_n \\ \rho v_x v_n + p\,n_x \\ \rho v_y v_n + p\,n_y \\ \rho H v_n
 \end{pmatrix},
-$$
+```
 
 since every boundary and interface term below is of this form. The flux
-Jacobian $\partial(\boldsymbol{\mathcal{F}}\cdot\mathbf{n})/\partial\mathbf{U}$
-has eigenvalues
+Jacobian $\partial\mathbf{F}_n/\partial\mathbf{U}$ has eigenvalues
 
-$$
+```math
 \lambda = \{\,v_n + a,\; v_n - a,\; v_n,\; v_n\,\},
-$$
+```
 
 whose signs determine how many conditions may be imposed at a boundary
 ([Boundary conditions](#boundary-conditions)).
@@ -161,10 +167,10 @@ contour at $\mathrm{AR} = 2.5019$, $x_{\mathrm{th}} = 0.1388$.*
 
 The wall half-height $y_{\mathrm{wall}}(x; \mathbf{a})$ is controlled by
 
-$$
+```math
 \mathbf{a} = \bigl(\mathrm{AR},\; x_{\mathrm{th}},\; y_{\mathrm{th}},\;
               y_{\mathrm{in}},\; L,\; \theta_i,\; \theta_e,\; w_1,\; w_2\bigr),
-$$
+```
 
 every one of which is differentiable ([Design sensitivities](#design-sensitivities)).
 
@@ -184,14 +190,14 @@ every one of which is differentiable ([Design sensitivities](#design-sensitiviti
 For $x \le x_{\mathrm{th}} L$, with $s = x/(x_{\mathrm{th}} L) \in [0,1]$, the
 wall is a cubic Hermite with zero slope at both ends,
 
-$$
+```math
 y_{\mathrm{wall}}(s) = h_{00}(s)\, y_{\mathrm{in}} + h_{01}(s)\, y_{\mathrm{th}},
 \qquad
 \begin{aligned}
   h_{00}(s) &= 2s^{3} - 3s^{2} + 1, \\
   h_{01}(s) &= -2s^{3} + 3s^{2}.
 \end{aligned}
-$$
+```
 
 Because $y'(x_{\mathrm{th}}^{-}) = 0$, the point $x_{\mathrm{th}}$ really is a
 stationary point of the wall, so "throat" and "$x_{\mathrm{th}}$" agree.
@@ -204,15 +210,15 @@ $y_{\mathrm{ex}} = \mathrm{AR}\,y_{\mathrm{th}}$, five families are available.
 
 **`'conical'` — straight wall.**
 
-$$
+```math
 y_{\mathrm{wall}} = y_{\mathrm{th}} + (y_{\mathrm{ex}} - y_{\mathrm{th}})\, s .
-$$
+```
 
 **`'bell'` and `'moc'` — prescribed wall angles.** A cubic Hermite with slopes
 $\tan\theta_i$ and $\tan\theta_e$ (converted to the $s$ variable through
 $\mathrm{d}x/\mathrm{d}s$):
 
-$$
+```math
 y_{\mathrm{wall}} = h_{00} y_{\mathrm{th}} + h_{10} m_i
                   + h_{01} y_{\mathrm{ex}} + h_{11} m_e ,
 \qquad
@@ -220,7 +226,7 @@ y_{\mathrm{wall}} = h_{00} y_{\mathrm{th}} + h_{10} m_i
   h_{10}(s) &= s^{3} - 2s^{2} + s, \\
   h_{11}(s) &= s^{3} - s^{2},
 \end{aligned}
-$$
+```
 
 with $m_i = \tan\theta_i \cdot \mathrm{d}x/\mathrm{d}s$ and similarly for
 $m_e$. `'moc'` fixes $\theta_i = 30^{\circ}$, $\theta_e = 0$, the classical Rao
@@ -240,10 +246,10 @@ wall slope is continuous across the throat and the exact solution is smooth.
 **`'bezier'` — two shape weights.** A cubic Bézier in $s$ with interior control
 values $c_k = y_{\mathrm{th}} + w_k (y_{\mathrm{ex}} - y_{\mathrm{th}})$:
 
-$$
+```math
 y_{\mathrm{wall}} = (1-s)^{3} y_{\mathrm{th}} + 3(1-s)^{2} s\, c_1
   + 3(1-s) s^{2} c_2 + s^{3} y_{\mathrm{ex}} .
-$$
+```
 
 $(w_1, w_2) = (\tfrac13, \tfrac23)$ reproduces the conical wall; $w_1 = 0$ gives
 a $C^1$ throat. This is the most convenient family for gradient-based shape
@@ -253,12 +259,12 @@ locally.
 **`'analytic'` — a closed-form verification contour.** A fixed shape, smooth
 everywhere,
 
-$$
+```math
 t(x) = \pi \ln\!\bigl(1 + (e^{2}-1)\,x/L\bigr),
 \qquad
 y_{\mathrm{wall}} = 0.01\left(4 - \cos\tfrac{t}{2}\right)
                     \left(\cos t + 5 - \cos\tfrac{t}{2}\right),
-$$
+```
 
 which runs from $y = 0.15$ at the inlet through a throat of $0.13989434$ at
 $x = 0.138805$ to $y = 0.35$ at the exit, an area ratio of $2.50189$. It
@@ -280,9 +286,9 @@ tractable.*
 A structured $n_x \times n_r$ grid of cells is laid out in logical coordinates
 $(\hat{x}, r) \in [0,1]^2$ and mapped to the nozzle by
 
-$$
+```math
 x = \hat{x} L, \qquad y = r\, y_{\mathrm{wall}}(x; \mathbf{a}).
-$$
+```
 
 Each cell becomes one quadrilateral or two triangles. Refinement level
 $\mathrm{ref}$ subdivides each cell $2^{\mathrm{ref}}$ ways per direction, so
@@ -291,10 +297,10 @@ the element count is $n_x n_r 4^{\mathrm{ref}}$ (doubled for triangles).
 Axial nodes may be clustered toward the throat, where the solution varies
 fastest. The base distribution is generated from a target spacing
 
-$$
+```math
 h(\hat{x}) = 1 + (\sigma - 1)
   \left(1 - e^{-\left((\hat{x} - x_{\mathrm{th}})/w\right)^{2}}\right),
-$$
+```
 
 integrated and inverted, with $\sigma$ the far-field-to-throat spacing ratio.
 Refinement then subdivides that base distribution linearly, so the node set at
@@ -308,7 +314,7 @@ one refinement level is a subset of the next.
 
 The solution is expanded in a nodal Lagrange basis of order $p$ on each element,
 
-$$
+```math
 \mathbf{U}_h(\mathbf{x})\big|_{\Omega_e}
 = \sum_{i=1}^{n_{bf}} \mathbf{U}_{e,i}\, \phi_i(\xi, \eta),
 \qquad
@@ -317,42 +323,42 @@ n_{bf} =
   \tfrac{1}{2}(p+1)(p+2) & \text{triangle},\\
   (p+1)^{2}              & \text{quadrilateral}.
 \end{cases}
-$$
+```
 
 The element geometry uses an independent Lagrange basis of order $Q$, so $Q = 1$
 gives straight-sided elements and $Q = 2$ a quadratic (curved) wall. The
 mapping from reference to physical coordinates and its Jacobian are
 
-$$
+```math
 \mathbf{x}(\xi,\eta) = \sum_{n} \mathbf{x}_n\, \psi_n(\xi,\eta),
 \qquad
 \mathbf{J} = \frac{\partial(x,y)}{\partial(\xi,\eta)},
 \qquad
 \nabla_{\mathbf{x}}\phi_i = \mathbf{J}^{-T}\nabla_{(\xi,\eta)}\phi_i .
-$$
+```
 
 ### Weak form
 
 Multiplying the Euler equations by a test function $\phi_i$, integrating over an
 element and applying the divergence theorem gives the discrete statement
 
-$$
+```math
 \int_{\Omega_e} \phi_i \frac{\partial \mathbf{U}_h}{\partial t}\,\mathrm{d}\Omega
 =
-\int_{\Omega_e} \nabla \phi_i \cdot
-  \boldsymbol{\mathcal{F}}(\mathbf{U}_h)\,\mathrm{d}\Omega
+\int_{\Omega_e} \left(\frac{\partial \phi_i}{\partial x}\mathbf{F}
+  + \frac{\partial \phi_i}{\partial y}\mathbf{G}\right)\mathrm{d}\Omega
 - \oint_{\partial \Omega_e} \phi_i\,
   \hat{\mathbf{F}}\bigl(\mathbf{U}_h^{+}, \mathbf{U}_h^{-}, \mathbf{n}\bigr)\,\mathrm{d}s
-$$
+```
 
 for every basis function $i$ and every element $e$. Writing the right-hand side
 as $-\mathbf{R}_e$ leaves the semi-discrete system
 
-$$
+```math
 \mathbf{M}_e\, \dot{\mathbf{U}}_e = -\mathbf{R}_e(\mathbf{U}),
 \qquad
 (\mathbf{M}_e)_{ij} = \int_{\Omega_e} \phi_i \phi_j\,\mathrm{d}\Omega .
-$$
+```
 
 The mass matrix is block diagonal — an element couples to itself only — so
 $\mathbf{M}^{-1}$ is applied as $n_{elem}$ independent
@@ -371,11 +377,11 @@ Duffy-collapsed Gauss–Jacobi rule for degree $\ge 3$) and tensor-product
 Gauss–Legendre on the quadrilateral; edge integrals use Gauss–Legendre on
 $[0,1]$. The degrees are
 
-$$
+```math
 d_{\mathrm{vol}} = 2p + 1 + 2(Q-1),
 \qquad
 d_{\mathrm{edge}} = 2p + Q .
-$$
+```
 
 > **Positive weights are not optional.** The Dunavant degree-3 rule used by the
 > original code has a negative first weight, $-0.28125$. A negative weight can
@@ -389,29 +395,29 @@ $$
 
 The interface flux is Roe's approximate Riemann solver,
 
-$$
+```math
 \hat{\mathbf{F}}(\mathbf{U}^{+}, \mathbf{U}^{-}, \mathbf{n})
-= \tfrac{1}{2}\left(\boldsymbol{\mathcal{F}}(\mathbf{U}^{+})\cdot\mathbf{n}
-                  + \boldsymbol{\mathcal{F}}(\mathbf{U}^{-})\cdot\mathbf{n}\right)
+= \tfrac{1}{2}\left(\mathbf{F}_n(\mathbf{U}^{+})
+                  + \mathbf{F}_n(\mathbf{U}^{-})\right)
 - \tfrac{1}{2}\left|\hat{\mathbf{A}}\right|
   \left(\mathbf{U}^{-} - \mathbf{U}^{+}\right),
-$$
+```
 
 where $\hat{\mathbf{A}}$ is the flux Jacobian evaluated at the Roe-averaged
 state
 
-$$
+```math
 \hat{v}_x = \frac{\sqrt{\rho^{+}}\,v_x^{+} + \sqrt{\rho^{-}}\,v_x^{-}}
                {\sqrt{\rho^{+}} + \sqrt{\rho^{-}}},
 \quad \text{(and likewise for } \hat{v}_y,\ \hat{H}\text{)},
 \qquad
 \hat{a}^{2} = (\gamma - 1)\left(\hat{H} - \tfrac{1}{2}|\hat{\mathbf{v}}|^{2}\right).
-$$
+```
 
 The dissipation term is evaluated in factored form rather than by assembling
 $|\hat{\mathbf{A}}|$: with $\Delta(\cdot) = (\cdot)^{-} - (\cdot)^{+}$,
 
-$$
+```math
 \begin{aligned}
   G_1 &= (\gamma-1)\left(\tfrac{1}{2}|\hat{\mathbf{v}}|^{2}\Delta\rho
          - \hat{v}_x\,\Delta(\rho v_x) - \hat{v}_y\,\Delta(\rho v_y)
@@ -425,7 +431,7 @@ $$
   \qquad
   C_2 = \frac{G_1}{\hat{a}} s_2 + \left(s_1 - |\lambda_3|\right) G_2 .
 \end{aligned}
-$$
+```
 
 ### Entropy fix
 
@@ -433,14 +439,14 @@ An unmodified Roe flux admits a non-physical expansion shock where an
 eigenvalue passes through zero — which happens at the throat of every choked
 nozzle. The Harten–Hyman fix replaces small eigenvalues by a smooth quadratic,
 
-$$
+```math
 |\lambda| \leftarrow
 \begin{cases}
   \dfrac{\lambda^{2} + \epsilon^{2}}{2\epsilon}, & |\lambda| < \epsilon,\\
   |\lambda|, & \text{otherwise},
 \end{cases}
 \qquad \epsilon = 0.05\,\hat{a}.
-$$
+```
 
 ---
 
@@ -456,12 +462,12 @@ Both are impermeable: $\mathbf{v}\cdot\mathbf{n} = 0$. Removing the normal
 velocity and recovering the pressure from the remaining energy gives a flux
 that transmits pressure but no mass or energy,
 
-$$
+```math
 p_b = (\gamma - 1)\left(\rho E
       - \tfrac{1}{2}\rho\,|\mathbf{v}_{t}|^{2}\right),
 \qquad
 \hat{\mathbf{F}} = \bigl(0,\; p_b n_x,\; p_b n_y,\; 0\bigr)^{T}.
-$$
+```
 
 The contoured wall and the symmetry axis use the same flux but carry different
 tags, so that thrust can be integrated over the wall alone.
@@ -471,15 +477,15 @@ tags, so that thrust can be integrated over the wall alone.
 Three characteristics enter, one leaves. The outgoing one carries the interior
 Riemann invariant
 
-$$
+```math
 J^{+} = v_n + \frac{2a}{\gamma - 1}.
-$$
+```
 
 Combining it with the isentropic stagnation relations and a prescribed flow
 direction $\hat{\mathbf{d}} = (\cos\alpha, \sin\alpha)$ gives a quadratic for
 the inflow Mach number,
 
-$$
+```math
 \underbrace{\left(\tfrac{\gamma-1}{2}\beta - n_d^{2}\right)}_{A} M^{2}
 \underbrace{-\,\tfrac{4 n_d}{\gamma-1}}_{B} M
 + \underbrace{\left(\beta
@@ -488,7 +494,7 @@ $$
 \qquad
 \beta = \left(\frac{J^{+}}{a_t}\right)^{2},\quad
 n_d = \mathbf{n}\cdot\hat{\mathbf{d}}.
-$$
+```
 
 The *smallest non-negative* root is the physical branch; the boundary state then
 follows from the isentropic relations and total enthalpy
@@ -508,13 +514,13 @@ exactly one condition is admissible. Static pressure is set to $p_b$, while
 entropy and the outgoing invariant are carried from the interior and the
 tangential velocity is unchanged:
 
-$$
+```math
 \rho_b = \rho^{+}\left(\frac{p_b}{p^{+}}\right)^{1/\gamma},
 \qquad
 v_{n,b} = v_n^{+} + \frac{2}{\gamma-1}\left(a^{+} - a_b\right),
 \qquad
 \mathbf{v}_{t,b} = \mathbf{v}_t^{+} .
-$$
+```
 
 The two branches are selected by the local normal Mach number, so a shock
 crossing the exit plane during the transient is handled without special cases.
@@ -530,58 +536,70 @@ crossing the exit plane during the transient is handled without special cases.
 The semi-discrete system is marched in pseudo-time to steady state with an
 element-local step,
 
-$$
+```math
 \Delta t_e
-= c(p, \text{scheme})\,\mathrm{CFL}\,
+= \frac{\mathrm{CFL}}{2p+1}\,
   \frac{2 A_e}{\displaystyle\sum_{f \in \partial\Omega_e} s_f\, \ell_f},
-$$
+```
 
 where $A_e$ is the element area, $\ell_f$ the length of face $f$ and $s_f$ the
-maximum signal speed there.
+maximum signal speed there. The $1/(2p+1)$ factor is the standard
+order-dependent restriction for explicit DG, and $\mathrm{CFL}$ means what it
+usually does: a multiplier on that stable step.
 
-The coefficient $c$ is **measured, not derived.** The textbook restriction for
-explicit DG is $c = 1/(2p+1)$, and it is far too pessimistic above $p = 0$: a
-bisection scan of the largest $\mathrm{CFL}$ that still converges, over two
-contours at two refinement levels, gives
+### What CFL is safe
 
-| $p$ | $c_{\max}$, RK4 | $c_{\max}$, SSP-RK3 | $1/(2p+1)$ |
+The textbook restriction is a bound, not an equality, and measurement says it is
+much tighter than it needs to be above $p = 0$. Bisecting the largest
+$\mathrm{CFL}$ at which the march still converges — over the `bell` and
+`smooth` contours at refinement levels 0 and 1, the two agreeing to within a
+bisection step at every order — gives
+
+| $p$ | RK4 | SSP-RK3 | $\mathrm{CFL} = 1$ as a fraction of the RK4 limit |
 |---|---|---|---|
-| 0 | 1.625 | 1.437 | 1.000 |
-| 1 | 0.875 | 0.779 | 0.333 |
-| 2 | 0.500 | 0.448 | 0.200 |
+| 0 | 1.625 | 1.437 | 62% |
+| 1 | 2.625 | 2.337 | 38% |
+| 2 | 2.500 | 2.240 | 40% |
 
-so $1/(2p+1)$ sat at 62% of the stable step at $p = 0$ but only 38% at $p = 1$
-and 40% at $p = 2$. The decay with order is close to $1/(p+1)$ — the measured
-ratios are $1 : 0.54 : 0.31$ against $1 : 0.5 : 0.33$ — not $1/(2p+1)$'s
-$1 : 0.33 : 0.2$, and that is used as the fallback beyond the measured orders.
-SSP-RK3 comes out at a near-constant $0.89$ times RK4, which is a useful check
-on both columns: the two schemes differ by a scheme factor, not by their order
-dependence.
+So a single fixed $\mathrm{CFL}$ carries a different safety margin at every
+order. The solver's default is therefore order-dependent — 70% of the measured
+limit, so the *margin* is constant at 30% while the definition stays
+conventional. Pass $\mathrm{CFL}$ explicitly and it means exactly what the
+formula above says.
 
-$\mathrm{CFL}$ is therefore defined as a *fraction of that limit*, so it means
-the same thing at every order and for either scheme, and the shipped default of
-$0.7$ keeps a 30% margin on a scan that covers two contours at one back
-pressure — which is a measurement, not a stability proof.
+Read as a coefficient on the geometric step rather than as a $\mathrm{CFL}$
+number, the stable value falls as $1 : 0.54 : 0.31$ across $p = 0, 1, 2$, which
+$1/(p+1)$ fits ($1 : 0.5 : 0.33$) and $1/(2p+1)$ does not ($1 : 0.33 : 0.2$).
+That is the scaling used beyond the measured orders. SSP-RK3 comes out at a
+near-constant $0.89$ times RK4, a useful check on both columns: the two schemes
+differ by a scheme factor, not by their order dependence.
+
+> **A measurement, not a proof.** Two contours at one back pressure is a scan,
+> not a stability analysis, which is why the default keeps 30% in hand rather
+> than sitting on the limit. `tests/test_timestep.py` marches 400 steps at each
+> tabulated limit, so a change to the flux, the quadrature or the limiter that
+> moves the real limit fails the suite instead of silently invalidating the
+> table.
 
 Two schemes are available. `'rk4'` is the classical four-stage method, with the
 local step frozen at the first stage (the intermediate stages are not meant to
 be time-accurate). `'ssprk3'` is the three-stage
 strong-stability-preserving method,
 
-$$
+```math
 \begin{aligned}
   \mathbf{U}^{(1)} &= \mathbf{U}^{n}
-    + \Delta t\, \boldsymbol{\mathcal{L}}(\mathbf{U}^{n}),\\
+    + \Delta t\, \mathbf{L}(\mathbf{U}^{n}),\\
   \mathbf{U}^{(2)} &= \tfrac{3}{4}\mathbf{U}^{n} + \tfrac{1}{4}
     \left(\mathbf{U}^{(1)}
-      + \Delta t\, \boldsymbol{\mathcal{L}}(\mathbf{U}^{(1)})\right),\\
+      + \Delta t\, \mathbf{L}(\mathbf{U}^{(1)})\right),\\
   \mathbf{U}^{n+1} &= \tfrac{1}{3}\mathbf{U}^{n} + \tfrac{2}{3}
     \left(\mathbf{U}^{(2)}
-      + \Delta t\, \boldsymbol{\mathcal{L}}(\mathbf{U}^{(2)})\right),
+      + \Delta t\, \mathbf{L}(\mathbf{U}^{(2)})\right),
 \end{aligned}
 \qquad
-\boldsymbol{\mathcal{L}} = -\mathbf{M}^{-1}\mathbf{R}.
-$$
+\mathbf{L} = -\mathbf{M}^{-1}\mathbf{R}.
+```
 
 Each SSP stage is a convex combination of forward-Euler updates, which is
 exactly the structure the positivity limiter assumes — so `'ssprk3'` plus
@@ -591,13 +609,13 @@ exactly the structure the positivity limiter assumes — so `'ssprk3'` plus
 
 The march stops when
 
-$$
+```math
 \frac{\left\|\dot{\mathbf{U}}\right\|_{\mathrm{rms}}}{\rho_t a_t / L}
 < \texttt{tolerance},
 \qquad
 \left\|\dot{\mathbf{U}}\right\|_{\mathrm{rms}}
 = \sqrt{\frac{1}{4N}\sum \left(\mathbf{M}^{-1}\mathbf{R}\right)^{2}} .
-$$
+```
 
 The choice of denominator matters more than it looks. Testing the
 *unnormalised* residual against a fixed threshold makes "converged" mean
@@ -622,11 +640,11 @@ or density goes negative at a quadrature point, and the Roe flux fails.
 
 Both limiters act by shrinking the deviation from the cell average,
 
-$$
+```math
 \mathbf{U}_{e,i}^{\mathrm{lim}} = \bar{\mathbf{U}}_e
   + \theta_e \left(\mathbf{U}_{e,i} - \bar{\mathbf{U}}_e\right),
 \qquad \theta_e \in [0,1],
-$$
+```
 
 which leaves the cell average untouched and is therefore *conservative*.
 
@@ -662,33 +680,33 @@ uniform start diverges where the quasi-1D start converges.
 
 The area–Mach relation is
 
-$$
+```math
 \frac{A}{A^{*}} = \frac{1}{M}
 \left[\frac{2}{\gamma+1}\left(1 + \frac{\gamma-1}{2}M^{2}\right)
 \right]^{\frac{\gamma+1}{2(\gamma-1)}},
-$$
+```
 
 monotone on each of the subsonic and supersonic branches and therefore
 invertible by bracketed bisection. The isentropic relations give
 
-$$
+```math
 \frac{p}{p_t} = \left(1 + \tfrac{\gamma-1}{2}M^{2}\right)^{-\frac{\gamma}{\gamma-1}},
 \qquad
 \frac{\rho}{\rho_t} = \left(1 + \tfrac{\gamma-1}{2}M^{2}\right)^{-\frac{1}{\gamma-1}},
 \qquad
 \frac{T}{T_t} = \left(1 + \tfrac{\gamma-1}{2}M^{2}\right)^{-1}.
-$$
+```
 
 Across a normal shock,
 
-$$
+```math
 M_2^{2} = \frac{1 + \frac{\gamma-1}{2}M_1^{2}}
                {\gamma M_1^{2} - \frac{\gamma-1}{2}},
 \qquad
 \frac{p_2}{p_1} = \frac{2\gamma M_1^{2} - (\gamma-1)}{\gamma+1},
 \qquad
 \frac{A_2^{*}}{A_1^{*}} = \frac{p_{t1}}{p_{t2}} .
-$$
+```
 
 ### Operating regimes
 
@@ -718,21 +736,21 @@ is exactly one position at which it equals $p_b$.
 For steady inviscid flow the axial momentum balance over the nozzle interior
 closes exactly, giving *two* expressions for the same force:
 
-$$
+```math
 F
 = \underbrace{\int_{\mathrm{exit}}\!\left(\rho v_x^{2} + p\right)\mathrm{d}A
   - \int_{\mathrm{inlet}}\!\left(\rho v_x^{2} + p\right)\mathrm{d}A}_{\text{momentum form}}
 = \underbrace{-\oint_{\mathrm{wall}} p\, n_x\, \mathrm{d}s}_{\text{wall form}} .
-$$
+```
 
 They are identical in exact arithmetic but *discretely* distinct, so the gap
 between them is a free measure of discretisation error. Both are computed and
 reported, together with
 
-$$
+```math
 c_F = \frac{F}{p_t A_{\mathrm{throat}}},
 \qquad A_{\mathrm{throat}} = 2 y_{\mathrm{th}} .
-$$
+```
 
 > **The throat height must come from the geometry.** Dividing by a fixed value
 > silently mis-normalises every coefficient computed at a different
@@ -744,14 +762,14 @@ $$
 
 For shock-free flow the exact solution is isentropic, so
 
-$$
+```math
 \varepsilon_s = \sqrt{\frac{1}{A}\int_{\Omega}
   \left(\frac{s}{s_t} - 1\right)^{2}\mathrm{d}\Omega},
 \qquad
 s = \frac{p}{\rho^{\gamma}},
 \qquad
 s_t = p_t^{1-\gamma}\left(R T_t\right)^{\gamma},
-$$
+```
 
 is a genuine error measure that converges at the scheme's design rate. Across a
 shock, entropy rises physically, and the number then reflects the flow rather
@@ -772,7 +790,7 @@ The following hold to machine precision and are asserted in the test suite:
 - **Discrete divergence theorem.**
   $\sum_f \mathbf{n}_f \ell_f = \mathbf{0}$ per element to $10^{-12}$, for
   triangles and quadrilaterals, $Q = 1$ and $Q = 2$.
-- **Flux consistency and conservation.** $\hat{\mathbf{F}}(\mathbf{U}, \mathbf{U}, \mathbf{n}) = \boldsymbol{\mathcal{F}}\cdot\mathbf{n}$, and $\hat{\mathbf{F}}(\mathbf{U}^{+}, \mathbf{U}^{-}, \mathbf{n}) = -\hat{\mathbf{F}}(\mathbf{U}^{-}, \mathbf{U}^{+}, -\mathbf{n})$.
+- **Flux consistency and conservation.** $\hat{\mathbf{F}}(\mathbf{U}, \mathbf{U}, \mathbf{n}) = \mathbf{F}_n(\mathbf{U})$, and $\hat{\mathbf{F}}(\mathbf{U}^{+}, \mathbf{U}^{-}, \mathbf{n}) = -\hat{\mathbf{F}}(\mathbf{U}^{-}, \mathbf{U}^{+}, -\mathbf{n})$.
 - **Inflow boundary condition.** A uniform isentropic state is reproduced
   exactly, to $10^{-15}$, for $M \in [0.05, 0.9]$.
 - **Backend agreement.** The Numba and NumPy residuals agree to a relative
@@ -906,7 +924,7 @@ For a scalar functional $J$ and design variables $\mathbf{a}$, the converged
 state satisfies $\mathbf{R}(\mathbf{U}, \mathbf{a}) = \mathbf{0}$.
 Differentiating implicitly,
 
-$$
+```math
 \frac{\mathrm{d}J}{\mathrm{d}\mathbf{a}}
 = \frac{\partial J}{\partial \mathbf{a}}
   - \frac{\partial J}{\partial \mathbf{U}}
@@ -914,27 +932,27 @@ $$
     \frac{\partial \mathbf{R}}{\partial \mathbf{a}}
 = \frac{\partial J}{\partial \mathbf{a}}
   - \boldsymbol{\psi}^{T}\frac{\partial \mathbf{R}}{\partial \mathbf{a}},
-$$
+```
 
 where the adjoint variable solves
 
-$$
+```math
 \left(\frac{\partial \mathbf{R}}{\partial \mathbf{U}}\right)^{T}
 \boldsymbol{\psi}
 = \left(\frac{\partial J}{\partial \mathbf{U}}\right)^{T}.
-$$
+```
 
 The cost is one adjoint solve *regardless of the number of design variables* —
 where finite differences would need two flow solves each.
 
 The adjoint system is solved by pseudo-time march,
 
-$$
+```math
 \frac{\mathrm{d}\boldsymbol{\psi}}{\mathrm{d}\tau}
 = -\mathbf{M}^{-1}\left(
     \left(\partial \mathbf{R}/\partial \mathbf{U}\right)^{T}\boldsymbol{\psi}
     - \left(\partial J/\partial \mathbf{U}\right)^{T}\right),
-$$
+```
 
 mirroring the forward solver. Because $\mathbf{M}$ is symmetric positive
 definite,

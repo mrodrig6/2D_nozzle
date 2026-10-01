@@ -1,10 +1,11 @@
 """The ``dg2d.sh`` launcher.
 
-This is the entry point students are told to use, and the thing it exists to
-fix is that ``python -m dgnozzle`` does not work from a clone: the package is
-under ``src/``, so without an install there is nothing to import.  So the tests
-here run the script the way a student would -- from an arbitrary directory,
-with no arguments beyond the ones documented -- rather than inspecting it.
+This is the entry point students are told to use.  The package sits at the
+repository root, so ``python -m dgnozzle`` works when you are standing in a
+clone; what the launcher adds is that it works from *anywhere*, with no install
+and without having to know where the clone is.  So the tests here run the script
+the way a student would -- from an arbitrary directory, with no arguments beyond
+the ones documented -- rather than inspecting it.
 """
 
 from __future__ import annotations
@@ -123,7 +124,7 @@ def test_docs_points_at_the_formulation():
 
 
 def test_check_works_from_an_unrelated_directory(tmp_path):
-    """The whole point: no install, no cd into src/, any working directory."""
+    """The whole point: no install, no clone to stand in, any working directory."""
     out = run("check", cwd=tmp_path)
     assert out.returncode == 0, out.stderr
     assert "dgnozzle" in out.stdout
