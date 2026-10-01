@@ -31,6 +31,8 @@ print(performance(result).summary())
   - [3. Shape optimisation](#3-shape-optimisation)
 - [Choosing resolution](#choosing-resolution)
 - [Backends and performance](#backends-and-performance)
+  - [Where the time goes](#where-the-time-goes)
+  - [CFL headroom](#cfl-headroom)
 - [Choking, as a check on the solver](#choking-as-a-check-on-the-solver)
 - [Known limitation: shocked operating points](#known-limitation-shocked-operating-points-do-not-converge)
 - [Verification](#verification)
@@ -75,16 +77,19 @@ Then solve something:
 ./dg2d.sh solve area_ratio=3.0 back_pressure_ratio=0.12 order=1
 ```
 
-```
-converged in 1751 iterations (0.59 s, numba): residual 9.169e-07 scaled
-  (1.80e-06 of initial); min rho 3.0174e-01, min p 5.1730e-02
+It prints the convergence history, then:
 
+```
 thrust        0.054007  (c_F = 0.193026, 92.24% of ideal)
   wall form   0.053504  (imbalance 9.31e-03)
 mass flow     in 0.301234, out 0.301633  (imbalance 1.32e-03)
 exit          M = 2.7188, p/p_t = 0.05041
 entropy error 1.8657e-02
 ```
+
+Thrust appears twice because it is computed from two mathematically identical
+integrals; the `imbalance` between them is a free estimate of discretisation
+error, and it falls when you raise `refine`.
 
 And run the three studies the course is built around:
 
@@ -161,7 +166,7 @@ seconds, cached afterwards).
 Run the tests:
 
 ```bash
-./dg2d.sh test -m "not slow"   # 298 unit tests, about a minute
+./dg2d.sh test -m "not slow"   # 317 unit tests, about a minute
 ./dg2d.sh test                 # plus the end-to-end solves and adjoint checks
 ```
 
@@ -458,16 +463,20 @@ convergence study and a back-pressure sweep. `./dg2d.sh list` names them.
 | `refine` | uniform refinement; each level multiplies elements by 4. |
 | `element` | `'tri'` (default) or `'quad'`. |
 
-Timings on 4 cores, converged to a relative residual of 1e-6:
+Solve times on 4 cores of a 2.1 GHz Xeon, default `bell` contour, converged to
+`1e-6` on the scaled residual, with the Numba kernels already compiled:
 
-| `p` | `refine` | elements | DOF | iterations | time |
-|---|---|---|---|---|---|
-| 0 | 0 | 140 | 140 | 851 | **0.20 s** |
-| 1 | 0 | 140 | 420 | 1751 | **0.59 s** |
-| 2 | 0 | 140 | 840 | 3301 | **1.8 s** |
-| 1 | 1 | 560 | 1680 | 2501 | **1.9 s** |
-| 2 | 1 | 560 | 3360 | 6301 | **7.3 s** |
-| 1 | 2 | 2240 | 6720 | 6051 | **12 s** |
+| `p` | `refine` | elements | DOF | iterations | time | ms/iteration |
+|---|---|---|---|---|---|---|
+| 0 | 0 | 140 | 140 | 851 | **0.19 s** | 0.22 |
+| 1 | 0 | 140 | 420 | 1751 | **0.56 s** | 0.32 |
+| 2 | 0 | 140 | 840 | 3301 | **1.6 s** | 0.50 |
+| 1 | 1 | 560 | 1680 | 2501 | **1.6 s** | 0.66 |
+| 2 | 1 | 560 | 3360 | 6301 | **7.0 s** | 1.11 |
+| 1 | 2 | 2240 | 6720 | 6051 | **9.7 s** | 1.60 |
+
+The *first* solve in a session pays a few seconds of Numba compilation on top,
+once, and then caches it.
 
 **Start with `p=1, refine=0`** for design exploration — it is under a second and
 already within a few percent on thrust. Move to `p=2, geometry_order=2,
@@ -489,10 +498,79 @@ Same equations, three execution strategies:
 ./dg2d.sh bench p=1 refine=1
 ```
 
-They agree to a relative 1e-10, which the test suite enforces.
+They agree to a relative 1e-10, which the test suite enforces. Measured on one
+RK4 step, `p=1`:
 
-Two things make it fast, and two make it robust. None of them change the answer
-— and the distinction is measured, not assumed.
+| elements | `numba` | `numpy` |
+|---|---|---|
+| 140 | 0.32 ms | 3.8 ms |
+| 560 | 0.71 ms | 8.9 ms |
+| 2240 | 1.55 ms | 34 ms |
+
+### Where the time goes
+
+One RK4 step at `p=1, refine=1` (560 elements, 1680 DOF), by component. The
+step measured 0.58 ms in this run; repeat runs on the same machine spread about
+±10%, so read the shares rather than the absolute times:
+
+| Component | Per step | Share |
+|---|---|---|
+| residual (edge pass + element pass) × 4 | 0.30 ms | 51% |
+| inverse mass × 4 | 0.059 ms | 10% |
+| positivity limiter × 4 (fast path, nothing limited) | 0.081 ms | 14% |
+| stage arithmetic (NumPy temporaries) | 0.035 ms | 6% |
+| residual norm + time step | 0.013 ms | 2% |
+| allocation and dispatch | — | ~17% |
+
+So the residual is half the cost, and the limiter's *inactive* fast path is a
+seventh of it.
+
+Thread scaling is the weak point at the sizes used for design work. All four
+Numba kernels are `prange`-parallel, but one RK4 step enters a parallel region
+sixteen times — four stages × (edge pass, element pass, inverse mass, limiter)
+— and at 140 elements that is only 35 elements per thread per region, so the
+launch overhead swamps the work:
+
+| elements | 1 thread | 2 threads | 4 threads |
+|---|---|---|---|
+| 140 | 0.31 ms | 0.32 ms | 0.32 ms |
+| 560 | 0.93 ms | 0.81 ms | 0.71 ms |
+| 2240 | 3.42 ms | 2.76 ms | 1.55 ms |
+
+### CFL headroom
+
+Iteration count is inversely proportional to `cfl` — exactly, which says the
+march is limited by nothing but its time step. The default of `1.0` is
+conservative. All times below are the `bell` contour at the default operating
+point; the last column records what a `smooth` scan at the same `p` and
+`refine` did one step further up.
+
+| `p` | `refine` | `cfl=1.0` | a larger `cfl` that converged | speed-up | one step further up |
+|---|---|---|---|---|---|
+| 0 | 0 | 851 it, 0.19 s | `1.5` → 551 it, 0.12 s | 1.6× | `2.0` goes non-finite in 51 it |
+| 1 | 0 | 1751 it, 0.56 s | `2.5` → 701 it, 0.21 s | 2.7× | `3.0` still converges |
+| 2 | 0 | 3301 it, 1.64 s | `2.0` → 1651 it, 0.72 s | 2.3× | `3.0` limit-cycles |
+| 1 | 1 | 2501 it, 1.64 s | `2.5` → 1001 it, 0.64 s | 2.6× | `3.0` limit-cycles |
+| 2 | 1 | 6301 it, 6.96 s | `2.0` → 3151 it, 3.45 s | 2.0× | `3.0` limit-cycles |
+| 1 | 2 | 6051 it, 9.68 s | `2.0` → 3051 it, 4.72 s | 2.1× | not tested |
+
+The last column is why the default has not simply been raised: at `p=0` the
+stability limit is below `2.0`, at `p≥2` it is below `3.0`, and these are two
+contours at one back pressure — not a stability proof. The **`cfl`-per-order
+scaling is what is really off**: the time step already carries a `1/(2p+1)`
+factor, which over-penalises `p≥1` relative to `p=0`, and that is exactly the
+pattern in the table.
+
+If you are sweeping and want the time back, `cfl=2.0` at `p≥1` is a reasonable
+bet, and the solver says plainly when it does not hold:
+
+```bash
+./dg2d.sh sweep area_ratio 2.0 4.0 9 p=1 cfl=2.0
+```
+
+### What makes it fast, and what makes it robust
+
+None of these change the answer — and the distinction is measured, not assumed.
 
 **Faster:**
 
