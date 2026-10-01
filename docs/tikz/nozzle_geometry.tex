@@ -3,19 +3,17 @@
 %%
 %%  Standalone TikZ figure.  Compile on its own with
 %%      pdflatex nozzle_geometry.tex
-%%  or \input{tikz/nozzle_geometry} inside another document (the standalone
-%%  wrapper is guarded, so the same file serves both).
+%%  or render it to the PNG that docs/theory.md shows with
+%%      python docs/render_figures.py
 %%
 %%  The wall coordinates are the actual 'bell' contour at AR = 2.5019 and
 %%  throat_x = 0.1388, sampled from dgnozzle.geometry and scaled by 12.
 %%  Regenerate with:  python docs/make_tikz.py
 %% ==========================================================================
-\ifdefined\DGNOZZLEEMBEDDED\else
 \documentclass[tikz,border=6pt]{standalone}
 \usepackage{amsmath}
 \usetikzlibrary{arrows.meta,decorations.pathmorphing,patterns,calc,positioning}
 \begin{document}
-\fi
 
 \begin{tikzpicture}[
   >={Stealth[length=2.6mm]},
@@ -113,6 +111,4 @@
 
 \end{tikzpicture}
 
-\ifdefined\DGNOZZLEEMBEDDED\else
 \end{document}
-\fi

@@ -3,8 +3,9 @@ r"""Compressible Euler physics: fluxes, the Roe solver, boundary conditions.
 State vector, in conserved variables:
 
 .. math::
-    U = (\rho,\ \rho u,\ \rho v,\ \rho E)^T, \qquad
-    p = (\gamma - 1)\Bigl(\rho E - \tfrac{1}{2}\rho (u^2 + v^2)\Bigr)
+    \mathbf{U} = (\rho,\ \rho v_x,\ \rho v_y,\ \rho E)^T, \qquad
+    p = (\gamma - 1)\Bigl(\rho E - \tfrac{1}{2}\rho |\mathbf{v}|^2\Bigr),
+    \qquad \mathbf{v} = (v_x, v_y)^T
 
 All routines take arrays whose **last axis has length 4** and whose leading axes
 are arbitrary, so the same function serves a single point, an edge's quadrature
@@ -45,13 +46,13 @@ class FluxResult(NamedTuple):
 # Primitive variables
 # --------------------------------------------------------------------------
 def primitives(U, gamma: float, xp=np):
-    r"""Return ``(rho, u, v, p, H)`` with ``rho`` and ``p`` floored positive."""
+    r"""Return ``(rho, vx, vy, p, H)`` with ``rho`` and ``p`` floored positive."""
     rho = xp.maximum(U[..., 0], FLOOR)
-    u = U[..., 1] / rho
-    v = U[..., 2] / rho
-    p = xp.maximum((gamma - 1.0) * (U[..., 3] - 0.5 * rho * (u * u + v * v)), FLOOR)
+    vx = U[..., 1] / rho
+    vy = U[..., 2] / rho
+    p = xp.maximum((gamma - 1.0) * (U[..., 3] - 0.5 * rho * (vx * vx + vy * vy)), FLOOR)
     H = (U[..., 3] + p) / rho
-    return rho, u, v, p, H
+    return rho, vx, vy, p, H
 
 
 def pressure(U, gamma: float, xp=np):
@@ -61,8 +62,8 @@ def pressure(U, gamma: float, xp=np):
 
 def mach_number(U, gamma: float, xp=np):
     """Local Mach number."""
-    rho, u, v, p, _ = primitives(U, gamma, xp=xp)
-    return xp.sqrt((u * u + v * v) * rho / (gamma * p))
+    rho, vx, vy, p, _ = primitives(U, gamma, xp=xp)
+    return xp.sqrt((vx * vx + vy * vy) * rho / (gamma * p))
 
 
 def sound_speed(U, gamma: float, xp=np):
@@ -72,18 +73,18 @@ def sound_speed(U, gamma: float, xp=np):
 
 def euler_flux(U, gamma: float, xp=np):
     r"""The inviscid flux pair :math:`(F, G)`, each shaped like ``U``."""
-    rho, u, v, p, H = primitives(U, gamma, xp=xp)
-    F = xp.stack([rho * u, rho * u * u + p, rho * u * v, rho * u * H], axis=-1)
-    G = xp.stack([rho * v, rho * u * v, rho * v * v + p, rho * v * H], axis=-1)
+    rho, vx, vy, p, H = primitives(U, gamma, xp=xp)
+    F = xp.stack([rho * vx, rho * vx * vx + p, rho * vx * vy, rho * vx * H], axis=-1)
+    G = xp.stack([rho * vy, rho * vx * vy, rho * vy * vy + p, rho * vy * H], axis=-1)
     return F, G
 
 
 def normal_flux(U, nx, ny, gamma: float, xp=np):
     r"""The projected flux :math:`F n_x + G n_y`."""
-    rho, u, v, p, H = primitives(U, gamma, xp=xp)
-    un = u * nx + v * ny
+    rho, vx, vy, p, H = primitives(U, gamma, xp=xp)
+    vn = vx * nx + vy * ny
     return xp.stack(
-        [rho * un, rho * u * un + p * nx, rho * v * un + p * ny, rho * H * un], axis=-1
+        [rho * vn, rho * vx * vn + p * nx, rho * vy * vn + p * ny, rho * H * vn], axis=-1
     )
 
 
@@ -94,17 +95,18 @@ def roe_flux(UL, UR, nx, ny, gamma: float, *, entropy_fix: float = 0.05, xp=np) 
     r"""Roe's approximate Riemann solver with the Harten-Hyman entropy fix.
 
     .. math::
-        \hat{F} = \tfrac{1}{2}\bigl(F(U_L) + F(U_R)\bigr)\cdot n
-                  - \tfrac{1}{2}\, |\hat{A}|\,(U_R - U_L)
+        \hat{\mathbf{F}} = \tfrac{1}{2}\bigl(\mathbf{F}(\mathbf{U}_L)
+                           + \mathbf{F}(\mathbf{U}_R)\bigr)\cdot\mathbf{n}
+                  - \tfrac{1}{2}\, |\hat{\mathbf{A}}|\,(\mathbf{U}_R - \mathbf{U}_L)
 
     The dissipation term is evaluated in the factored form of the standard
-    AE623 formulation rather than by forming :math:`|\hat{A}|` explicitly.
+    AE623 formulation rather than by forming :math:`|\hat{\mathbf{A}}|` explicitly.
     Eigenvalues smaller in magnitude than ``entropy_fix * c`` are replaced by
     :math:`(\lambda^2 + \epsilon^2)/(2\epsilon)`, which prevents the expansion
     shock that an unmodified Roe flux admits at a sonic point.
     """
-    rhoL, uL, vL, pL, HL = primitives(UL, gamma, xp=xp)
-    rhoR, uR, vR, pR, HR = primitives(UR, gamma, xp=xp)
+    rhoL, vxL, vyL, pL, HL = primitives(UL, gamma, xp=xp)
+    rhoR, vxR, vyR, pR, HR = primitives(UR, gamma, xp=xp)
 
     FL = normal_flux(UL, nx, ny, gamma, xp=xp)
     FR = normal_flux(UR, nx, ny, gamma, xp=xp)
@@ -113,16 +115,16 @@ def roe_flux(UL, UR, nx, ny, gamma: float, *, entropy_fix: float = 0.05, xp=np) 
     sL = xp.sqrt(rhoL)
     sR = xp.sqrt(rhoR)
     denom = sL + sR
-    u = (sL * uL + sR * uR) / denom
-    v = (sL * vL + sR * vR) / denom
+    vx = (sL * vxL + sR * vxR) / denom
+    vy = (sL * vyL + sR * vyR) / denom
     H = (sL * HL + sR * HR) / denom
-    q2 = u * u + v * v
+    q2 = vx * vx + vy * vy
     c = xp.sqrt(xp.maximum((gamma - 1.0) * (H - 0.5 * q2), FLOOR))
-    un = u * nx + v * ny
+    vn = vx * nx + vy * ny
 
-    lam1 = xp.abs(un + c)
-    lam2 = xp.abs(un - c)
-    lam3 = xp.abs(un)
+    lam1 = xp.abs(vn + c)
+    lam2 = xp.abs(vn - c)
+    lam3 = xp.abs(vn)
     max_speed = xp.maximum(lam1, lam2)
 
     eps = entropy_fix * c
@@ -134,10 +136,10 @@ def roe_flux(UL, UR, nx, ny, gamma: float, *, entropy_fix: float = 0.05, xp=np) 
     lam3 = fix(lam3)
 
     dU = UR - UL
-    drho, drhou, drhov, drhoE = dU[..., 0], dU[..., 1], dU[..., 2], dU[..., 3]
+    drho, drho_vx, drho_vy, drhoE = dU[..., 0], dU[..., 1], dU[..., 2], dU[..., 3]
 
-    G1 = (gamma - 1.0) * (0.5 * q2 * drho - u * drhou - v * drhov + drhoE)
-    G2 = -un * drho + drhou * nx + drhov * ny
+    G1 = (gamma - 1.0) * (0.5 * q2 * drho - vx * drho_vx - vy * drho_vy + drhoE)
+    G2 = -vn * drho + drho_vx * nx + drho_vy * ny
 
     s1 = 0.5 * (lam1 + lam2)
     s2 = 0.5 * (lam1 - lam2)
@@ -147,9 +149,9 @@ def roe_flux(UL, UR, nx, ny, gamma: float, *, entropy_fix: float = 0.05, xp=np) 
     diss = xp.stack(
         [
             lam3 * drho + C1,
-            lam3 * drhou + C1 * u + C2 * nx,
-            lam3 * drhov + C1 * v + C2 * ny,
-            lam3 * drhoE + C1 * H + C2 * un,
+            lam3 * drho_vx + C1 * vx + C2 * nx,
+            lam3 * drho_vy + C1 * vy + C2 * ny,
+            lam3 * drhoE + C1 * H + C2 * vn,
         ],
         axis=-1,
     )
@@ -166,15 +168,15 @@ def wall_flux(U, nx, ny, gamma: float, xp=np) -> FluxResult:
     remaining energy, giving a flux that transmits pressure but no mass:
 
     .. math::
-        p_b = (\gamma - 1)\Bigl(\rho E - \tfrac{1}{2}\rho |v_\parallel|^2\Bigr),
-        \qquad \hat{F} = (0,\ p_b n_x,\ p_b n_y,\ 0)^T
+        p_b = (\gamma - 1)\Bigl(\rho E - \tfrac{1}{2}\rho |\mathbf{v}_t|^2\Bigr),
+        \qquad \hat{\mathbf{F}} = (0,\ p_b n_x,\ p_b n_y,\ 0)^T
     """
     rho = xp.maximum(U[..., 0], FLOOR)
-    u = U[..., 1] / rho
-    v = U[..., 2] / rho
-    un = u * nx + v * ny
-    ut2 = (u - un * nx) ** 2 + (v - un * ny) ** 2
-    pb = xp.maximum((gamma - 1.0) * (U[..., 3] - 0.5 * rho * ut2), FLOOR)
+    vx = U[..., 1] / rho
+    vy = U[..., 2] / rho
+    vn = vx * nx + vy * ny
+    vt2 = (vx - vn * nx) ** 2 + (vy - vn * ny) ** 2
+    pb = xp.maximum((gamma - 1.0) * (U[..., 3] - 0.5 * rho * vt2), FLOOR)
     zero = xp.zeros_like(pb)
     flux = xp.stack([zero, pb * nx, pb * ny, zero], axis=-1)
     return FluxResult(flux, xp.sqrt(gamma * pb / rho))
@@ -186,7 +188,7 @@ def inflow_flux(
     r"""Subsonic stagnation inflow: total temperature, total pressure and flow angle.
 
     One characteristic leaves the domain, carrying the interior Riemann
-    invariant :math:`J^+ = u_n + 2a/(\gamma - 1)` (with ``n`` the *outward*
+    invariant :math:`J^+ = v_n + 2a/(\gamma - 1)` (with :math:`\mathbf{n}` the *outward*
     normal).  Combining it with the isentropic stagnation relations gives a
     quadratic for the inflow Mach number,
 
@@ -195,9 +197,9 @@ def inflow_flux(
         - \tfrac{4 n_d}{\gamma-1} M
         + \Bigl(\beta - \bigl(\tfrac{2}{\gamma-1}\bigr)^2\Bigr) = 0,
         \qquad \beta = \Bigl(\tfrac{J^+}{a_t}\Bigr)^2,\
-        n_d = n \cdot \hat{d}
+        n_d = \mathbf{n} \cdot \hat{\mathbf{d}}
 
-    where :math:`\hat{d}` is the prescribed inflow direction.
+    where :math:`\hat{\mathbf{d}}` is the prescribed inflow direction.
 
     The smallest non-negative root is the physical branch.  Taking
     ``(-b + sqrt(disc)) / 2a`` unconditionally is correct only while ``a > 0``:
@@ -208,10 +210,10 @@ def inflow_flux(
     at = np.sqrt(at2)
     rho_t = gamma * pt / at2
 
-    rho, u, v, p, _ = primitives(U, gamma, xp=xp)
+    rho, vx, vy, p, _ = primitives(U, gamma, xp=xp)
     a = xp.sqrt(gamma * p / rho)
-    un = u * nx + v * ny
-    Jp = un + 2.0 * a / (gamma - 1.0)
+    vn = vx * nx + vy * ny
+    Jp = vn + 2.0 * a / (gamma - 1.0)
 
     beta = (Jp / at) ** 2
     nd = nx * np.cos(alpha) + ny * np.sin(alpha)
@@ -238,32 +240,32 @@ def inflow_flux(
 
     ab = xp.sqrt(at2 / (1.0 + 0.5 * (gamma - 1.0) * M * M))
     qb = M * ab
-    ub = qb * np.cos(alpha)
-    vb = qb * np.sin(alpha)
+    vxb = qb * np.cos(alpha)
+    vyb = qb * np.sin(alpha)
     rhob = rho_t * (1.0 + 0.5 * (gamma - 1.0) * M * M) ** (-1.0 / (gamma - 1.0))
     pb = rhob * ab * ab / gamma
     Hb = at2 / (gamma - 1.0)  # total enthalpy is conserved from the reservoir
-    unb = ub * nx + vb * ny
+    vnb = vxb * nx + vyb * ny
 
     flux = xp.stack(
-        [rhob * unb, rhob * ub * unb + pb * nx, rhob * vb * unb + pb * ny, rhob * Hb * unb],
+        [rhob * vnb, rhob * vxb * vnb + pb * nx, rhob * vyb * vnb + pb * ny, rhob * Hb * vnb],
         axis=-1,
     )
-    return FluxResult(flux, xp.abs(unb) + ab)
+    return FluxResult(flux, xp.abs(vnb) + ab)
 
 
 def outflow_flux(U, nx, ny, gamma: float, *, p_back: float, xp=np) -> FluxResult:
     r"""Pressure outflow that switches automatically to supersonic extrapolation.
 
-    *Subsonic* outflow (:math:`u_n / a < 1`) admits one incoming characteristic,
+    *Subsonic* outflow (:math:`v_n / a < 1`) admits one incoming characteristic,
     so exactly one condition may be imposed.  Static pressure is set to
     ``p_back``; entropy and the outgoing invariant are carried from the interior,
     and the tangential velocity is unchanged:
 
     .. math::
         \rho_b = \rho_L\Bigl(\frac{p_b}{p_L}\Bigr)^{1/\gamma},\quad
-        u_{n,b} = u_{n,L} + \frac{2}{\gamma-1}\bigl(a_L - a_b\bigr),\quad
-        v_{t,b} = v_{t,L}
+        v_{n,b} = v_{n,L} + \frac{2}{\gamma-1}\bigl(a_L - a_b\bigr),\quad
+        \mathbf{v}_{t,b} = \mathbf{v}_{t,L}
 
     *Supersonic* outflow admits none, so the interior state is extrapolated and
     ``p_back`` is ignored.  The two branches are blended by the local normal
@@ -275,9 +277,9 @@ def outflow_flux(U, nx, ny, gamma: float, *, p_back: float, xp=np) -> FluxResult
        leave the back pressure with no effect on the flow at all, and with it
        every operating point whose exit is subsonic.
     """
-    rho, u, v, p, _ = primitives(U, gamma, xp=xp)
+    rho, vx, vy, p, _ = primitives(U, gamma, xp=xp)
     a = xp.sqrt(gamma * p / rho)
-    un = u * nx + v * ny
+    vn = vx * nx + vy * ny
 
     # -- subsonic branch: impose static pressure.  Multiplying by ones_like
     # rather than calling float() keeps this working when p_back is a JAX tracer,
@@ -285,19 +287,19 @@ def outflow_flux(U, nx, ny, gamma: float, *, p_back: float, xp=np) -> FluxResult
     pb = xp.asarray(p_back) * xp.ones_like(p)
     rhob = rho * (pb / p) ** (1.0 / gamma)
     ab = xp.sqrt(gamma * pb / rhob)
-    unb = un + 2.0 / (gamma - 1.0) * (a - ab)
-    ut_x = u - un * nx
-    ut_y = v - un * ny
-    ub = ut_x + unb * nx
-    vb = ut_y + unb * ny
-    Eb = pb / ((gamma - 1.0) * rhob) + 0.5 * (ub * ub + vb * vb)
-    U_sub = xp.stack([rhob, rhob * ub, rhob * vb, rhob * Eb], axis=-1)
+    vnb = vn + 2.0 / (gamma - 1.0) * (a - ab)
+    vtx = vx - vn * nx
+    vty = vy - vn * ny
+    vxb = vtx + vnb * nx
+    vyb = vty + vnb * ny
+    Eb = pb / ((gamma - 1.0) * rhob) + 0.5 * (vxb * vxb + vyb * vyb)
+    U_sub = xp.stack([rhob, rhob * vxb, rhob * vyb, rhob * Eb], axis=-1)
 
     # -- blend with the extrapolated (supersonic) state
-    supersonic = (un / a >= 1.0)[..., None]
+    supersonic = (vn / a >= 1.0)[..., None]
     U_b = xp.where(supersonic, U, U_sub)
 
     flux = normal_flux(U_b, nx, ny, gamma, xp=xp)
-    rb, ubb, vbb, pbb, _ = primitives(U_b, gamma, xp=xp)
-    ab2 = xp.sqrt(gamma * pbb / rb)
-    return FluxResult(flux, xp.abs(ubb * nx + vbb * ny) + ab2)
+    rho_o, vx_o, vy_o, p_o, _ = primitives(U_b, gamma, xp=xp)
+    a_o = xp.sqrt(gamma * p_o / rho_o)
+    return FluxResult(flux, xp.abs(vx_o * nx + vy_o * ny) + a_o)

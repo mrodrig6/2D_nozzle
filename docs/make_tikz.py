@@ -6,7 +6,7 @@ freehand sketch, so it stays honest when the contour families change.  Run this
 after editing :mod:`dgnozzle.geometry`, then recompile the figure::
 
     python docs/make_tikz.py
-    cd docs/tikz && pdflatex nozzle_geometry.tex
+    python docs/render_figures.py
 
 Only the two coordinate lists and the throat marker are rewritten; the rest of
 the TikZ source is hand-maintained and left alone.
@@ -76,7 +76,7 @@ def main() -> int:
     TARGET.write_text(text)
     print(f"rewrote {EXPECTED_UPPER} upper and {EXPECTED_LOWER} lower "
           f"coordinate list(s) in {TARGET.name}")
-    print("done -- recompile with: cd docs/tikz && pdflatex nozzle_geometry.tex")
+    print("done -- re-render with: python docs/render_figures.py")
     return 0
 
 

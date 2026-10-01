@@ -74,16 +74,16 @@ def edge_fluxes(U, ops: Operators, flow: FlowConditions, xp=np):
     # ---- interior edges: Roe flux between the two traces
     lelem, relem = edges.iedge_elem[:, 0], edges.iedge_elem[:, 1]
     lface, rface = edges.iedge_face[:, 0], edges.iedge_face[:, 1]
-    uL = xp.einsum("kiq,kis->kqs", phi_face[0][lface], U[lelem])
-    uR = xp.einsum("kiq,kis->kqs", phi_face[1][rface], U[relem])
+    UL = xp.einsum("kiq,kis->kqs", phi_face[0][lface], U[lelem])
+    UR = xp.einsum("kiq,kis->kqs", phi_face[1][rface], U[relem])
     nx_i, ny_i = nrm[:ni, :, 0], nrm[:ni, :, 1]
     interior = ph.roe_flux(
-        uL, uR, nx_i, ny_i, flow.gamma, entropy_fix=flow.entropy_fix, xp=xp
+        UL, UR, nx_i, ny_i, flow.gamma, entropy_fix=flow.entropy_fix, xp=xp
     )
 
     # ---- boundary edges: one call per tag, on a contiguous slice
     belem, bface = edges.bedge_elem, edges.bedge_face
-    ub = xp.einsum("kiq,kis->kqs", phi_face[0][bface], U[belem])
+    Ub = xp.einsum("kiq,kis->kqs", phi_face[0][bface], U[belem])
     nx_b, ny_b = nrm[ni:, :, 0], nrm[ni:, :, 1]
 
     pieces: list[object] = []
@@ -92,17 +92,17 @@ def edge_fluxes(U, ops: Operators, flow: FlowConditions, xp=np):
         sl = topo.tag_slice(tag)
         if sl.stop <= sl.start:
             continue
-        u_s, nxs, nys = ub[sl], nx_b[sl], ny_b[sl]
+        U_s, nxs, nys = Ub[sl], nx_b[sl], ny_b[sl]
         if tag is BoundaryTag.INFLOW:
             res = ph.inflow_flux(
-                u_s, nxs, nys, flow.gamma,
+                U_s, nxs, nys, flow.gamma,
                 Tt=flow.total_temperature, pt=flow.total_pressure,
                 Rgas=flow.Rgas, alpha=flow.inflow_angle, xp=xp,
             )
         elif tag is BoundaryTag.OUTFLOW:
-            res = ph.outflow_flux(u_s, nxs, nys, flow.gamma, p_back=flow.back_pressure, xp=xp)
+            res = ph.outflow_flux(U_s, nxs, nys, flow.gamma, p_back=flow.back_pressure, xp=xp)
         else:  # WALL and AXIS share the inviscid slip flux
-            res = ph.wall_flux(u_s, nxs, nys, flow.gamma, xp=xp)
+            res = ph.wall_flux(U_s, nxs, nys, flow.gamma, xp=xp)
         pieces.append(res.flux)
         speeds.append(res.max_speed)
 

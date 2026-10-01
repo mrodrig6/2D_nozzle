@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Example 4 --- gradient-based shape optimisation.
 
-Run:  python examples/04_shape_optimisation.py     (needs JAX and SciPy)
+Run:  ./dg2d.sh run optimise     (needs JAX and SciPy)
 
 Maximises thrust over a Bezier wall using L-BFGS-B with adjoint gradients.
 

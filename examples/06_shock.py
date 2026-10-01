@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Example 6 --- driving a shock through the nozzle with back pressure.
 
-Run:  python examples/06_shock_in_nozzle.py
+Run:  ./dg2d.sh run shock
 
 Sweeps the back pressure across all four operating regimes and tracks where the
 shock stands.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Example 5 --- order-of-accuracy study.
 
-Run:  python examples/05_convergence_study.py
+Run:  ./dg2d.sh run convergence
 
 Measures the observed order of accuracy from the entropy error, which is a true
 error measure for shock-free flow (the exact solution is isentropic).

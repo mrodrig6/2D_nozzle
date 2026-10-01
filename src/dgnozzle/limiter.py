@@ -126,15 +126,15 @@ def floor_cell_means(U, ops: Operators, flow: FlowConditions, *, fraction: float
     return U + shift[:, None, :]
 
 
-def _pressure_at(u, gamma, xp):
-    rho = xp.maximum(u[..., 0], 1e-300)
-    return (gamma - 1.0) * (u[..., 3] - 0.5 * (u[..., 1] ** 2 + u[..., 2] ** 2) / rho)
+def _pressure_at(U, gamma, xp):
+    rho = xp.maximum(U[..., 0], 1e-300)
+    return (gamma - 1.0) * (U[..., 3] - 0.5 * (U[..., 1] ** 2 + U[..., 2] ** 2) / rho)
 
 
 def _min_pressure(ubar, dev, theta, gamma, xp):
     """Minimum pressure over probe points for a given scaling ``theta``."""
-    u = ubar[:, None, :] + theta[:, None, None] * dev
-    return _pressure_at(u, gamma, xp).min(axis=1)
+    U = ubar[:, None, :] + theta[:, None, None] * dev
+    return _pressure_at(U, gamma, xp).min(axis=1)
 
 
 def _solve_theta(ubar, probes, eps_rho, eps_p, gamma, steps, xp):

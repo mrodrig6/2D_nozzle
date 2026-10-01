@@ -70,7 +70,7 @@ def test_entropy_error_is_positive_off_the_isentrope(projected):
 
 
 @pytest.mark.parametrize("name", ["mach", "pressure", "density", "temperature",
-                                  "u", "v", "velocity", "entropy"])
+                                  "vx", "vy", "velocity", "entropy"])
 def test_scalar_fields_are_finite_and_sensible(projected, name):
     from dgnozzle.postprocess import solution_at_quadrature
 
@@ -116,9 +116,9 @@ def test_performance_reports_full_nozzle_quantities(projected):
     """The mesh is a half channel; integral quantities must be doubled."""
     perf = performance(projected)
     tr = boundary_trace(projected.U, projected.operators, BoundaryTag.INFLOW)
-    rho, u, v, _, _ = ph.primitives(tr.state, projected.flow.gamma)
-    un = u * tr.normal[..., 0] + v * tr.normal[..., 1]
-    half = -float((rho * un * tr.weight).sum())
+    rho, vx, vy, _, _ = ph.primitives(tr.state, projected.flow.gamma)
+    vn = vx * tr.normal[..., 0] + vy * tr.normal[..., 1]
+    half = -float((rho * vn * tr.weight).sum())
     assert perf.mass_flow_in == pytest.approx(2.0 * half, rel=1e-12)
 
 

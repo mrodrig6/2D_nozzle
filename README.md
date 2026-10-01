@@ -19,17 +19,20 @@ print(performance(result).summary())
 
 ## Contents
 
+- [Quick start](#quick-start)
+- [The launcher](#the-launcher)
 - [Install](#install)
-- [Run it](#run-it)
+- [Run it from Python](#run-it-from-python)
 - [Documentation](#documentation)
 - [Design variables](#design-variables)
 - [What students do with it](#what-students-do-with-it)
   - [1. Parameter sweeps](#1-parameter-sweeps)
   - [2. Sensitivity analysis](#2-sensitivity-analysis)
   - [3. Shape optimisation](#3-shape-optimisation)
-- [Command line](#command-line)
 - [Choosing resolution](#choosing-resolution)
 - [Backends and performance](#backends-and-performance)
+  - [Where the time goes](#where-the-time-goes)
+  - [CFL headroom](#cfl-headroom)
 - [Choking, as a check on the solver](#choking-as-a-check-on-the-solver)
 - [Known limitation: shocked operating points](#known-limitation-shocked-operating-points-do-not-converge)
 - [Verification](#verification)
@@ -37,24 +40,134 @@ print(performance(result).summary())
 
 ---
 
-## Install
+## Quick start
+
+You need Python 3.10+ and nothing else. Clone it and run:
 
 ```bash
 git clone https://github.com/mrodrig6/dg.git
 cd dg
-pip install -e ".[all]"
+./dg2d.sh check
+```
+
+```
+python   3.12.3  (/usr/bin/python3)
+dgnozzle 1.0.0  (/home/you/dg/src/dgnozzle)
+backends numba, numpy, jax
+  yes  numba        the fast solver
+  yes  jax          gradients and sensitivity
+  yes  matplotlib   figures
+  yes  scipy        optimisation
+```
+
+**There is no install step and nothing to compile.** `dg2d.sh` finds your
+Python, puts `src/` on the import path if the package is not installed, and
+works from any directory. It uses whatever environment you have loaded — set
+`DG2D_PYTHON=python3.12` to pin a different one.
+
+If `check` reports a `NO`, that optional piece is missing. Add them all with:
+
+```bash
+./dg2d.sh install
+```
+
+Then solve something:
+
+```bash
+./dg2d.sh solve area_ratio=3.0 back_pressure_ratio=0.12 order=1
+```
+
+It prints the convergence history, then:
+
+```
+thrust        0.054007  (c_F = 0.193026, 92.24% of ideal)
+  wall form   0.053504  (imbalance 9.31e-03)
+mass flow     in 0.301234, out 0.301633  (imbalance 1.32e-03)
+exit          M = 2.7188, p/p_t = 0.05041
+entropy error 1.8657e-02
+```
+
+Thrust appears twice because it is computed from two mathematically identical
+integrals; the `imbalance` between them is a free estimate of discretisation
+error, and it falls when you raise `refine`.
+
+And run the three studies the course is built around:
+
+```bash
+./dg2d.sh run sweep          # parameter sweep, finds the thrust optimum
+./dg2d.sh run sensitivity    # adjoint gradients vs finite differences
+./dg2d.sh run optimise       # L-BFGS-B on a Bézier wall
+```
+
+---
+
+## The launcher
+
+`./dg2d.sh help` lists everything. Arguments are `name=value`, using the same
+names as the Python API, so there is one vocabulary to learn rather than two.
+
+| Command | What it does |
+|---|---|
+| `./dg2d.sh check` | report the Python, the version, and which backends work |
+| `./dg2d.sh list` | list the cases `run` can execute |
+| `./dg2d.sh run <case>` | run one of the scripts in [`examples/`](examples/) |
+| `./dg2d.sh solve ...` | one operating point |
+| `./dg2d.sh sweep <var> <lo> <hi> <n> ...` | sweep one design variable |
+| `./dg2d.sh geometry ...` | inspect a contour; no flow solve |
+| `./dg2d.sh bench ...` | time the backends against each other |
+| `./dg2d.sh test` | run the test suite |
+| `./dg2d.sh install` | `pip install -e ".[all]"`, if you want it installed |
+| `./dg2d.sh docs` | where the documentation is |
+
+```bash
+./dg2d.sh solve ar=3.0 pb=0.12 p=1 figure=result.png
+./dg2d.sh sweep area_ratio 2.0 4.0 9 order=1 csv=sweep.csv
+./dg2d.sh geometry contour=bezier bezier_w1=0.7 figure=wall.png
+./dg2d.sh bench p=1 refine=1
+```
+
+Short aliases: `p`=`order`, `Q`=`geometry_order`, `ref`=`refine`,
+`ar`=`area_ratio`, `pb`=`back_pressure_ratio`. Ordinary `--flags` pass through
+untouched, so anything `python -m dgnozzle --help` documents still works.
+
+`geometry` runs no flow solve — use it to check a contour before committing to
+a simulation.
+
+### The cases
+
+| `run` | Script | Shows | Needs | Roughly |
+|---|---|---|---|---|
+| `solve` | `01_solve.py` | one design point against quasi-1D theory | — | 5 s |
+| **`sweep`** | `02_sweep.py` | **sweeping the area ratio; the thrust optimum** | — | 1 min |
+| **`sensitivity`** | `03_sensitivity.py` | **adjoint gradients, verified against finite differences** | JAX | 2 min |
+| **`optimise`** | `04_optimise.py` | **L-BFGS-B on a Bézier wall** | JAX, SciPy | 5 min |
+| `convergence` | `05_convergence.py` | observed order of accuracy | — | 5 min |
+| `shock` | `06_shock.py` | all four operating regimes | — | 5 min |
+
+They are meant to be copied and edited: changing the geometry in one of them is
+the normal way to start a study.
+
+---
+
+## Install
+
+Only needed if you want `import dgnozzle` to work outside the launcher:
+
+```bash
+./dg2d.sh install            # pip install -e ".[all]"
 ```
 
 `[all]` pulls in Numba (speed), JAX (gradients) and matplotlib (figures). The
 solver itself needs only NumPy and SciPy; everything optional degrades
-gracefully with a clear message if it is missing.
+gracefully with a clear message if it is missing. There is **nothing to compile
+and no binary to download** — Numba compiles the kernels on first use (a few
+seconds, cached afterwards).
 
-Check the install:
+Run the tests:
 
 ```bash
-python -m dgnozzle solve --order 1
-pytest -q -m "not slow"   # 276 unit tests, under a minute
-pytest -q                 # plus the end-to-end solves and adjoint checks
+./dg2d.sh test -m "not slow"   # 317 unit tests, about a minute
+./dg2d.sh test                 # plus the end-to-end solves and adjoint checks
 ```
 
 The `slow` marker covers the tests that run a real flow solve — including the
@@ -62,12 +175,9 @@ finite-difference gradient checks, which are two extra solves per design
 variable. Run those before trusting a change to the physics; the fast suite is
 enough while iterating.
 
-There is **nothing to compile and no binary to download**. Numba compiles the
-kernels on first use (a few seconds, cached afterwards).
-
 ---
 
-## Run it
+## Run it from Python
 
 Everything goes through one function. Give it the design you want; leave the
 rest alone.
@@ -116,7 +226,7 @@ import matplotlib.pyplot as plt
 
 overview(result)              # four-panel summary
 plot_field(result, "mach")    # any of: mach, pressure, density, temperature,
-                              #         u, v, velocity, entropy
+                              #         vx, vy, velocity, entropy
 plot_centreline(result)       # axial profile against quasi-1D theory
 plt.show()
 ```
@@ -127,24 +237,22 @@ plt.show()
 
 | Document | What is in it |
 |---|---|
-| **[`docs/theory.pdf`](docs/theory.tex)** | **The formulation and the geometry definition.** Governing equations, the DG weak form, the Roe flux, every boundary condition, the limiters, quasi-1D theory, the thrust and entropy-error definitions, and the verification evidence — all in LaTeX, with TikZ figures. Start here. |
+| **[`docs/theory.md`](docs/theory.md)** | **The formulation and the geometry definition.** Governing equations, the DG weak form, the Roe flux, every boundary condition, the limiters, quasi-1D theory, the thrust and entropy-error definitions, and the verification evidence. Markdown with LaTeX equations — it renders on GitHub, so there is nothing to build. Start here. |
 | [`docs/lab_guide.md`](docs/lab_guide.md) | The student-facing lab: exercises, what to look for, what to report. |
-| [`docs/tikz/`](docs/tikz/) | TikZ sources for every figure. Each compiles standalone *and* embeds in `theory.tex`. |
+| [`docs/tikz/`](docs/tikz/) | TikZ sources for every figure in `theory.md`. |
 | Docstrings | Every module carries its own derivation and rationale. `help(dgnozzle.physics)` is worth reading. |
 
-Build the theory document:
-
-```bash
-cd docs && pdflatex theory.tex && pdflatex theory.tex
-```
+`./dg2d.sh docs` prints the same list.
 
 The geometry figure is generated from the *actual* contour the solver uses, not
 sketched by hand. Regenerate it after changing the contour families:
 
 ```bash
-python docs/make_tikz.py
-cd docs/tikz && pdflatex nozzle_geometry.tex
+python docs/make_tikz.py        # coordinates, from dgnozzle.geometry
+python docs/render_figures.py   # TikZ -> the PNGs theory.md shows
 ```
+
+See [`docs/README.md`](docs/README.md) for what those two scripts need.
 
 ---
 
@@ -212,7 +320,21 @@ print(critical_ratios(2.5019).describe())
 
 ## What students do with it
 
+Three workflows, each with a worked case you can run right now and then edit.
+
 ### 1. Parameter sweeps
+
+```bash
+./dg2d.sh run sweep          # examples/02_sweep.py
+```
+
+Or from the command line, with no script at all:
+
+```bash
+./dg2d.sh sweep area_ratio 2.0 4.0 9 order=1 contour=smooth csv=sweep.csv
+```
+
+In Python:
 
 ```python
 import numpy as np
@@ -259,6 +381,10 @@ for point, why in table.failures():
 
 ### 2. Sensitivity analysis
 
+```bash
+./dg2d.sh run sensitivity    # examples/03_sensitivity.py
+```
+
 Exact derivatives by the **discrete adjoint** — one solve, any number of design
 variables:
 
@@ -297,6 +423,10 @@ Objectives: `thrust`, `thrust_coefficient`, `exit_mach`, `mass_flow`,
 
 ### 3. Shape optimisation
 
+```bash
+./dg2d.sh run optimise       # examples/04_optimise.py
+```
+
 The gradient plugs straight into SciPy:
 
 ```python
@@ -317,22 +447,8 @@ best = minimize(negative_thrust, x0, jac=True, method="L-BFGS-B",
                 bounds=[(1.5, 5.0), (0.0, 1.0), (0.0, 1.0)])
 ```
 
-Worked versions of all three live in [`examples/`](examples/).
-
----
-
-## Command line
-
-```bash
-python -m dgnozzle solve --area-ratio 3.0 --back-pressure-ratio 0.12 -p 1 \
-                         --figure result.png
-python -m dgnozzle sweep area_ratio 2.0 4.0 9 -p 1 --csv sweep.csv
-python -m dgnozzle geometry --contour bezier --bezier-w1 0.7 --figure wall.png
-python -m dgnozzle bench -p 1 --refine 1
-```
-
-`geometry` runs no flow solve — use it to check a contour before committing to a
-simulation.
+All three live in [`examples/`](examples/), alongside a first solve, a
+convergence study and a back-pressure sweep. `./dg2d.sh list` names them.
 
 ---
 
@@ -347,16 +463,20 @@ simulation.
 | `refine` | uniform refinement; each level multiplies elements by 4. |
 | `element` | `'tri'` (default) or `'quad'`. |
 
-Timings on 4 cores, converged to a relative residual of 1e-6:
+Solve times on 4 cores of a 2.1 GHz Xeon, default `bell` contour, converged to
+`1e-6` on the scaled residual, with the Numba kernels already compiled:
 
-| `p` | `refine` | elements | DOF | iterations | time |
-|---|---|---|---|---|---|
-| 0 | 0 | 140 | 140 | 851 | **0.20 s** |
-| 1 | 0 | 140 | 420 | 1751 | **0.59 s** |
-| 2 | 0 | 140 | 840 | 3301 | **1.8 s** |
-| 1 | 1 | 560 | 1680 | 2501 | **1.9 s** |
-| 2 | 1 | 560 | 3360 | 6301 | **7.3 s** |
-| 1 | 2 | 2240 | 6720 | 6051 | **12 s** |
+| `p` | `refine` | elements | DOF | iterations | time | ms/iteration |
+|---|---|---|---|---|---|---|
+| 0 | 0 | 140 | 140 | 851 | **0.19 s** | 0.22 |
+| 1 | 0 | 140 | 420 | 1751 | **0.56 s** | 0.32 |
+| 2 | 0 | 140 | 840 | 3301 | **1.6 s** | 0.50 |
+| 1 | 1 | 560 | 1680 | 2501 | **1.6 s** | 0.66 |
+| 2 | 1 | 560 | 3360 | 6301 | **7.0 s** | 1.11 |
+| 1 | 2 | 2240 | 6720 | 6051 | **9.7 s** | 1.60 |
+
+The *first* solve in a session pays a few seconds of Numba compilation on top,
+once, and then caches it.
 
 **Start with `p=1, refine=0`** for design exploration — it is under a second and
 already within a few percent on thrust. Move to `p=2, geometry_order=2,
@@ -375,13 +495,82 @@ Same equations, three execution strategies:
 | `'jax'` | the same vectorised source under `jax.numpy`; **differentiable** |
 
 ```bash
-python -m dgnozzle bench -p 1 --refine 1
+./dg2d.sh bench p=1 refine=1
 ```
 
-They agree to a relative 1e-10, which the test suite enforces.
+They agree to a relative 1e-10, which the test suite enforces. Measured on one
+RK4 step, `p=1`:
 
-Two things make it fast, and two make it robust. None of them change the answer
-— and the distinction is measured, not assumed.
+| elements | `numba` | `numpy` |
+|---|---|---|
+| 140 | 0.32 ms | 3.8 ms |
+| 560 | 0.71 ms | 8.9 ms |
+| 2240 | 1.55 ms | 34 ms |
+
+### Where the time goes
+
+One RK4 step at `p=1, refine=1` (560 elements, 1680 DOF), by component. The
+step measured 0.58 ms in this run; repeat runs on the same machine spread about
+±10%, so read the shares rather than the absolute times:
+
+| Component | Per step | Share |
+|---|---|---|
+| residual (edge pass + element pass) × 4 | 0.30 ms | 51% |
+| inverse mass × 4 | 0.059 ms | 10% |
+| positivity limiter × 4 (fast path, nothing limited) | 0.081 ms | 14% |
+| stage arithmetic (NumPy temporaries) | 0.035 ms | 6% |
+| residual norm + time step | 0.013 ms | 2% |
+| allocation and dispatch | — | ~17% |
+
+So the residual is half the cost, and the limiter's *inactive* fast path is a
+seventh of it.
+
+Thread scaling is the weak point at the sizes used for design work. All four
+Numba kernels are `prange`-parallel, but one RK4 step enters a parallel region
+sixteen times — four stages × (edge pass, element pass, inverse mass, limiter)
+— and at 140 elements that is only 35 elements per thread per region, so the
+launch overhead swamps the work:
+
+| elements | 1 thread | 2 threads | 4 threads |
+|---|---|---|---|
+| 140 | 0.31 ms | 0.32 ms | 0.32 ms |
+| 560 | 0.93 ms | 0.81 ms | 0.71 ms |
+| 2240 | 3.42 ms | 2.76 ms | 1.55 ms |
+
+### CFL headroom
+
+Iteration count is inversely proportional to `cfl` — exactly, which says the
+march is limited by nothing but its time step. The default of `1.0` is
+conservative. All times below are the `bell` contour at the default operating
+point; the last column records what a `smooth` scan at the same `p` and
+`refine` did one step further up.
+
+| `p` | `refine` | `cfl=1.0` | a larger `cfl` that converged | speed-up | one step further up |
+|---|---|---|---|---|---|
+| 0 | 0 | 851 it, 0.19 s | `1.5` → 551 it, 0.12 s | 1.6× | `2.0` goes non-finite in 51 it |
+| 1 | 0 | 1751 it, 0.56 s | `2.5` → 701 it, 0.21 s | 2.7× | `3.0` still converges |
+| 2 | 0 | 3301 it, 1.64 s | `2.0` → 1651 it, 0.72 s | 2.3× | `3.0` limit-cycles |
+| 1 | 1 | 2501 it, 1.64 s | `2.5` → 1001 it, 0.64 s | 2.6× | `3.0` limit-cycles |
+| 2 | 1 | 6301 it, 6.96 s | `2.0` → 3151 it, 3.45 s | 2.0× | `3.0` limit-cycles |
+| 1 | 2 | 6051 it, 9.68 s | `2.0` → 3051 it, 4.72 s | 2.1× | not tested |
+
+The last column is why the default has not simply been raised: at `p=0` the
+stability limit is below `2.0`, at `p≥2` it is below `3.0`, and these are two
+contours at one back pressure — not a stability proof. The **`cfl`-per-order
+scaling is what is really off**: the time step already carries a `1/(2p+1)`
+factor, which over-penalises `p≥1` relative to `p=0`, and that is exactly the
+pattern in the table.
+
+If you are sweeping and want the time back, `cfl=2.0` at `p≥1` is a reasonable
+bet, and the solver says plainly when it does not hold:
+
+```bash
+./dg2d.sh sweep area_ratio 2.0 4.0 9 p=1 cfl=2.0
+```
+
+### What makes it fast, and what makes it robust
+
+None of these change the answer — and the distinction is measured, not assumed.
 
 **Faster:**
 
@@ -525,6 +714,9 @@ defect, and the reason to use `smooth` for convergence work.
 
 | Symptom | What it means |
 |---|---|
+| `No module named dgnozzle` | You ran `python -m dgnozzle` directly. The package lives under `src/`, so it is not importable from a clone — use `./dg2d.sh`, which puts it on the path for you, or `./dg2d.sh install`. |
+| `dg2d.sh: Permission denied` | `chmod +x dg2d.sh`, or run it as `bash dg2d.sh ...`. |
+| `dg2d.sh: no python3 on PATH` | Load your Python environment first, or set `DG2D_PYTHON` to the interpreter you want. |
 | *"the residual has stalled … That is a limit cycle"* | The mesh cannot resolve a shock or strong expansion. **`refine=+1`** usually fixes it. |
 | *"residual converged but the solution is not physical"* | Residual convergence to negative pressure. Enable a limiter, or refine. |
 | *"residual became non-finite"* | Reduce `cfl` (try `0.5`), or `scheme='ssprk3'`. |

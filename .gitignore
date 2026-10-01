@@ -12,7 +12,8 @@ htmlcov/
 venv/
 .venv/
 
-# LaTeX build products (the PDFs are committed; the intermediates are not)
+# LaTeX build products.  The figures are authored in TikZ and rendered to the
+# PNGs under docs/figures/tikz/, which are committed; nothing LaTeX produces is.
 *.aux
 *.log
 *.out
@@ -20,6 +21,7 @@ venv/
 *.synctex.gz
 *.fls
 *.fdb_latexmk
+docs/tikz/*.pdf
 
 # Solver output
 *.npz

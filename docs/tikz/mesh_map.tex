@@ -1,12 +1,10 @@
 %% ==========================================================================
 %%  dgnozzle -- logical grid to physical nozzle mapping
 %% ==========================================================================
-\ifdefined\DGNOZZLEEMBEDDED\else
 \documentclass[tikz,border=6pt]{standalone}
 \usepackage{amsmath}
 \usetikzlibrary{arrows.meta,calc}
 \begin{document}
-\fi
 
 \begin{tikzpicture}[
   >={Stealth[length=2.8mm]},
@@ -68,6 +66,4 @@
 
 \end{tikzpicture}
 
-\ifdefined\DGNOZZLEEMBEDDED\else
 \end{document}
-\fi

@@ -3,7 +3,7 @@
 A student-facing guide. You will not write solver code; you will **engineer the
 geometry** and explain what the flow does in response.
 
-Read [`theory.pdf`](theory.tex) alongside this — it defines every quantity used
+Read [`theory.md`](theory.md) alongside this — it defines every quantity used
 below, and the geometry figure in §3 names every design variable.
 
 ---
@@ -13,8 +13,12 @@ below, and the geometry figure in §3 names every design variable.
 Run this and make sure it works:
 
 ```bash
-python examples/01_first_solve.py
+./dg2d.sh check              # what is installed and which backends work
+./dg2d.sh run solve          # one design point, start to finish
 ```
+
+Nothing has to be installed first; `./dg2d.sh help` lists every command, and
+`./dg2d.sh list` names every case you can run.
 
 Then get comfortable with the one function you need:
 
@@ -192,8 +196,8 @@ divergence loss, and you can see it directly.
 **Question.** Does the solver achieve its design order of accuracy, and what
 limits it?
 
-```python
-python examples/05_convergence_study.py
+```bash
+./dg2d.sh run convergence
 ```
 
 **What to report.** Observed rates for `p=1` and `p=2` with `contour='smooth'`,
@@ -242,8 +246,8 @@ this operating point. Why? (Hint: look at the exit Mach number.)
 
 ## Exercise 7 — Optimise a shape
 
-```python
-python examples/04_shape_optimisation.py
+```bash
+./dg2d.sh run optimise
 ```
 
 **What to report.** The optimised wall against the initial one, the thrust

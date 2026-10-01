@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Example 3 --- exact design sensitivities by the discrete adjoint.
 
-Run:  python examples/03_sensitivity.py     (needs JAX)
+Run:  ./dg2d.sh run sensitivity     (needs JAX)
 
 The adjoint gives dJ/da for *every* design variable at the cost of one extra
 solve, where finite differences need two flow solves per variable.  This script

@@ -198,7 +198,8 @@ def plot_centreline(
 
     if compare_quasi1d:
         q = solve_quasi1d(result.geometry, result.flow)
-        ref = {"mach": q.mach, "pressure": q.pressure, "density": q.density, "u": q.velocity}
+        ref = {"mach": q.mach, "pressure": q.pressure,
+               "density": q.density, "vx": q.velocity}
         ax.plot(q.x, ref[quantity], "--", color="0.4", lw=1.2, label="quasi-1D theory")
         if q.shock_x is not None:
             ax.axvline(q.shock_x, color="tab:red", lw=0.8, ls=":",
@@ -207,7 +208,7 @@ def plot_centreline(
     ax.axvline(result.geometry.throat_location(), color="0.7", lw=0.7, ls="--")
     ax.set_xlabel("$x$ [m]")
     ax.set_ylabel({"mach": "Mach number", "pressure": "$p$", "density": r"$\rho$",
-                   "u": "$u$"}[quantity])
+                   "vx": "$v_x$"}[quantity])
     ax.legend(fontsize=8, frameon=False)
     ax.grid(alpha=0.25)
     return ax
