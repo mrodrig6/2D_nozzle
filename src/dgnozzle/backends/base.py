@@ -46,6 +46,17 @@ class Backend(ABC):
         self.n_limited = 0
         self.n_mean_repaired = 0
         self.n_limit_calls = 0
+        self.rate_source = None
+        r"""FAS defect source, subtracted from the rate.
+
+        ``None`` on an ordinary solve.  A multigrid coarse level sets it to
+        :math:`s_H = L_H(\Pi U_h) - \Pi L_h(U_h)`, so that the level marches
+        :math:`\mathrm{d}V/\mathrm{d}\tau = L_H(V) - s_H` and its fixed point
+        is the coarse problem the fine level actually needs solved.  Keeping it
+        here rather than in the integrators means the residual norm, the stall
+        detector and both schemes measure the *coarse* defect without knowing
+        anything about multigrid.
+        """
 
     def limiter_activity(self) -> float:
         """Mean number of elements limited per limiter call; NaN if not tracked."""
@@ -82,9 +93,12 @@ class Backend(ABC):
 
     # -- integrators -------------------------------------------------------
     def rate(self, U):
-        r"""``dU/dt = -M^{-1} R``, plus the wave-speed sum."""
+        r"""``dU/dt = -M^{-1} R``, less any FAS source, plus the wave-speed sum."""
         R, wave = self.residual(U)
-        return -self.inverse_mass(R), wave
+        F = -self.inverse_mass(R)
+        if self.rate_source is not None:
+            F = F - self.rate_source
+        return F, wave
 
     def rk4_step(self, U):
         """One classical RK4 pseudo-time step.  Returns ``(U_new, residual_norm)``."""
@@ -129,6 +143,7 @@ class Backend(ABC):
         """
         step = self.make_step(scheme)
         res = float("nan")
-        for _ in range(n_steps):
-            U, res = step(U)
+        with np.errstate(over="ignore", invalid="ignore"):
+            for _ in range(n_steps):
+                U, res = step(U)
         return U, res

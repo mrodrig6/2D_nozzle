@@ -227,6 +227,16 @@ def _outflow(Ub, nx, ny, gamma, p_back, out):
     return abs(vnb) + ab
 
 
+# ==========================================================================
+#  Assembly passes
+# ==========================================================================
+# Every kernel below writes into caller-supplied arrays.  The backend allocates
+# those once and reuses them for the life of the solve, which matters more than
+# it looks: a four-stage step calls the residual four times, and allocating and
+# zeroing `fw`, `smax`, `R` and the mass-solve output on each call was a measured
+# sixth of the step.
+
+
 @njit(parallel=True, **_JIT)
 def edge_pass(
     U,
@@ -247,16 +257,19 @@ def edge_pass(
     ca,
     sa,
     p_back,
+    fw,
+    smax,
 ):
-    """Weighted numerical flux and max signal speed for every global edge."""
+    """Weighted numerical flux and max signal speed for every global edge.
+
+    Writes ``fw`` (nedge, nqf, 4) and ``smax`` (nedge); both are fully
+    overwritten, so they need no zeroing by the caller.
+    """
     n_int = iedge_elem.shape[0]
     n_bnd = bedge_elem.shape[0]
     n_edge = n_int + n_bnd
     nbf = U.shape[1]
     nqf = w_face.shape[0]
-
-    fw = np.zeros((n_edge, nqf, 4))
-    smax = np.zeros(n_edge)
 
     for k in prange(n_edge):
         UL = np.zeros(4)
@@ -312,7 +325,6 @@ def edge_pass(
                 for s in range(4):
                     fw[k, q, s] = flux[s] * scale
         smax[k] = best
-    return fw, smax
 
 
 @njit(parallel=True, **_JIT)
@@ -329,18 +341,31 @@ def element_pass(
     face_sign,
     edge_length,
     gamma,
+    inv_mass,
+    apply_mass,
+    out,
+    wave,
 ):
-    """Volume integral plus the gathered face integrals, per element."""
+    r"""Volume integral plus the gathered face integrals, per element.
+
+    With ``apply_mass`` false, ``out`` receives the residual :math:`R`.  With it
+    true, ``out`` receives the *rate* :math:`-M^{-1}R`, which is what the time
+    march actually wants.  Fusing the mass solve in here rather than running it
+    as a second parallel pass saves writing :math:`R` to memory and reading it
+    straight back -- about a tenth of a step, and one of four thread launches.
+
+    The accumulation runs in a small per-element scratch rather than directly
+    into ``out``, so the inner loop's read-modify-write stays in cache whatever
+    the mesh size.
+    """
     nelem = U.shape[0]
     nbf = U.shape[1]
     nqv = phi_vol.shape[1]
     nface = face_edge.shape[1]
     nqf = fw.shape[1]
 
-    R = np.zeros((nelem, nbf, 4))
-    wave = np.zeros(nelem)
-
     for e in prange(nelem):
+        Re = np.zeros((nbf, 4))
         Uq = np.zeros(4)
         F = np.zeros(4)
         G = np.zeros(4)
@@ -369,7 +394,7 @@ def element_pass(
                 gx = grad_x[e, i, q]
                 gy = grad_y[e, i, q]
                 for s in range(4):
-                    R[e, i, s] -= gx * F[s] + gy * G[s]
+                    Re[i, s] -= gx * F[s] + gy * G[s]
         # ---- faces: R += sign * phi . fw
         acc = 0.0
         for f in range(nface):
@@ -380,18 +405,32 @@ def element_pass(
                 for i in range(nbf):
                     b = sg * phi_face[sd, f, i, q]
                     for s in range(4):
-                        R[e, i, s] += b * fw[k, q, s]
+                        Re[i, s] += b * fw[k, q, s]
             acc += smax[k] * edge_length[k]
         wave[e] = acc
-    return R, wave
+        # ---- optionally fold in -M^{-1}
+        if apply_mass:
+            for i in range(nbf):
+                for s in range(4):
+                    tot = 0.0
+                    for j in range(nbf):
+                        tot += inv_mass[e, i, j] * Re[j, s]
+                    out[e, i, s] = -tot
+        else:
+            for i in range(nbf):
+                for s in range(4):
+                    out[e, i, s] = Re[i, s]
 
 
 @njit(parallel=True, **_JIT)
-def apply_inverse_mass(inv_mass, R):
-    """Block-diagonal mass-matrix solve, one small dense block per element."""
+def apply_inverse_mass(inv_mass, R, out):
+    """Block-diagonal mass-matrix solve, one small dense block per element.
+
+    Still here for the unfused path that :meth:`Backend.residual` and the
+    cross-backend tests use; the march goes through ``element_pass`` instead.
+    """
     nelem = R.shape[0]
     nbf = R.shape[1]
-    out = np.zeros_like(R)
     for e in prange(nelem):
         for i in range(nbf):
             for s in range(4):
@@ -399,7 +438,84 @@ def apply_inverse_mass(inv_mass, R):
                 for j in range(nbf):
                     acc += inv_mass[e, i, j] * R[e, j, s]
                 out[e, i, s] = acc
-    return out
+
+
+# ==========================================================================
+#  Time-march arithmetic
+# ==========================================================================
+# These replace NumPy expressions like ``U + 0.5 * dt * F0``.  Each such
+# expression allocates a full state array and makes two passes over memory; done
+# six times a step it was a measured tenth of the runtime, and the allocations
+# churned the heap for no reason at all.
+
+
+@njit(parallel=True, **_JIT)
+def rms(A):
+    """Root-mean-square of a state array, without materialising ``A * A``."""
+    nelem, nbf, ns = A.shape
+    total = 0.0
+    for e in prange(nelem):
+        acc = 0.0
+        for i in range(nbf):
+            for s in range(ns):
+                v = A[e, i, s]
+                acc += v * v
+        total += acc
+    return np.sqrt(total / (nelem * nbf * ns))
+
+
+@njit(parallel=True, **_JIT)
+def local_dt(wave, elem_area, factor, out):
+    r"""``dt_e = factor * 2 A_e / max(sum_f s_f l_f, FLOOR)``."""
+    for e in prange(wave.shape[0]):
+        d = wave[e]
+        if d < FLOOR:
+            d = FLOOR
+        out[e] = factor * 2.0 * elem_area[e] / d
+
+
+@njit(parallel=True, **_JIT)
+def stage(U, F, coef, dt, out):
+    """``out = U + coef * dt * F``, with ``dt`` per element.
+
+    Safe when ``out`` aliases ``U``: index ``(e, i, s)`` of the output depends
+    only on index ``(e, i, s)`` of the inputs.
+    """
+    nelem, nbf, ns = U.shape
+    for e in prange(nelem):
+        c = coef * dt[e]
+        for i in range(nbf):
+            for s in range(ns):
+                out[e, i, s] = U[e, i, s] + c * F[e, i, s]
+
+
+@njit(parallel=True, **_JIT)
+def combine_rk4(U, F0, F1, F2, F3, dt, out):
+    """``out = U + dt / 6 * (F0 + 2 F1 + 2 F2 + F3)``."""
+    nelem, nbf, ns = U.shape
+    for e in prange(nelem):
+        c = dt[e] / 6.0
+        for i in range(nbf):
+            for s in range(ns):
+                out[e, i, s] = U[e, i, s] + c * (
+                    F0[e, i, s] + 2.0 * F1[e, i, s] + 2.0 * F2[e, i, s] + F3[e, i, s]
+                )
+
+
+@njit(parallel=True, **_JIT)
+def combine_ssp(U, V, F, dt, a, b, out):
+    """``out = a * U + b * (V + dt * F)`` -- both non-trivial SSP-RK3 stages."""
+    nelem, nbf, ns = U.shape
+    for e in prange(nelem):
+        d = dt[e]
+        for i in range(nbf):
+            for s in range(ns):
+                out[e, i, s] = a * U[e, i, s] + b * (V[e, i, s] + d * F[e, i, s])
+
+
+# ==========================================================================
+#  Positivity limiter
+# ==========================================================================
 
 
 @njit(inline="always", **_JIT)
@@ -473,19 +589,53 @@ def _probe_minima(Ue, Ubar0, Ubar1, Ubar2, Ubar3, theta, phi_vol, phi_face, fsid
 
 @njit(parallel=True, **_JIT)
 def positivity_limit(
-    U, phi_vol, phi_face, face_side, mean_weights, gamma, fraction, rho_floor, p_floor, steps
+    U, phi_vol, phi_face, face_side, mean_weights, gamma, fraction, rho_floor, p_floor,
+    steps, lebesgue,
 ):
-    """Zhang-Shu positivity limiter.  Returns ``(U_limited, n_scaled, n_mean_repaired)``.
+    r"""Zhang-Shu positivity limiter, **in place**.  Returns ``(n_scaled, n_repaired)``.
 
     The cell average is preserved wherever it is admissible, so the limiter is
     conservative there.  Where the average itself has gone non-physical it is
-    minimally repaired and counted in ``n_mean_repaired`` -- that count being
-    non-zero means the time step was too large.
+    minimally repaired and counted in ``n_repaired`` -- that count being non-zero
+    means the time step was too large.
+
+    The cheap screen
+    ----------------
+    On a smooth solution no element violates positivity, so almost every call
+    does nothing -- but proving that still cost a full sweep of the probe points,
+    which made the *inactive* limiter about a seventh of a Runge-Kutta step.
+
+    A sufficient condition avoids the sweep.  The basis is a partition of unity,
+    so for any probe point :math:`x`,
+
+    .. math::
+        |\rho(x) - \bar\rho| = \Bigl|\sum_i \phi_i(x)(U_{i0} - \bar\rho)\Bigr|
+        \le \Lambda \max_i |U_{i0} - \bar\rho|,
+        \qquad
+        \Lambda = \max_x \sum_i |\phi_i(x)| ,
+
+    with :math:`\Lambda` (``lebesgue``) a constant of the reference element and
+    the probe set, computed once.  The same bound applied to momentum and energy
+    gives a lower bound on the pressure,
+
+    .. math::
+        p(x) \ge (\gamma - 1)\Bigl(
+            \overline{\rho E} - \Lambda d_E
+            - \tfrac{1}{2}\frac{(|\bar{\mathbf{m}}| + \Lambda d_m)^2}
+                               {\bar\rho - \Lambda d_\rho}\Bigr),
+        \qquad d_m = \sqrt{d_{m_x}^2 + d_{m_y}^2},
+
+    costing one pass over the ``nbf`` coefficients instead of ``nbf`` times the
+    probe count.  When the screen passes, the element is provably admissible and
+    is skipped.  When it fails -- it is only sufficient, never necessary -- the
+    exact probe runs as before, so the limiter's output is unchanged in every
+    case.  At ``p = 0`` the deviations are identically zero and the screen always
+    passes, which is why the limiter costs nothing there.
     """
     nelem, nbf, _ = U.shape
-    out = U.copy()
-    n_scaled = np.zeros(nelem, dtype=np.int64)
-    n_repair = np.zeros(nelem, dtype=np.int64)
+    n_scaled = 0
+    n_repair = 0
+    g1 = gamma - 1.0
 
     for e in prange(nelem):
         Ubar0 = 0.0
@@ -501,19 +651,19 @@ def positivity_limit(
 
         # -- repair a non-physical cell average (last resort, not conservative)
         rho_new = Ubar0 if Ubar0 > rho_floor else rho_floor
-        e_min = p_floor / (gamma - 1.0) + 0.5 * (Ubar1 * Ubar1 + Ubar2 * Ubar2) / rho_new
+        e_min = p_floor / g1 + 0.5 * (Ubar1 * Ubar1 + Ubar2 * Ubar2) / rho_new
         rhoE_new = Ubar3 if Ubar3 > e_min else e_min
         d0 = rho_new - Ubar0
         d3 = rhoE_new - Ubar3
         if d0 != 0.0 or d3 != 0.0:
             for i in range(nbf):
-                out[e, i, 0] += d0
-                out[e, i, 3] += d3
+                U[e, i, 0] += d0
+                U[e, i, 3] += d3
             Ubar0 = rho_new
             Ubar3 = rhoE_new
-            n_repair[e] = 1
+            n_repair += 1
 
-        p_bar = (gamma - 1.0) * (Ubar3 - 0.5 * (Ubar1 * Ubar1 + Ubar2 * Ubar2) / Ubar0)
+        p_bar = g1 * (Ubar3 - 0.5 * (Ubar1 * Ubar1 + Ubar2 * Ubar2) / Ubar0)
         eps_rho = fraction * Ubar0
         if eps_rho < 0.5 * rho_floor:
             eps_rho = 0.5 * rho_floor
@@ -521,13 +671,40 @@ def positivity_limit(
         if eps_p < 0.5 * p_floor:
             eps_p = 0.5 * p_floor
 
-        Ue = out[e]
+        # -- cheap sufficient screen, O(nbf)
+        d_rho = 0.0
+        d_mx = 0.0
+        d_my = 0.0
+        d_en = 0.0
+        for i in range(nbf):
+            a = abs(U[e, i, 0] - Ubar0)
+            if a > d_rho:
+                d_rho = a
+            a = abs(U[e, i, 1] - Ubar1)
+            if a > d_mx:
+                d_mx = a
+            a = abs(U[e, i, 2] - Ubar2)
+            if a > d_my:
+                d_my = a
+            a = abs(U[e, i, 3] - Ubar3)
+            if a > d_en:
+                d_en = a
+        rho_lo = Ubar0 - lebesgue * d_rho
+        if rho_lo >= eps_rho:
+            m_hi = np.sqrt(Ubar1 * Ubar1 + Ubar2 * Ubar2) + lebesgue * np.sqrt(
+                d_mx * d_mx + d_my * d_my
+            )
+            p_lo = g1 * (Ubar3 - lebesgue * d_en - 0.5 * m_hi * m_hi / rho_lo)
+            if p_lo >= eps_p:
+                continue  # provably admissible, no probe needed
+
+        Ue = U[e]
         fside = face_side[e]
         rho_min, p_min = _probe_minima(
             Ue, Ubar0, Ubar1, Ubar2, Ubar3, 1.0, phi_vol, phi_face, fside, gamma
         )
         if rho_min >= eps_rho and p_min >= eps_p:
-            continue  # the common case: nothing to do
+            continue  # the screen was pessimistic; still nothing to do
 
         # -- density bound is linear in theta, solve it directly
         theta = 1.0
@@ -561,10 +738,10 @@ def positivity_limit(
             theta = lo
 
         for i in range(nbf):
-            out[e, i, 0] = Ubar0 + theta * (Ue[i, 0] - Ubar0)
-            out[e, i, 1] = Ubar1 + theta * (Ue[i, 1] - Ubar1)
-            out[e, i, 2] = Ubar2 + theta * (Ue[i, 2] - Ubar2)
-            out[e, i, 3] = Ubar3 + theta * (Ue[i, 3] - Ubar3)
-        n_scaled[e] = 1
+            U[e, i, 0] = Ubar0 + theta * (Ue[i, 0] - Ubar0)
+            U[e, i, 1] = Ubar1 + theta * (Ue[i, 1] - Ubar1)
+            U[e, i, 2] = Ubar2 + theta * (Ue[i, 2] - Ubar2)
+            U[e, i, 3] = Ubar3 + theta * (Ue[i, 3] - Ubar3)
+        n_scaled += 1
 
-    return out, n_scaled.sum(), n_repair.sum()
+    return n_scaled, n_repair

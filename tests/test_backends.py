@@ -76,3 +76,54 @@ def test_unknown_backend_is_rejected(setup):
     case, _ = setup
     with pytest.raises(ValueError, match="unknown backend"):
         get_backend("cuda", case.operators, case.flow, SolverOptions())
+
+
+@pytest.mark.numba
+@pytest.mark.parametrize("scheme", ["rk4", "ssprk3"])
+@pytest.mark.parametrize("limiter", ["none", "positivity"])
+def test_the_fused_numba_step_matches_the_shared_one(setup, scheme, limiter):
+    """The Numba backend reimplements both schemes; they must not drift.
+
+    It overrides ``run`` to keep every stage inside preallocated buffers, which
+    means the arithmetic of ``rk4_step`` and ``ssprk3_step`` exists twice --
+    once in :class:`~dgnozzle.backends.base.Backend` for NumPy and JAX, once in
+    kernels here.  Ten steps is long enough that a wrong coefficient or a stale
+    buffer shows up; `fastmath` reassociation keeps it from being exact.
+    """
+    from dgnozzle import initialize
+
+    case, _ = setup
+    ops, flow = case.operators, case.flow
+    opts = SolverOptions(limiter=limiter, scheme=scheme)
+    # the perturbed state of `setup` oscillates within elements, and ten
+    # unlimited steps of it diverge in both backends -- which agrees, but
+    # compares NaN to NaN.  Start from the real initial condition instead.
+    U = np.ascontiguousarray(
+        initialize.initial_state(ops, flow, case.geometry, "quasi1d")
+    )
+
+    ref, res_ref = get_backend("numpy", ops, flow, opts).run(U.copy(), 10, scheme)
+    out, res = get_backend("numba", ops, flow, opts).run(U.copy(), 10, scheme)
+
+    assert np.abs(np.asarray(out) - ref).max() / np.abs(ref).max() < 1e-9
+    assert abs(res - res_ref) / abs(res_ref) < 1e-9
+
+
+@pytest.mark.numba
+def test_reusing_the_buffers_does_not_leak_between_runs(setup):
+    """Every array is preallocated and shared, so a stale one would show here."""
+    case, U = setup
+    ops, flow = case.operators, case.flow
+    opts = SolverOptions(limiter="positivity")
+    bk = get_backend("numba", ops, flow, opts)
+
+    once, _ = bk.run(U.copy(), 6, "rk4")
+    # the same march in two chunks must land in the same place
+    half, _ = bk.run(U.copy(), 3, "rk4")
+    twice, _ = bk.run(half, 3, "rk4")
+    assert np.abs(np.asarray(twice) - np.asarray(once)).max() < 1e-13
+
+    # and the returned array must not alias a buffer the next run overwrites
+    kept = np.asarray(once).copy()
+    bk.run(U.copy(), 4, "rk4")
+    assert np.abs(np.asarray(once) - kept).max() == 0.0

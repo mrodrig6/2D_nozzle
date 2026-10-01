@@ -105,3 +105,69 @@ def test_numba_limiter_matches_the_numpy_one(case, smooth_state):
     U[20, 2, 0] = -0.2
     reference = lim.apply_limiter(U, ops, flow, "positivity")
     assert np.abs(bk.limit(U) - reference).max() < 1e-14
+
+
+@pytest.mark.numba
+def test_the_cheap_screen_never_changes_the_answer(case):
+    """The limiter's O(nbf) screen is sufficient, not necessary.
+
+    It may be pessimistic -- that only costs a probe -- but it must never
+    declare an inadmissible element admissible.  A field of marginal states
+    exercises both branches in the same call: most elements pass the screen, some
+    fail it and pass the exact probe, and some are genuinely limited.
+    """
+    from dgnozzle.backends import get_backend
+    from dgnozzle.config import SolverOptions
+
+    ops, flow = case.operators, case.flow
+    bk = get_backend("numba", ops, flow, SolverOptions(limiter="positivity"))
+    rng = np.random.default_rng(7)
+
+    # scale the deviation from tiny (screen passes) up to large (limiter acts)
+    for amplitude in (1e-6, 0.1, 0.5, 0.9, 1.5):
+        mean = np.array([2.0, 0.6, 0.0, 5.0])
+        U = np.broadcast_to(mean, (ops.n_elem, ops.ref.n_basis, 4)).copy()
+        U += amplitude * mean * rng.standard_normal(U.shape)
+        reference = lim.apply_limiter(U, ops, flow, "positivity")
+        got = bk.limit(U)
+        # Relative, not absolute: both implementations bisect the pressure bound
+        # twelve times, and an element whose pressure sits on the threshold can
+        # take the other branch on one step from round-off alone.  At amplitude
+        # 0.9 exactly one element of 140 does, differing by 7e-10 where the rest
+        # agree to 2e-15.  That is the bisection's own resolution showing
+        # through, not the screen admitting something it should not.
+        err = np.abs(got - reference).max() / np.abs(reference).max()
+        assert err < 1e-12, (amplitude, err)
+
+
+@pytest.mark.numba
+def test_the_lebesgue_constant_bounds_the_probe_deviation(case):
+    r"""``Lambda = max_x sum_i |phi_i(x)|`` is what makes the screen valid.
+
+    The screen bounds a probe-point value by its cell mean plus
+    ``Lambda * max_i |U_i - Ubar|``.  If the constant were understated the bound
+    would not hold and an inadmissible element could be skipped, so check it
+    directly against every probe point the kernel ever evaluates.
+    """
+    from dgnozzle.backends import get_backend
+    from dgnozzle.config import SolverOptions
+
+    ops = case.operators
+    bk = get_backend("numba", ops, case.flow, SolverOptions())
+    rng = np.random.default_rng(11)
+    U = rng.standard_normal((ops.n_elem, ops.ref.n_basis, 4))
+
+    mean = np.einsum("ei,eis->es", np.asarray(ops.mean_weights), U)
+    dev = np.abs(U - mean[:, None, :]).max(axis=1)
+
+    phi_vol = np.asarray(ops.ref.phi_vol)
+    probes = [np.einsum("iq,eis->eqs", phi_vol, U)]
+    side = ops.topology.edges.face_side
+    phi_face = np.asarray(ops.ref.phi_face)
+    for f in range(ops.topology.n_faces):
+        basis = phi_face[side[:, f], f]  # (nelem, nbf, nqf)
+        probes.append(np.einsum("eiq,eis->eqs", basis, U))
+    values = np.concatenate(probes, axis=1)  # (nelem, n_probe, 4)
+
+    bound = bk._lebesgue * dev[:, None, :]
+    assert np.all(np.abs(values - mean[:, None, :]) <= bound + 1e-12)
