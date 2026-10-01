@@ -144,19 +144,82 @@ def residual(U, ops: Operators, flow: FlowConditions, xp=np) -> ResidualResult:
     return ResidualResult(R, wave_speed_sum(speed, ops, xp=xp))
 
 
-def local_time_step(wave_sum, ops: Operators, order: int, cfl: float, xp=np):
+#: Largest ``cfl`` -- in the units of this module, so already the coefficient
+#: multiplying ``2 A_e / sum_f s_f l_f`` -- at which the march still converged,
+#: by polynomial order.  Measured by bisection to about 3%, over the ``bell``
+#: and ``smooth`` contours at refinement levels 0 and 1; the two contours agreed
+#: to within a bisection step at every order, and the tighter refinement level is
+#: the one recorded.  ``tests/test_solver.py`` re-checks that a step at
+#: ``cfl = 1`` stays finite, so a change that eats the margin fails the suite.
+#:
+#: These are *limits*, not recommendations: the shipped default keeps a 30%
+#: margin on them, see :data:`dgnozzle.config.DEFAULT_CFL`.
+STABILITY_LIMIT: dict[str, tuple[float, ...]] = {
+    "rk4": (1.625, 0.875, 0.500),
+    "ssprk3": (1.437, 0.779, 0.448),
+}
+
+#: Beyond the measured orders, fall back to ``K / (p + 1)``.  That scaling fits
+#: the measurements better than the textbook ``1/(2p+1)``: the stable coefficient
+#: falls as 1 : 0.54 : 0.31 across ``p = 0, 1, 2``, against 1 : 0.5 : 0.33 for
+#: ``1/(p+1)`` and 1 : 0.33 : 0.2 for ``1/(2p+1)``.  ``K`` is the smallest the
+#: measurements support, so the fallback is conservative where it is used.
+#:
+#: SSP-RK3 comes out at 0.885, 0.890 and 0.897 times RK4 at the three measured
+#: orders -- near enough constant that the two schemes differ by a scheme factor
+#: and not by their order dependence, which is a useful sanity check on both
+#: columns.
+STABILITY_FALLBACK: dict[str, float] = {"rk4": 1.5, "ssprk3": 1.32}
+
+
+
+def stability_limit(order: int, scheme: str = "rk4") -> float:
+    """The measured stable step coefficient for this order and scheme."""
+    try:
+        table = STABILITY_LIMIT[scheme]
+    except KeyError:
+        raise ValueError(
+            f"unknown scheme {scheme!r}; choose from {tuple(STABILITY_LIMIT)}"
+        ) from None
+    if order < len(table):
+        return table[order]
+    return STABILITY_FALLBACK[scheme] / (order + 1)
+
+
+def step_coefficient(order: int, cfl: float, scheme: str = "rk4") -> float:
+    r"""The scalar in :math:`\Delta t_e = c\,2 A_e / \sum_f s_f l_f`.
+
+    ``cfl`` is a *fraction of the stability limit* for this order and scheme, so
+    ``cfl = 1`` sits at the measured edge of stability and ``cfl = 0.7`` -- the
+    default -- keeps a 30% margin, whatever ``p`` is and whichever scheme runs.
+
+    .. note::
+       This is a change of units.  The step used to be
+       :math:`\mathrm{cfl}/(2p+1) \cdot 2A_e/\sum_f s_f l_f`, which made the same
+       ``cfl`` mean very different fractions of the stable step at different
+       orders: measured, ``cfl = 1`` sat at 62% of the limit at ``p = 0`` but
+       only 38% at ``p = 1`` and 40% at ``p = 2``.  The old default was therefore
+       leaving most of a factor of two on the floor at every order above zero,
+       and a value a user had tuned at one order was meaningless at another.
+       A script that passed an explicit ``cfl`` above 1 will now be past the
+       stability limit rather than comfortably inside it.
+    """
+    return cfl * stability_limit(order, scheme)
+
+
+def local_time_step(
+    wave_sum, ops: Operators, order: int, cfl: float, scheme: str = "rk4", xp=np
+):
     r"""Element-local pseudo-time step.
 
     .. math::
-        \Delta t_e = \frac{\mathrm{CFL}}{2p + 1}\,
+        \Delta t_e = c(p, \text{scheme},\ \mathrm{cfl})\,
                      \frac{2\,A_e}{\sum_f s_f\, l_f}
 
-    The ``1/(2p+1)`` factor is the standard order-dependent restriction for
-    explicit DG.  A ``1/(p+1)`` scaling is optimistic at ``p >= 1`` and will
-    eventually go unstable there.
+    with :math:`c` from :func:`step_coefficient`.
     """
     denom = xp.maximum(wave_sum, ph.FLOOR)
-    return cfl / (2 * order + 1) * 2.0 * ops.elem_area / denom
+    return step_coefficient(order, cfl, scheme) * 2.0 * ops.elem_area / denom
 
 
 def residual_scale(flow: FlowConditions, length: float) -> float:

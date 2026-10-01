@@ -34,7 +34,10 @@ class NumpyBackend(Backend):
         return out
 
     def time_step(self, wave_sum):
-        dt = asm.local_time_step(wave_sum, self.ops, self.ops.ref.order, self.opts.cfl, xp=np)
+        dt = asm.local_time_step(
+            wave_sum, self.ops, self.ops.ref.order, self.opts.cfl,
+            self.opts.scheme, xp=np,
+        )
         return dt[:, None, None]
 
     def norm(self, A) -> float:

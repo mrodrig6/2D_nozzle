@@ -24,6 +24,12 @@ from typing import Any
 
 BACKENDS = ("numba", "numpy", "jax")
 
+#: Default ``cfl``, as a fraction of the measured stability limit for the order
+#: and scheme in use (see :data:`dgnozzle.assembly.STABILITY_LIMIT`).  The scan
+#: behind those limits covers two contours at one back pressure, which is not a
+#: stability proof, so the default keeps a 30% margin on it.
+DEFAULT_CFL = 0.7
+
 
 @dataclass(frozen=True)
 class FlowConditions:
@@ -167,8 +173,19 @@ class SolverOptions:
     Parameters
     ----------
     cfl
-        Multiplier on the order-dependent stable step
-        ``dt = cfl * 2 A_e / ((2p + 1) * sum_f s_f l_f)``.
+        Step size as a **fraction of the stability limit** for the polynomial
+        order and scheme in use, so ``cfl = 1`` sits at the measured edge of
+        stability and the default keeps a 30% margin there whatever ``p`` is.
+        The limits are in :data:`dgnozzle.assembly.STABILITY_LIMIT`, measured by
+        bisection rather than taken from a textbook bound.
+
+        This is a change of units from the step
+        ``dt = cfl * 2 A_e / ((2p + 1) * sum_f s_f l_f)`` used previously, under
+        which the same ``cfl`` meant 62% of the stable step at ``p = 0`` but only
+        38% at ``p = 1`` -- so a value tuned at one order was meaningless at
+        another, and the default left most of a factor of two unused above
+        ``p = 0``.  A script passing an explicit ``cfl`` above 1 is now past the
+        limit instead of comfortably inside it.
     tolerance
         Convergence threshold on the residual norm, measured against the
         problem's own physical scale ``rho_t a_t / L`` rather than against the
@@ -206,6 +223,23 @@ class SolverOptions:
 
         Turn it on as a *fallback*: it converges cases a direct high-order solve
         cannot start, such as ``p = 2`` from a uniform initial condition.
+    multigrid
+        ``'none'``, ``'p'`` or ``'h'``.  Accelerates the march with an FAS
+        multigrid cycle instead of plain stepping; see
+        :mod:`dgnozzle.multigrid`.  ``'p'`` coarsens the polynomial order on the
+        same mesh and needs ``order >= 1``; ``'h'`` coarsens the mesh one
+        refinement level at a time and needs ``refine >= 1``.  Either silently
+        falls back to plain stepping when no coarse level exists.
+
+        A multigrid run reports ``iterations`` as **V-cycles**, which are not
+        comparable with single-grid steps; ``work_equivalent`` on the result is
+        the comparable number.
+    mg_pre, mg_post
+        Smoothing steps before and after the coarse-level visit, per level.
+    mg_coarse
+        Smoothing steps on the coarsest level, where they are cheapest.
+    mg_levels
+        Cap on the number of levels; ``0`` uses every level available.
     check_interval
         Iterations between convergence tests.  Also the chunk size handed to the
         backend, so it is what the JAX backend fuses into one compiled loop.
@@ -221,7 +255,12 @@ class SolverOptions:
         without this the run would spend its whole budget on a limit cycle.
     """
 
-    cfl: float = 1.0
+    cfl: float = DEFAULT_CFL
+    multigrid: str = "none"
+    mg_pre: int = 2
+    mg_post: int = 2
+    mg_coarse: int = 8
+    mg_levels: int = 0
     tolerance: float = 1e-6
     max_iterations: int = 200_000
     scheme: str = "rk4"
@@ -253,6 +292,14 @@ class SolverOptions:
             raise ValueError(
                 f"limiter must be 'none', 'positivity' or 'barth-jespersen', got {self.limiter!r}"
             )
+        if self.multigrid not in ("none", "p", "h"):
+            raise ValueError(
+                f"multigrid must be 'none', 'p' or 'h', got {self.multigrid!r}"
+            )
+        if min(self.mg_pre, self.mg_post, self.mg_coarse) < 1:
+            raise ValueError("mg_pre, mg_post and mg_coarse must each be at least 1")
+        if self.mg_levels < 0:
+            raise ValueError("mg_levels must be non-negative")
         if self.initial_condition not in ("quasi1d", "uniform"):
             raise ValueError(
                 f"initial_condition must be 'quasi1d' or 'uniform', got {self.initial_condition!r}"

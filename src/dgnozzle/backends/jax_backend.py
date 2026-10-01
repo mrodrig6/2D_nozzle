@@ -80,7 +80,8 @@ class JaxBackend(Backend):
 
     def time_step(self, wave_sum):
         dt = asm.local_time_step(
-            wave_sum, self.ops, self.ops.ref.order, self.opts.cfl, xp=self.jnp
+            wave_sum, self.ops, self.ops.ref.order, self.opts.cfl,
+            self.opts.scheme, xp=self.jnp,
         )
         return dt[:, None, None]
 

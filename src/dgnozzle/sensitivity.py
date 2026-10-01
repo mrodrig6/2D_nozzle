@@ -315,7 +315,8 @@ class DifferentiableCase:
         # frozen local time step from the converged state
         _, wave = asm.residual(U, ops, flow, xp=jnp)
         dt = asm.local_time_step(
-            wave, ops, self.discretization.order, self.options.cfl, xp=jnp
+            wave, ops, self.discretization.order, self.options.cfl,
+            self.options.scheme, xp=jnp,
         )[:, None, None]
         inv_mass = ops.inv_mass
 

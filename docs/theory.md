@@ -532,13 +532,36 @@ element-local step,
 
 $$
 \Delta t_e
-= \frac{\mathrm{CFL}}{2p+1}\,
+= c(p, \text{scheme})\,\mathrm{CFL}\,
   \frac{2 A_e}{\displaystyle\sum_{f \in \partial\Omega_e} s_f\, \ell_f},
 $$
 
 where $A_e$ is the element area, $\ell_f$ the length of face $f$ and $s_f$ the
-maximum signal speed there. The $1/(2p+1)$ factor is the standard
-order-dependent restriction for explicit DG.
+maximum signal speed there.
+
+The coefficient $c$ is **measured, not derived.** The textbook restriction for
+explicit DG is $c = 1/(2p+1)$, and it is far too pessimistic above $p = 0$: a
+bisection scan of the largest $\mathrm{CFL}$ that still converges, over two
+contours at two refinement levels, gives
+
+| $p$ | $c_{\max}$, RK4 | $c_{\max}$, SSP-RK3 | $1/(2p+1)$ |
+|---|---|---|---|
+| 0 | 1.625 | 1.437 | 1.000 |
+| 1 | 0.875 | 0.779 | 0.333 |
+| 2 | 0.500 | 0.448 | 0.200 |
+
+so $1/(2p+1)$ sat at 62% of the stable step at $p = 0$ but only 38% at $p = 1$
+and 40% at $p = 2$. The decay with order is close to $1/(p+1)$ — the measured
+ratios are $1 : 0.54 : 0.31$ against $1 : 0.5 : 0.33$ — not $1/(2p+1)$'s
+$1 : 0.33 : 0.2$, and that is used as the fallback beyond the measured orders.
+SSP-RK3 comes out at a near-constant $0.89$ times RK4, which is a useful check
+on both columns: the two schemes differ by a scheme factor, not by their order
+dependence.
+
+$\mathrm{CFL}$ is therefore defined as a *fraction of that limit*, so it means
+the same thing at every order and for either scheme, and the shipped default of
+$0.7$ keeps a 30% margin on a scan that covers two contours at one back
+pressure — which is a measurement, not a stability proof.
 
 Two schemes are available. `'rk4'` is the classical four-stage method, with the
 local step frozen at the first stage (the intermediate stages are not meant to
@@ -978,6 +1001,21 @@ the identical code runs under NumPy, Numba and JAX.
   condition, which a direct solve does not.
 - **Warm-started sweeps** — the mesh topology is invariant under design changes,
   so the previous point's field is always a valid start.
+- **FAS multigrid** (off by default) — a V-cycle over either a $p$-hierarchy on
+  the same mesh or an $h$-hierarchy of refinement levels. The transfers are
+  exact projection pairs and the cycle leaves a converged state untouched, so
+  the answer is the single-grid answer; what it does not do is save time.
+  Measured at the same $\mathrm{CFL}$ it buys 1.1–1.3×, costs more than plain
+  stepping at $p = 2$, $\mathrm{ref} = 1$, and at some settings stops
+  converging; compared at each method's own best $\mathrm{CFL}$, plain stepping
+  wins outright. The reason is in the march: its iteration count is exactly
+  inversely proportional to $\Delta t$, so the slow mode is the acoustic
+  transit of the nozzle rather than a spectrum of spatial wavenumbers — which is
+  the error a coarse grid is good at removing. Raising the coarse-level work
+  from 8 smoothing steps to 40 does not change the fine-level cycle count at
+  all, which says the same thing. The second half of the explanation is that
+  RK4 tuned for the largest stable step is a poor *smoother*: the residual falls
+  by about 0.92 per cycle where textbook multigrid expects 0.1–0.3.
 - **Limiter fast path** — on a smooth solution no element violates positivity,
   so the pressure bisection is skipped entirely. This is the single largest
   saving in the code: the limiter runs once per Runge–Kutta stage, and in naive
@@ -986,7 +1024,8 @@ the identical code runs under NumPy, Numba and JAX.
   RK4 step from 3.92 ms to 0.34 ms.
 
 > **On measuring these honestly.** The first two were documented as large
-> speed-ups until they were measured. The iteration counts that appeared to
+> speed-ups until they were measured, and multigrid was estimated at 2–8× before
+> it was built and measured at 1.1–1.3×. The iteration counts that appeared to
 > support that were an artefact of two defects, both since fixed: convergence
 > tested *relative to the first residual*, which tightens the target as the
 > initial guess improves and so penalises a good starting field; and
