@@ -38,8 +38,8 @@ def test_area_ratio_is_honoured_across_the_range(contour, area_ratio):
     assert diag["area_ratio"] == pytest.approx(area_ratio, rel=1e-3)
 
 
-def test_analytic_contour_reproduces_the_legacy_shape():
-    """The original single-formula contour, which the refactor had broken."""
+def test_analytic_contour_matches_its_closed_form():
+    """The fixed verification contour: inlet 0.15, throat 0.13989434, exit 0.35."""
     x = np.linspace(0.0, 1.0, 200_001)
     y = analytic_contour(x)
     i = int(np.argmin(y))
@@ -51,7 +51,7 @@ def test_analytic_contour_reproduces_the_legacy_shape():
 
 
 def test_contour_never_goes_negative():
-    """The legacy 'smooth' branch dipped to -0.053 m just past the throat."""
+    """A wall that crosses zero produces inverted elements, so no family may."""
     for contour in CONTOURS:
         for ar in (1.5, 2.5, 4.0, 6.0):
             geom = NozzleGeometry(contour=contour, area_ratio=ar)
@@ -60,7 +60,7 @@ def test_contour_never_goes_negative():
 
 
 def test_contour_never_overshoots_its_exit_height():
-    """The legacy rescale constants gave a 12.4x overshoot (4.34 m vs 0.35 m)."""
+    """A mis-scaled diverging section shows up here as a wall above the exit."""
     for contour in ("smooth", "conical", "bezier", "analytic"):
         geom = NozzleGeometry(contour=contour, area_ratio=2.5019)
         y = np.asarray(geom.wall(np.linspace(0.0, 1.0, 2001)))

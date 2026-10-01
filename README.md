@@ -34,7 +34,6 @@ print(performance(result).summary())
 - [Known limitation: shocked operating points](#known-limitation-shocked-operating-points-do-not-converge)
 - [Verification](#verification)
 - [Troubleshooting](#troubleshooting)
-- [Relationship to the original MATLAB code](#relationship-to-the-original-matlab-code)
 
 ---
 
@@ -179,7 +178,7 @@ isentropic tables apply directly.
 | `'conical'` | straight diverging wall | the simplest baseline |
 | `'moc'` | `'bell'` at the classical Rao angles (30°, 0°) | textbook comparison |
 | `'bezier'` | cubic Bézier, two shape weights | **shape optimisation** |
-| `'analytic'` | the fixed contour of the original MATLAB code | reproducing legacy results |
+| `'analytic'` | a fixed closed-form contour, smooth throughout | a verification geometry with no throat corner |
 
 > **A deliberate corner.** With `theta_initial_deg > 0` the wall slope jumps at
 > the throat. That sharp-corner expansion is the classical minimum-length
@@ -359,9 +358,6 @@ Timings on 4 cores, converged to a relative residual of 1e-6:
 | 2 | 1 | 560 | 3360 | 6301 | **7.3 s** |
 | 1 | 2 | 2240 | 6720 | 6051 | **12 s** |
 
-For comparison, the original MATLAB code documented ~30 s for the first row and
-"several minutes" for `p=1, refine=1`.
-
 **Start with `p=1, refine=0`** for design exploration — it is under a second and
 already within a few percent on thrust. Move to `p=2, geometry_order=2,
 refine=1` for numbers you will put in a report.
@@ -539,30 +535,6 @@ defect, and the reason to use `smooth` for convergence work.
 
 Every failure message names both the cause and the fix. The solver detects a
 limit cycle and stops rather than burning the whole iteration budget.
-
----
-
-## Relationship to the original MATLAB code
-
-This is a rewrite, not a translation. The MATLAB sources are preserved in
-[`matlab_legacy/`](matlab_legacy/) for reference. Defects found and fixed:
-
-| Defect | Consequence |
-|---|---|
-| Diverging-contour rescale used constants evaluated at the wrong parameter values | The default contour reached an exit half-height of **4.34 m instead of 0.350 m**, and went **negative** just past the throat — inverted elements |
-| Outflow boundary always extrapolated | `p_back_ratio` was dead; **no shocked operating point was reachable** |
-| Inflow quadratic took the wrong root when the leading coefficient changed sign | Negative Mach number, meaningless boundary state |
-| Throat height hard-coded in the thrust normalisation | Wrong `c_F` for any geometry but the original |
-| Wall integral included the symmetry axis | Harmless for a horizontal axis, wrong in general |
-| `extrapolate.m` read the new order as the old one, and the mesh changed between calls | `p`-continuation indexed past the end of its input |
-| `postprocess()` took no arguments but was called with two; loaded `.mat` files never written | Post-processing could not run at all |
-| Dunavant degree-3 rule (weight `−0.28125`) | Risked an indefinite mass matrix and a negative sum-of-squares |
-| Unnormalised convergence test on the 4th RK stage; no iteration cap | "Converged" meant different things on different meshes; a diverging run never stopped |
-| Negative Roe sound speed raised an error | A recoverable transient aborted the whole run |
-
-Beyond the fixes: quadrilateral elements, curved (`Q=2`) geometry, a working
-back-pressure boundary condition, positivity and slope limiters, quasi-1D
-theory, adjoint sensitivities, sweeps, and a test suite.
 
 ---
 

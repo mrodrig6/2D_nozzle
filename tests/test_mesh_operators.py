@@ -35,7 +35,7 @@ def test_face_count_is_consistent(geom, kind, refine):
 
 
 @pytest.mark.parametrize("kind", KINDS)
-def test_legacy_element_counts(geom, kind):
+def test_element_counts_quadruple_per_refinement(geom, kind):
     counts = [build_nozzle_mesh(geom, kind=kind, refine=r)[0].n_elem for r in (0, 1, 2)]
     expected = [140, 560, 2240] if kind == "tri" else [70, 280, 1120]
     assert counts == expected

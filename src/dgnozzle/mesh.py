@@ -250,8 +250,12 @@ class MeshTopology:
 # --------------------------------------------------------------------------
 # Node distributions
 # --------------------------------------------------------------------------
-def _legacy_x_distribution(n_intervals: int) -> np.ndarray:
-    """The original MATLAB inlet-clustered distribution on ``[0, 1]``."""
+def _inlet_clustered_distribution(n_intervals: int) -> np.ndarray:
+    """Inlet-clustered points on ``[0, 1]``, geometrically graded.
+
+    Resolves a throat that sits near the inlet, but puts the fine spacing in the
+    wrong place for a throat further downstream -- see ``'throat'``.
+    """
     a, b = 0.7, 1.2
     v = np.logspace(a, b, n_intervals + 1)
     return (v - 10.0**a) / (10.0**b - 10.0**a)
@@ -282,10 +286,9 @@ def _clustered_x_distribution(
 def _subdivide(base: np.ndarray, n_sub: int) -> np.ndarray:
     """Linearly split each interval of ``base`` into ``n_sub`` pieces.
 
-    Reproduces the legacy ``spaceq``.  Because refinement only subdivides, the
-    node set at one refinement level is a subset of the next, which is what
-    makes :func:`dgnozzle.restart.interpolate_between_meshes` exact on the
-    shared nodes.
+    Because refinement only subdivides, the node set at one refinement level is
+    a subset of the next, so the coarse nodes survive exactly into the fine
+    mesh.
     """
     if n_sub == 1:
         return base.copy()
@@ -441,13 +444,13 @@ def nozzle_x_distribution(
     """Normalised axial node positions matching the topology's node count."""
     if spacing == "uniform":
         base = np.linspace(0.0, 1.0, nx_base + 1)
-    elif spacing == "legacy":
-        base = _legacy_x_distribution(nx_base)
+    elif spacing == "inlet":
+        base = _inlet_clustered_distribution(nx_base)
     elif spacing == "throat":
         base = _clustered_x_distribution(nx_base, x_throat, cluster_strength, cluster_width)
     else:
         raise ValueError(
-            f"unknown x_spacing {spacing!r}; use 'throat', 'legacy' or 'uniform'"
+            f"unknown x_spacing {spacing!r}; use 'throat', 'inlet' or 'uniform'"
         )
     x = _subdivide(base, n_sub)
     if x.size != n_nodes_x:  # pragma: no cover - guarded by construction

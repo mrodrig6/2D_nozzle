@@ -5,10 +5,10 @@ Why a limiter is needed
 At ``p = 0`` the solution is constant in each element and cannot oscillate.  At
 ``p >= 1`` it can, and near a shock it does: the polynomial overshoots, density
 or pressure goes negative at a quadrature point, and the Roe flux hits a
-negative Roe-averaged sound speed.  The legacy MATLAB solver responded to that
-by raising ``error 'negative roe-averaged speed of sound'`` and throwing the run
-away -- which meant any operating point with a shock in the nozzle was simply
-unreachable at ``p >= 1``.
+negative Roe-averaged sound speed.  Aborting on that is the wrong response in a
+pseudo-time march, where such an excursion is a transient to be controlled
+rather than a fatal error -- and it would put every shocked operating point out
+of reach at ``p >= 1``.
 
 Two limiters are provided.
 
@@ -97,11 +97,11 @@ def floor_cell_means(U, ops: Operators, flow: FlowConditions, *, fraction: float
     density is unfixable by any scaling.  A negative mean means the time step was
     too large or the state was already broken.
 
-    Rather than abort -- the legacy behaviour -- the mean is minimally repaired:
-    density is raised to the floor and energy raised to whatever makes the
-    pressure reach its floor, with momentum untouched.  This is **not
-    conservative**, so the solver counts these repairs and reports them; a run
-    that needed them should be rerun with a smaller ``cfl``.
+    Rather than abort, the mean is minimally repaired: density is raised to the
+    floor and energy raised to whatever makes the pressure reach its floor, with
+    momentum untouched.  This is **not conservative**, so the solver counts these
+    repairs and reports them; a run that needed them should be rerun with a
+    smaller ``cfl``.
     """
     rho_floor, p_floor = reference_floors(flow, fraction)
     gamma = flow.gamma

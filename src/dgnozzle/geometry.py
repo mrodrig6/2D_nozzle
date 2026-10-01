@@ -29,8 +29,10 @@ Contour families
                0 deg exit wall angles.  Only monotone for long nozzles.
 ``'bezier'``   Cubic Bezier diverging section with two shape weights.  The most
                convenient family for gradient-based shape optimisation.
-``'analytic'`` The fixed analytic contour of the original MATLAB code, kept for
-               verification.  Ignores ``area_ratio`` and ``throat_x``.
+``'analytic'`` A fixed closed-form contour, smooth everywhere, kept as a
+               verification geometry: it has no throat corner, so it reaches the
+               scheme's design order of accuracy.  Ignores ``area_ratio`` and
+               ``throat_x``.
 
 The converging section is always a cubic Hermite from the inlet to the throat
 with zero slope at both ends, so the throat really is a stationary point of
@@ -62,7 +64,7 @@ DESIGN_PARAMETERS = (
     "length",
 )
 
-#: Throat of the legacy analytic contour, located by Newton iteration below.
+#: Throat of the fixed analytic contour, located by Newton iteration below.
 ANALYTIC_THROAT_X = 0.13880048
 ANALYTIC_THROAT_Y = 0.13989434
 ANALYTIC_INLET_Y = 0.15
@@ -71,10 +73,10 @@ ANALYTIC_AREA_RATIO = ANALYTIC_EXIT_Y / ANALYTIC_THROAT_Y
 
 
 # --------------------------------------------------------------------------
-# The legacy analytic contour
+# The fixed analytic contour
 # --------------------------------------------------------------------------
 def analytic_contour(x, xp=np):
-    r"""The original MATLAB bell contour on :math:`x \in [0, 1]`.
+    r"""A closed-form bell contour on :math:`x \in [0, 1]`.
 
     .. math::
         t(x) &= \pi \ln\!\bigl(1 + (e^2 - 1)\, x\bigr) \\

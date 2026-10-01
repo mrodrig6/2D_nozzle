@@ -56,7 +56,7 @@ def test_roe_flux_is_conservative(states, normals):
 
 
 def test_roe_survives_a_vacuum_like_state():
-    """The legacy code raised an error here and threw the whole run away."""
+    """A near-vacuum state must give a finite flux, not abort the run."""
     bad = np.array([[1e-14, 0.0, 0.0, 1e-14]])
     good = np.array([[1.0, 0.3, 0.0, 2.5]])
     out = ph.roe_flux(bad, good, np.array([1.0]), np.array([0.0]), GAMMA)
@@ -100,8 +100,8 @@ def test_inflow_reproduces_a_uniform_isentropic_state(mach):
 
 
 def test_inflow_picks_a_non_negative_mach_number():
-    """The legacy root choice returned a negative Mach where the leading
-    coefficient of the quadratic changes sign."""
+    """Taking the larger root unconditionally returns a negative Mach number
+    wherever the quadratic's leading coefficient changes sign."""
     rng = np.random.default_rng(0)
     for _ in range(200):
         rho = rng.uniform(0.2, 3.0)
@@ -125,7 +125,7 @@ def test_outflow_extrapolates_when_supersonic():
 
 
 def test_outflow_imposes_the_back_pressure_when_subsonic():
-    """The legacy solver always extrapolated, so p_back never reached the flow."""
+    """Extrapolating unconditionally would leave p_back with no effect at all."""
     U = np.array([[1.0, 0.3, 0.0, 2.0]])
     nx, ny = np.array([1.0]), np.array([0.0])
     assert ph.mach_number(U, GAMMA)[0] < 1.0

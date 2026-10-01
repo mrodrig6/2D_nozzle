@@ -7,9 +7,9 @@ Starting from the quasi-one-dimensional solution for the actual geometry and bac
 pressure is worth doing, but the honest accounting is narrower than it might
 seem.  On the reference case it saves about 15% of the iterations at ``p = 0``
 and 3% at ``p = 1``.  Where it earns its place is robustness: at ``p = 2``
-without ``p``-continuation a uniform ``M = 0.95`` start -- what the legacy code
-used -- diverges, its residual growing by four orders of magnitude, while the
-quasi-1D start converges cleanly.
+without ``p``-continuation a uniform ``M = 0.95`` start diverges, its residual
+growing by four orders of magnitude, while the quasi-1D start converges
+cleanly.
 
 Note also that the saving is only visible because convergence is judged against
 a *fixed physical scale* rather than against the first iteration's residual.  A
@@ -59,7 +59,7 @@ def uniform_state(flow: FlowConditions, mach: float = 0.95) -> np.ndarray:
 
 
 def uniform_initial(ops: Operators, flow: FlowConditions, mach: float = 0.95, xp=np):
-    """Project a uniform freestream.  Reproduces the legacy initial condition."""
+    """Project a uniform freestream at a single Mach number."""
     state = uniform_state(flow, mach)
     values = xp.broadcast_to(xp.asarray(state), (ops.n_elem, ops.ref.n_qvol, 4))
     return project(values, ops, xp=xp)
@@ -126,12 +126,12 @@ def change_order(U, ops_from: Operators, ops_to: Operators, xp=np):
     removes iterations.
 
     .. note::
-       The legacy ``extrapolate.m`` read ``resdata.p`` as the *old* order, but
-       ``main.m`` had already overwritten it with the *new* one before calling.
-       It therefore built the operator for the wrong pair of orders and indexed
-       past the end of the incoming solution.  It also assumed the mesh was
-       unchanged while ``main.m`` rebuilt it at a new refinement level between
-       calls, so the element counts disagreed as well.
+       Both orders must be passed explicitly, and both operator sets must come
+       from the *same* mesh.  Inferring the source order from mutable solver
+       state is fragile -- if that state has already been advanced to the target
+       order, the projection is built for the wrong pair and indexes past the
+       end of its input -- and a mesh rebuilt at a different refinement level
+       between the two calls gives disagreeing element counts.
     """
     if ops_from.n_elem != ops_to.n_elem:
         raise ValueError(

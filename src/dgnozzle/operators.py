@@ -5,9 +5,8 @@ container of arrays.  Two properties are deliberate:
 
 *Element-batched layout.*  Arrays are shaped ``(n_elem, ...)`` or
 ``(n_edge, ...)`` so the whole residual is a handful of ``einsum`` calls rather
-than a Python loop over elements.  The legacy MATLAB code looped over every
-element and every edge in interpreted code; that loop is the single largest
-reason it was slow.
+than a Python loop over elements.  Interpreted per-element and per-edge loops
+dominate the cost of a scheme like this one, so there are none.
 
 *Written through an injected array module.*  Passing ``xp=jax.numpy`` makes the
 metric terms -- and therefore the residual, the steady solution and the thrust

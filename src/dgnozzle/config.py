@@ -12,8 +12,8 @@ The reference state is the inlet stagnation condition, with
 ``total_pressure = 1``, ``total_temperature = 1``, ``Rgas = 0.4`` and
 ``gamma = 1.4``.  That gives a stagnation speed of sound
 ``a_t = sqrt(gamma R T_t) = 0.7483`` and stagnation density
-``rho_t = gamma p_t / a_t^2 = 2.5``.  These are the units of the original MATLAB
-solver, so results are directly comparable.
+``rho_t = gamma p_t / a_t^2 = 2.5``.  Every reported quantity is in these
+units unless stated otherwise.
 """
 
 from __future__ import annotations
@@ -111,8 +111,9 @@ class Discretization:
         Base element counts along and across the channel, before refinement.
     x_spacing
         ``'throat'`` clusters axial nodes around the throat (the default, and
-        correct for any ``throat_x``); ``'legacy'`` reproduces the original
-        MATLAB inlet-clustered distribution exactly; ``'uniform'`` is uniform.
+        correct for any ``throat_x``); ``'inlet'`` clusters them toward the inlet
+        instead, which resolves a throat near ``x = 0`` but not one placed
+        further downstream; ``'uniform'`` is uniform.
     cluster_strength, cluster_width
         For ``x_spacing='throat'``: the far-field-to-throat spacing ratio, and
         the width of the clustered region as a fraction of the length.
@@ -178,8 +179,8 @@ class SolverOptions:
     max_iterations
         Hard cap.  Reaching it is reported, never silently ignored.
     scheme
-        ``'rk4'`` (classical four-stage, the legacy choice) or ``'ssprk3'``
-        (three-stage strong-stability-preserving, better behaved with limiters).
+        ``'rk4'`` (classical four-stage) or ``'ssprk3'`` (three-stage
+        strong-stability-preserving, better behaved with limiters).
     limiter
         ``'none'``, ``'positivity'`` (Zhang-Shu scaling, cheap and enough to
         keep the march alive) or ``'barth-jespersen'`` (also damps shock
@@ -191,8 +192,8 @@ class SolverOptions:
         reference case it saves only about 15% of the iterations at ``p = 0``
         and 3% at ``p = 1`` -- but at ``p = 2`` without ``p_continuation`` the
         uniform start *diverges* while the quasi-1D start converges.  Its value
-        is robustness, not speed.  ``'uniform'`` reproduces the legacy
-        ``M = 0.95`` freestream start.
+        is robustness, not speed.  ``'uniform'`` starts from a uniform
+        ``M = 0.95`` freestream.
     p_continuation
         Solve at ``p = 0`` first and re-project upward one order at a time.
 
