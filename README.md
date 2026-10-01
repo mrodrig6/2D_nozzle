@@ -32,7 +32,9 @@ print(performance(result).summary())
 - [Choosing resolution](#choosing-resolution)
 - [Backends and performance](#backends-and-performance)
   - [Where the time goes](#where-the-time-goes)
-  - [CFL headroom](#cfl-headroom)
+  - [What made it faster](#what-made-it-faster)
+  - [The time step](#the-time-step)
+  - [Multigrid, and why it is off](#multigrid-and-why-it-is-off)
 - [Choking, as a check on the solver](#choking-as-a-check-on-the-solver)
 - [Known limitation: shocked operating points](#known-limitation-shocked-operating-points-do-not-converge)
 - [Verification](#verification)
@@ -166,7 +168,7 @@ seconds, cached afterwards).
 Run the tests:
 
 ```bash
-./dg2d.sh test -m "not slow"   # 317 unit tests, about a minute
+./dg2d.sh test -m "not slow"   # 359 unit tests, about two minutes
 ./dg2d.sh test                 # plus the end-to-end solves and adjoint checks
 ```
 
@@ -199,8 +201,8 @@ print(performance(result).summary())
 ```
 
 ```
-converged in 1701 iterations (0.63 s, numba): residual 9.169e-07 scaled
-  (1.80e-06 of initial); min rho 3.0174e-01, min p 5.1730e-02
+converged in 951 iterations (0.18 s, numba): residual 6.408e-07 scaled
+  (1.25e-06 of initial); min rho 3.0174e-01, min p 5.1730e-02
 
 thrust        0.045825  (c_F = 0.163785, 90.09% of ideal)
   wall form   0.045344  (imbalance 1.05e-02)
@@ -462,23 +464,27 @@ convergence study and a back-pressure sweep. `./dg2d.sh list` names them.
 | `geometry_order` (`Q`) | `1` straight-sided, `2` curved. `Q=2` represents the curved wall ~125× more accurately at the same element count. |
 | `refine` | uniform refinement; each level multiplies elements by 4. |
 | `element` | `'tri'` (default) or `'quad'`. |
+| `cfl` | step size as a fraction of the measured stability limit; `0.7` by default, see [the time step](#the-time-step). |
 
 Solve times on 4 cores of a 2.1 GHz Xeon, default `bell` contour, converged to
 `1e-6` on the scaled residual, with the Numba kernels already compiled:
 
 | `p` | `refine` | elements | DOF | iterations | time | ms/iteration |
 |---|---|---|---|---|---|---|
-| 0 | 0 | 140 | 140 | 851 | **0.19 s** | 0.22 |
-| 1 | 0 | 140 | 420 | 1751 | **0.56 s** | 0.32 |
-| 2 | 0 | 140 | 840 | 3301 | **1.6 s** | 0.50 |
-| 1 | 1 | 560 | 1680 | 2501 | **1.6 s** | 0.66 |
-| 2 | 1 | 560 | 3360 | 6301 | **7.0 s** | 1.11 |
-| 1 | 2 | 2240 | 6720 | 6051 | **9.7 s** | 1.60 |
+| 0 | 0 | 140 | 140 | 751 | **0.08 s** | 0.11 |
+| 1 | 0 | 140 | 420 | 951 | **0.16 s** | 0.17 |
+| 2 | 0 | 140 | 840 | 1901 | **0.46 s** | 0.24 |
+| 1 | 1 | 560 | 1680 | 1401 | **0.43 s** | 0.31 |
+| 2 | 1 | 560 | 3360 | 3601 | **2.3 s** | 0.64 |
+| 1 | 2 | 2240 | 6720 | 3301 | **2.9 s** | 0.86 |
+
+That is 2.5–3.8× faster than this table read a release ago; [what changed and
+what each part was worth](#what-made-it-faster) is below.
 
 The *first* solve in a session pays a few seconds of Numba compilation on top,
 once, and then caches it.
 
-**Start with `p=1, refine=0`** for design exploration — it is under a second and
+**Start with `p=1, refine=0`** for design exploration — a fifth of a second, and
 already within a few percent on thrust. Move to `p=2, geometry_order=2,
 refine=1` for numbers you will put in a report.
 
@@ -501,71 +507,154 @@ Same equations, three execution strategies:
 They agree to a relative 1e-10, which the test suite enforces. Measured on one
 RK4 step, `p=1`:
 
-| elements | `numba` | `numpy` |
-|---|---|---|
-| 140 | 0.32 ms | 3.8 ms |
-| 560 | 0.71 ms | 8.9 ms |
-| 2240 | 1.55 ms | 34 ms |
+| elements | `numba` | `numpy` | ratio |
+|---|---|---|---|
+| 140 | 0.17 ms | 3.8 ms | 22× |
+| 560 | 0.34 ms | 8.9 ms | 26× |
+| 2240 | 0.83 ms | 34 ms | 41× |
+
+Only the Numba path carries the fused stages and the preallocated working set;
+`numpy` is the readable reference and is not meant to be fast.
 
 ### Where the time goes
 
-One RK4 step at `p=1, refine=1` (560 elements, 1680 DOF), by component. The
-step measured 0.58 ms in this run; repeat runs on the same machine spread about
-±10%, so read the shares rather than the absolute times:
+One RK4 step at `p=1, refine=1` (560 elements, 1680 DOF), by component. The step
+measured 0.34 ms in this run; repeat runs on the same machine spread about ±10%,
+so read the shares rather than the absolute times:
 
 | Component | Per step | Share |
 |---|---|---|
-| residual (edge pass + element pass) × 4 | 0.30 ms | 51% |
-| inverse mass × 4 | 0.059 ms | 10% |
-| positivity limiter × 4 (fast path, nothing limited) | 0.081 ms | 14% |
-| stage arithmetic (NumPy temporaries) | 0.035 ms | 6% |
-| residual norm + time step | 0.013 ms | 2% |
-| allocation and dispatch | — | ~17% |
+| rate: edge pass + element pass + inverse mass, × 4 | 0.22 ms | 65% |
+| positivity limiter × 4 (screened out, nothing limited) | 0.029 ms | 8% |
+| stage arithmetic (3 axpy + the final combination) | 0.021 ms | 6% |
+| residual norm + local time step | 0.008 ms | 2% |
+| allocation and dispatch | — | ~18% |
 
-So the residual is half the cost, and the limiter's *inactive* fast path is a
-seventh of it.
+Thread scaling is still the weak point at the sizes used for design work. All
+four Numba kernels are `prange`-parallel, but at 140 elements there are only 35
+elements per thread per parallel region, so the launch overhead swamps the work.
+Throughput, on the other hand, now runs from 10 M unknown-updates/s at the
+smallest size to 32 M at the largest.
 
-Thread scaling is the weak point at the sizes used for design work. All four
-Numba kernels are `prange`-parallel, but one RK4 step enters a parallel region
-sixteen times — four stages × (edge pass, element pass, inverse mass, limiter)
-— and at 140 elements that is only 35 elements per thread per region, so the
-launch overhead swamps the work:
+### What made it faster
 
-| elements | 1 thread | 2 threads | 4 threads |
-|---|---|---|---|
-| 140 | 0.31 ms | 0.32 ms | 0.32 ms |
-| 560 | 0.93 ms | 0.81 ms | 0.71 ms |
-| 2240 | 3.42 ms | 2.76 ms | 1.55 ms |
+Three changes, measured in two groups. Running at the `cfl` that reproduces the
+*old* time step exactly separates the groups: the iteration count then matches
+the old table to the digit, so whatever wall time has moved is the kernel work
+and the rest is the time step. The two kernel changes landed together and are
+not separated from each other here.
 
-### CFL headroom
+| `p` | `refine` | before | kernels only | time step as well |
+|---|---|---|---|---|
+| 0 | 0 | 851 it, 0.19 s | 2.30× | **2.50×** |
+| 1 | 0 | 1751 it, 0.56 s | 2.10× | **3.42×** |
+| 2 | 0 | 3301 it, 1.64 s | 1.73× | **3.57×** |
+| 1 | 1 | 2501 it, 1.64 s | 2.16× | **3.83×** |
+| 2 | 1 | 6301 it, 6.96 s | 1.79× | **3.03×** |
+| 1 | 2 | 6051 it, 9.68 s | 1.71× | **3.40×** |
 
-Iteration count is inversely proportional to `cfl` — exactly, which says the
-march is limited by nothing but its time step. The default of `1.0` is
-conservative. All times below are the `bell` contour at the default operating
-point; the last column records what a `smooth` scan at the same `p` and
-`refine` did one step further up.
+**The kernels (1.7–2.3×).** Two things, both of which were measured as small and
+turned out not to be:
 
-| `p` | `refine` | `cfl=1.0` | a larger `cfl` that converged | speed-up | one step further up |
-|---|---|---|---|---|---|
-| 0 | 0 | 851 it, 0.19 s | `1.5` → 551 it, 0.12 s | 1.6× | `2.0` goes non-finite in 51 it |
-| 1 | 0 | 1751 it, 0.56 s | `2.5` → 701 it, 0.21 s | 2.7× | `3.0` still converges |
-| 2 | 0 | 3301 it, 1.64 s | `2.0` → 1651 it, 0.72 s | 2.3× | `3.0` limit-cycles |
-| 1 | 1 | 2501 it, 1.64 s | `2.5` → 1001 it, 0.64 s | 2.6× | `3.0` limit-cycles |
-| 2 | 1 | 6301 it, 6.96 s | `2.0` → 3151 it, 3.45 s | 2.0× | `3.0` limit-cycles |
-| 1 | 2 | 6051 it, 9.68 s | `2.0` → 3051 it, 4.72 s | 2.1× | not tested |
+- *Everything is preallocated and the stages are fused.* A four-stage step
+  evaluated the residual four times, and each evaluation allocated and zeroed an
+  edge flux table and a residual array; the stage arithmetic (`U + 0.5*dt*F0` and
+  friends) allocated a full state array six more times, and the residual norm
+  allocated one more for `A*A`. The inverse mass solve was a separate parallel
+  pass over the residual, so every step wrote `R` to memory and read it straight
+  back. All of that is gone: the backend owns its working set, the mass solve is
+  folded into the element pass, and the stage arithmetic is kernels.
+- *The limiter's inactive path is screened.* On a smooth solution nothing
+  violates positivity, but proving it still swept every probe point. The basis is
+  a partition of unity, so a cell's mean plus `Λ·max|U_i − Ū|` bounds every probe
+  value, with `Λ = max_x Σ|φ_i(x)|` a constant of the element. That costs one pass
+  over the `nbf` coefficients instead of `nbf` times the probe count, and it is
+  sufficient — when it fails, the exact probe still runs, so the limiter's output
+  is unchanged. The inactive limiter went from 14% of a step to 8%.
 
-The last column is why the default has not simply been raised: at `p=0` the
-stability limit is below `2.0`, at `p≥2` it is below `3.0`, and these are two
-contours at one back pressure — not a stability proof. The **`cfl`-per-order
-scaling is what is really off**: the time step already carries a `1/(2p+1)`
-factor, which over-penalises `p≥1` relative to `p=0`, and that is exactly the
-pattern in the table.
+**The time step (a further 1.1–2.1×).** See below.
 
-If you are sweeping and want the time back, `cfl=2.0` at `p≥1` is a reasonable
-bet, and the solver says plainly when it does not hold:
+### The time step
+
+`cfl` is now a **fraction of the measured stability limit** for the order and
+scheme in use, so it means the same thing everywhere and the default carries a
+known margin. The limits come from a bisection scan of the largest `cfl` that
+still converges, over the `bell` and `smooth` contours at refinement levels 0
+and 1 — the two contours agreed to within a bisection step at every order:
+
+| `p` | RK4 | SSP-RK3 | old `1/(2p+1)` | old default as a fraction of the limit |
+|---|---|---|---|---|
+| 0 | 1.625 | 1.437 | 1.000 | 62% |
+| 1 | 0.875 | 0.779 | 0.333 | 38% |
+| 2 | 0.500 | 0.448 | 0.200 | 40% |
+
+That is the defect the calibration fixes: the textbook `1/(2p+1)` restriction is
+roughly right at `p=0` and leaves 60% of the stable step unused above it, so a
+`cfl` someone had tuned at one order meant something else at another. The decay
+with order is close to `1/(p+1)` (measured `1 : 0.54 : 0.31`, against `1 : 0.5 :
+0.33`), which is the fallback beyond `p=2`. SSP-RK3 comes out at a near-constant
+0.89 × RK4, which is a useful check on both columns.
+
+**The default is `cfl=0.7`** — a 30% margin, because a scan over two contours at
+one back pressure is a measurement, not a stability proof. If you want the rest,
+`cfl=0.9` converged everywhere tested; the solver says plainly when it does not:
 
 ```bash
-./dg2d.sh sweep area_ratio 2.0 4.0 9 p=1 cfl=2.0
+./dg2d.sh sweep area_ratio 2.0 4.0 9 p=1 cfl=0.9
+```
+
+> **This is a change of units.** A script that passed an explicit `cfl` above 1
+> is now past the stability limit rather than comfortably inside it.
+
+### Multigrid, and why it is off
+
+An FAS multigrid cycle is implemented over two hierarchies — `multigrid='p'`
+coarsens the polynomial order on the same mesh, `'h'` coarsens the mesh one
+refinement level at a time. Both are correct: the transfers are exact projection
+pairs to round-off, a converged state is a fixed point of the cycle, and the
+converged answer is the single-grid answer. **Neither is faster, so both are off
+by default.**
+
+Wall time, `smooth` contour, best *converged* cycle settings found, compared at
+the same `cfl`:
+
+| `p` | `refine` | plain | `multigrid='p'` | `multigrid='h'` |
+|---|---|---|---|---|
+| 1 | 0 | 0.15 s | 0.14 s (1.07×) | no coarse level |
+| 1 | 1 | 0.58 s | 0.45 s (1.29×) | 0.52 s (1.11×) |
+| 2 | 0 | 0.48 s | 0.40 s (1.21×) | no coarse level |
+| 2 | 1 | 1.95 s | 3.35 s (**0.58×**) | 2.51 s (**0.78×**) |
+| 1 | 2 | 2.29 s | 1.73 s (1.32×) | 1.94 s (1.18×) |
+
+"Converged" is doing work in that sentence. At `p=2, refine=1` every setting
+with `mg_pre=2` **fails to converge** — the coarse correction pushes cell
+averages non-physical and the limiter starts repairing them — and the three
+settings that failed were also the three fastest, which is exactly the trap a
+wall-time table invites. The solver reports them as `converged=False`, and only
+`mg_pre=3` gets there, 1.7× slower than plain stepping. Below `cfl≈0.55` the
+cycle stops converging at every order tested.
+
+And compared at each method's *own* best `cfl`, plain stepping wins outright: at
+`p=1, refine=1` it reaches 0.39 s where the best cycle manages 0.45 s.
+
+The reason is visible in the march itself. Its iteration count is *exactly*
+inversely proportional to the time step, which says the slow mode is the acoustic
+transit of the nozzle rather than a spectrum of spatial wavenumbers — and
+low-wavenumber spatial error is precisely what a coarse grid is good at removing.
+Raising the coarse-level work from 8 smoothing steps to 40 bears that out: the
+coarse level converges completely and the fine-level cycle count does not move,
+so the error multigrid removes is not the error that is left. The other half is
+the smoother: RK4 tuned for the largest stable step damps high wavenumbers
+poorly, and the residual falls by only about 0.92 per cycle where textbook
+multigrid expects 0.1–0.3. A smoother designed for damping is the missing piece,
+and a separate piece of work.
+
+It is kept, off, because it is correct and tested, because the measurement is
+worth having written down, and because it is what anything better would be built
+on. Estimated beforehand at 2–8×; measured at 1.1–1.3×. If you want to try it:
+
+```bash
+./dg2d.sh solve p=2 ref=1 mg=p mg_pre=3 mg_post=3 mg_coarse=20
 ```
 
 ### What makes it fast, and what makes it robust
@@ -577,12 +666,9 @@ None of these change the answer — and the distinction is measured, not assumed
 - **Vectorised, gather-only assembly.** No Python loop over elements or edges,
   and no scatter-add — so the loops parallelise without atomics and the same
   source runs under all three backends.
-- **A limiter fast path.** On a smooth solution nothing violates positivity, so
-  the pressure bisection is skipped entirely. This is not a micro-optimisation:
-  the limiter runs once per Runge–Kutta stage, and in naive vectorised form it
-  cost ~20× a residual evaluation and dominated the whole solve. Moving it into
-  a kernel with a zero-allocation fast path took one RK4 step from 3.92 ms to
-  0.34 ms.
+- **Fused stages and a preallocated working set**, and **a screened limiter
+  fast path** — both above, together 1.7–2.3×.
+- **A calibrated time step** — above, a further 1.1–2.1×.
 
 **More robust, at a small cost:**
 
@@ -597,11 +683,14 @@ None of these change the answer — and the distinction is measured, not assumed
   converges `p=2` from a uniform initial condition, which a direct solve does
   not.
 
-> Both of the last two were documented here as large speed-ups until they were
-> actually measured. The iteration counts that seemed to support that were an
-> artefact of two defects since fixed: convergence measured *relative to the
-> first residual* (which tightens the target as the guess improves), and
-> `p`-continuation reporting only its final stage's cost.
+> **On measuring these honestly.** Four things in this section were documented or
+> estimated as large speed-ups before anyone measured them: the quasi-1D start,
+> `p`-continuation, warm-started sweeps, and multigrid. The first three were
+> corrected a release ago; multigrid was estimated at 2–8× and came in at
+> 1.1–1.3×. The two that *did* pay — the kernel work and the time step — were
+> estimated at 25–40% and 60–90%, and came in at 1.7–2.3× and 1.1–2.1×. The
+> estimates were wrong in both directions, which is the argument for the
+> measurement rather than for the estimate.
 
 ---
 

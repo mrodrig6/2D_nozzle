@@ -145,6 +145,14 @@ class Operators:
 
     ref: ReferenceData
     topology: MeshTopology
+    node_coords: Any
+    """The geometry nodes these operators were built from.
+
+    Kept so that a second operator set can be built on the *same* mesh at a
+    different polynomial order -- which is what ``p``-continuation and
+    ``p``-multigrid both need -- without the caller having to carry the
+    coordinates alongside.
+    """
 
     # volume
     det_jac: Any  # (nelem, nqv)
@@ -293,6 +301,7 @@ def build_operators(
     return Operators(
         ref=rd,
         topology=topology,
+        node_coords=X,
         det_jac=det,
         weighted_det=wdet,
         grad_x=grad_x,
