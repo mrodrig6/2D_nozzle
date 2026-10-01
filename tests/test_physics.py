@@ -27,8 +27,10 @@ def normals():
 
 
 def test_primitives_round_trip(states):
-    rho, u, v, p, H = ph.primitives(states, GAMMA)
-    rebuilt = np.stack([rho, rho * u, rho * v, p / (GAMMA - 1) + 0.5 * rho * (u * u + v * v)], -1)
+    rho, vx, vy, p, H = ph.primitives(states, GAMMA)
+    rebuilt = np.stack(
+        [rho, rho * vx, rho * vy, p / (GAMMA - 1) + 0.5 * rho * (vx * vx + vy * vy)], -1
+    )
     assert np.allclose(rebuilt, states)
     assert np.allclose(H, (states[:, 3] + p) / rho)
 
@@ -105,9 +107,9 @@ def test_inflow_picks_a_non_negative_mach_number():
     rng = np.random.default_rng(0)
     for _ in range(200):
         rho = rng.uniform(0.2, 3.0)
-        u = rng.uniform(-0.9, 0.9)
+        vx = rng.uniform(-0.9, 0.9)
         p = rng.uniform(0.05, 1.5)
-        U = np.array([[rho, rho * u, 0.0, p / (GAMMA - 1) + 0.5 * rho * u * u]])
+        U = np.array([[rho, rho * vx, 0.0, p / (GAMMA - 1) + 0.5 * rho * vx * vx]])
         out = ph.inflow_flux(U, np.array([-1.0]), np.array([0.0]), GAMMA,
                              Tt=1.0, pt=1.0, Rgas=0.4)
         assert np.all(np.isfinite(out.flux))
@@ -140,8 +142,8 @@ def test_outflow_is_continuous_across_the_sonic_point():
     a = np.sqrt(GAMMA * p / rho)
     prev = None
     for mach in np.linspace(0.90, 1.10, 41):
-        u = mach * a
-        U = np.array([[rho, rho * u, 0.0, p / (GAMMA - 1) + 0.5 * rho * u * u]])
+        vx = mach * a
+        U = np.array([[rho, rho * vx, 0.0, p / (GAMMA - 1) + 0.5 * rho * vx * vx]])
         f = ph.outflow_flux(U, nx, ny, GAMMA, p_back=p).flux[0]
         if prev is not None:
             assert np.abs(f - prev).max() < 0.2

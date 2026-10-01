@@ -243,9 +243,9 @@ class Quasi1DSolution:
     def as_conserved(self, gamma: float) -> np.ndarray:
         """The state as ``(n, 4)`` conserved variables with ``v = 0``."""
         rho = self.density
-        u = self.velocity
-        rhoE = self.pressure / (gamma - 1.0) + 0.5 * rho * u * u
-        return np.column_stack([rho, rho * u, np.zeros_like(rho), rhoE])
+        vx = self.velocity
+        rhoE = self.pressure / (gamma - 1.0) + 0.5 * rho * vx * vx
+        return np.column_stack([rho, rho * vx, np.zeros_like(rho), rhoE])
 
     def summary(self) -> str:
         shock = (
@@ -346,8 +346,8 @@ def solve_quasi1d(
     T = Tt * temperature_ratio(mach, gamma)
     rho = p / (flow.Rgas * T)
     a = np.sqrt(gamma * flow.Rgas * T)
-    u = mach * a
-    mdot = float(rho[0] * u[0] * area[0])
+    vx = mach * a
+    mdot = float(rho[0] * vx[0] * area[0])
 
     return Quasi1DSolution(
         x=x,
@@ -356,7 +356,7 @@ def solve_quasi1d(
         pressure=p,
         density=rho,
         temperature=T,
-        velocity=u,
+        velocity=vx,
         regime=regime,
         critical=crit,
         shock_x=shock_x,

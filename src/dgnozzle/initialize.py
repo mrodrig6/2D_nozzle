@@ -54,8 +54,8 @@ def uniform_state(flow: FlowConditions, mach: float = 0.95) -> np.ndarray:
     p = flow.total_pressure * fac ** (-g / (g - 1.0))
     rho = flow.stagnation_density * fac ** (-1.0 / (g - 1.0))
     a = np.sqrt(g * p / rho)
-    u = mach * a
-    return np.array([rho, rho * u, 0.0, p / (g - 1.0) + 0.5 * rho * u * u])
+    vx = mach * a
+    return np.array([rho, rho * vx, 0.0, p / (g - 1.0) + 0.5 * rho * vx * vx])
 
 
 def uniform_initial(ops: Operators, flow: FlowConditions, mach: float = 0.95, xp=np):
@@ -76,7 +76,7 @@ def quasi1d_initial(
     """Project the quasi-1D solution, with a transverse velocity from the wall slope.
 
     The axial state is taken from quasi-1D theory at each quadrature point's
-    ``x``.  The transverse velocity is set to ``v = u (y / y_wall) dy_wall/dx``,
+    ``x``.  The transverse velocity is set to ``vy = vx (y / y_wall) dy_wall/dx``,
     the leading-order streamline slope for a slowly diverging channel, which
     gives the march a start that already satisfies the wall condition
     approximately.
@@ -87,7 +87,7 @@ def quasi1d_initial(
     y = xy[..., 1]
 
     rho = np.interp(x, sol.x, sol.density)
-    u = np.interp(x, sol.x, sol.velocity)
+    vx = np.interp(x, sol.x, sol.velocity)
     p = np.interp(x, sol.x, sol.pressure)
 
     y_wall = np.asarray(geom.wall(x))
@@ -95,10 +95,10 @@ def quasi1d_initial(
     slope = (np.asarray(geom.wall(x + h)) - np.asarray(geom.wall(np.maximum(x - h, 0.0)))) / (
         h + np.minimum(x, h)
     )
-    v = u * np.clip(y / np.maximum(y_wall, 1e-30), 0.0, 1.0) * slope
+    vy = vx * np.clip(y / np.maximum(y_wall, 1e-30), 0.0, 1.0) * slope
 
-    rhoE = p / (flow.gamma - 1.0) + 0.5 * rho * (u * u + v * v)
-    values = np.stack([rho, rho * u, rho * v, rhoE], axis=-1)
+    rhoE = p / (flow.gamma - 1.0) + 0.5 * rho * (vx * vx + vy * vy)
+    values = np.stack([rho, rho * vx, rho * vy, rhoE], axis=-1)
     return project(xp.asarray(values), ops, xp=xp)
 
 

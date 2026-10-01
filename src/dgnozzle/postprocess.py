@@ -6,8 +6,8 @@ For an inviscid steady flow the axial momentum balance over the nozzle interior
 closes exactly:
 
 .. math::
-    \underbrace{\int_{exit}\!\!\bigl(\rho u^2 + p\bigr)dA
-     - \int_{inlet}\!\!\bigl(\rho u^2 + p\bigr)dA}_{F\ \text{(momentum form)}}
+    \underbrace{\int_{exit}\!\!\bigl(\rho v_x^2 + p\bigr)dA
+     - \int_{inlet}\!\!\bigl(\rho v_x^2 + p\bigr)dA}_{F\ \text{(momentum form)}}
     \;=\;
     \underbrace{-\oint_{wall} p\, n_x\, ds}_{F\ \text{(wall form)}}
 
@@ -122,16 +122,16 @@ class Performance:
 
 
 def _axial_momentum_flux(tr: BoundaryTrace, gamma: float) -> float:
-    r"""``\int (rho u u.n + p n_x) ds`` over a boundary, outward normal."""
-    rho, u, v, p, _ = ph.primitives(tr.state, gamma)
-    un = u * tr.normal[..., 0] + v * tr.normal[..., 1]
-    return float(((rho * u * un + p * tr.normal[..., 0]) * tr.weight).sum())
+    r"""``\int (rho v_x (v.n) + p n_x) ds`` over a boundary, outward normal."""
+    rho, vx, vy, p, _ = ph.primitives(tr.state, gamma)
+    vn = vx * tr.normal[..., 0] + vy * tr.normal[..., 1]
+    return float(((rho * vx * vn + p * tr.normal[..., 0]) * tr.weight).sum())
 
 
 def _mass_flux(tr: BoundaryTrace, gamma: float) -> float:
-    rho, u, v, _, _ = ph.primitives(tr.state, gamma)
-    un = u * tr.normal[..., 0] + v * tr.normal[..., 1]
-    return float((rho * un * tr.weight).sum())
+    rho, vx, vy, _, _ = ph.primitives(tr.state, gamma)
+    vn = vx * tr.normal[..., 0] + vy * tr.normal[..., 1]
+    return float((rho * vn * tr.weight).sum())
 
 
 def entropy_error(U, ops: Operators, flow: FlowConditions) -> float:
@@ -211,9 +211,9 @@ def performance(result: SolveResult, *, quasi1d: Quasi1DSolution | None = None) 
 
 def _ideal_thrust(q1d: Quasi1DSolution, flow: FlowConditions) -> float:
     """Quasi-1D axial force for the same geometry: momentum form, full nozzle."""
-    rho, u, p, a = q1d.density, q1d.velocity, q1d.pressure, q1d.area
-    exit_term = (rho[-1] * u[-1] ** 2 + p[-1]) * a[-1]
-    inlet_term = (rho[0] * u[0] ** 2 + p[0]) * a[0]
+    rho, vx, p, a = q1d.density, q1d.velocity, q1d.pressure, q1d.area
+    exit_term = (rho[-1] * vx[-1] ** 2 + p[-1]) * a[-1]
+    inlet_term = (rho[0] * vx[0] ** 2 + p[0]) * a[0]
     return float(exit_term - inlet_term)
 
 
@@ -262,15 +262,15 @@ def sample_boundary(
     key = y if tag in (BoundaryTag.INFLOW, BoundaryTag.OUTFLOW) else x
     order = np.argsort(key, kind="stable")
 
-    rho, u, v, pres, _ = ph.primitives(state, gamma)
+    rho, vx, vy, pres, _ = ph.primitives(state, gamma)
     return {
         "x": x[order],
         "y": y[order],
         "mach": np.asarray(ph.mach_number(state, gamma))[order],
         "pressure": np.asarray(pres)[order],
         "density": np.asarray(rho)[order],
-        "u": np.asarray(u)[order],
-        "v": np.asarray(v)[order],
+        "vx": np.asarray(vx)[order],
+        "vy": np.asarray(vy)[order],
     }
 
 
@@ -299,13 +299,13 @@ def inlet_profile(result: SolveResult, n_points: int = 25) -> dict[str, np.ndarr
     return sample_boundary(result, BoundaryTag.INFLOW, n_points)
 
 
-SCALARS = ("mach", "pressure", "density", "temperature", "u", "v", "velocity", "entropy")
+SCALARS = ("mach", "pressure", "density", "temperature", "vx", "vy", "velocity", "entropy")
 
 
 def scalar_field(state: np.ndarray, flow: FlowConditions, name: str) -> np.ndarray:
     """Derive a named scalar from conserved states shaped ``(..., 4)``."""
     gamma = flow.gamma
-    rho, u, v, p, _ = ph.primitives(state, gamma)
+    rho, vx, vy, p, _ = ph.primitives(state, gamma)
     if name == "mach":
         return np.asarray(ph.mach_number(state, gamma))
     if name == "pressure":
@@ -314,12 +314,12 @@ def scalar_field(state: np.ndarray, flow: FlowConditions, name: str) -> np.ndarr
         return np.asarray(rho)
     if name == "temperature":
         return np.asarray(p / (flow.Rgas * rho))
-    if name == "u":
-        return np.asarray(u)
-    if name == "v":
-        return np.asarray(v)
+    if name == "vx":
+        return np.asarray(vx)
+    if name == "vy":
+        return np.asarray(vy)
     if name == "velocity":
-        return np.asarray(np.sqrt(u * u + v * v))
+        return np.asarray(np.sqrt(vx * vx + vy * vy))
     if name == "entropy":
         s_t = flow.total_pressure ** (1.0 - gamma) * (
             flow.Rgas * flow.total_temperature

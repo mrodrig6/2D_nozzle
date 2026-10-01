@@ -117,9 +117,9 @@ def objective_value(U, ops, flow: FlowConditions, name: str, geom: NozzleGeometr
         in_s, in_n, in_ds = _trace(U, ops, BoundaryTag.INFLOW, xp)
 
         def axial(state, n, ds):
-            rho, u, v, p, _ = ph.primitives(state, gamma, xp=xp)
-            un = u * n[..., 0] + v * n[..., 1]
-            return ((rho * u * un + p * n[..., 0]) * ds).sum()
+            rho, vx, vy, p, _ = ph.primitives(state, gamma, xp=xp)
+            vn = vx * n[..., 0] + vy * n[..., 1]
+            return ((rho * vx * vn + p * n[..., 0]) * ds).sum()
 
         thrust = 2.0 * (axial(out_s, out_n, out_ds) + axial(in_s, in_n, in_ds))
         if name == "thrust":
@@ -128,9 +128,9 @@ def objective_value(U, ops, flow: FlowConditions, name: str, geom: NozzleGeometr
 
     if name == "mass_flow":
         s, n, ds = _trace(U, ops, BoundaryTag.INFLOW, xp)
-        rho, u, v, _, _ = ph.primitives(s, gamma, xp=xp)
-        un = u * n[..., 0] + v * n[..., 1]
-        return -2.0 * (rho * un * ds).sum()
+        rho, vx, vy, _, _ = ph.primitives(s, gamma, xp=xp)
+        vn = vx * n[..., 0] + vy * n[..., 1]
+        return -2.0 * (rho * vn * ds).sum()
 
     if name in ("exit_mach", "exit_pressure"):
         s, n, ds = _trace(U, ops, BoundaryTag.OUTFLOW, xp)
@@ -305,8 +305,8 @@ class DifferentiableCase:
         ops = self.operators(params)
         flow = self._flow_with(params)
 
-        def R_of_U(u):
-            R, _ = asm.residual(u, ops, flow, xp=jnp)
+        def R_of_U(U):
+            R, _ = asm.residual(U, ops, flow, xp=jnp)
             return R
 
         _, vjp_U = jax.vjp(R_of_U, U)

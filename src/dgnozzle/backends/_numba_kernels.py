@@ -37,69 +37,69 @@ _JIT = {"cache": True, "fastmath": True, "nogil": True}
 
 
 @njit(inline="always", **_JIT)
-def _pressure(u0, u1, u2, u3, gamma):
-    rho = max(u0, FLOOR)
-    p = (gamma - 1.0) * (u3 - 0.5 * (u1 * u1 + u2 * u2) / rho)
+def _pressure(U0, U1, U2, U3, gamma):
+    rho = max(U0, FLOOR)
+    p = (gamma - 1.0) * (U3 - 0.5 * (U1 * U1 + U2 * U2) / rho)
     return max(p, FLOOR)
 
 
 @njit(inline="always", **_JIT)
-def _normal_flux(u0, u1, u2, u3, nx, ny, gamma, out):
-    rho = max(u0, FLOOR)
-    u = u1 / rho
-    v = u2 / rho
-    p = _pressure(u0, u1, u2, u3, gamma)
-    H = (u3 + p) / rho
-    un = u * nx + v * ny
-    out[0] = rho * un
-    out[1] = rho * u * un + p * nx
-    out[2] = rho * v * un + p * ny
-    out[3] = rho * H * un
+def _normal_flux(U0, U1, U2, U3, nx, ny, gamma, out):
+    rho = max(U0, FLOOR)
+    vx = U1 / rho
+    vy = U2 / rho
+    p = _pressure(U0, U1, U2, U3, gamma)
+    H = (U3 + p) / rho
+    vn = vx * nx + vy * ny
+    out[0] = rho * vn
+    out[1] = rho * vx * vn + p * nx
+    out[2] = rho * vy * vn + p * ny
+    out[3] = rho * H * vn
 
 
 @njit(inline="always", **_JIT)
-def _roe(uL, uR, nx, ny, gamma, efix, out):
+def _roe(UL, UR, nx, ny, gamma, efix, out):
     """Roe flux with the Harten-Hyman entropy fix.  Returns the max signal speed."""
-    rL = max(uL[0], FLOOR)
-    aL = uL[1] / rL
-    bL = uL[2] / rL
-    pL = _pressure(uL[0], uL[1], uL[2], uL[3], gamma)
-    HL = (uL[3] + pL) / rL
+    rL = max(UL[0], FLOOR)
+    vxL = UL[1] / rL
+    vyL = UL[2] / rL
+    pL = _pressure(UL[0], UL[1], UL[2], UL[3], gamma)
+    HL = (UL[3] + pL) / rL
 
-    rR = max(uR[0], FLOOR)
-    aR = uR[1] / rR
-    bR = uR[2] / rR
-    pR = _pressure(uR[0], uR[1], uR[2], uR[3], gamma)
-    HR = (uR[3] + pR) / rR
+    rR = max(UR[0], FLOOR)
+    vxR = UR[1] / rR
+    vyR = UR[2] / rR
+    pR = _pressure(UR[0], UR[1], UR[2], UR[3], gamma)
+    HR = (UR[3] + pR) / rR
 
-    unL = aL * nx + bL * ny
-    unR = aR * nx + bR * ny
+    vnL = vxL * nx + vyL * ny
+    vnR = vxR * nx + vyR * ny
 
-    fL0 = rL * unL
-    fL1 = rL * aL * unL + pL * nx
-    fL2 = rL * bL * unL + pL * ny
-    fL3 = rL * HL * unL
-    fR0 = rR * unR
-    fR1 = rR * aR * unR + pR * nx
-    fR2 = rR * bR * unR + pR * ny
-    fR3 = rR * HR * unR
+    fL0 = rL * vnL
+    fL1 = rL * vxL * vnL + pL * nx
+    fL2 = rL * vyL * vnL + pL * ny
+    fL3 = rL * HL * vnL
+    fR0 = rR * vnR
+    fR1 = rR * vxR * vnR + pR * nx
+    fR2 = rR * vyR * vnR + pR * ny
+    fR3 = rR * HR * vnR
 
     sL = np.sqrt(rL)
     sR = np.sqrt(rR)
     den = sL + sR
-    u = (sL * aL + sR * aR) / den
-    v = (sL * bL + sR * bR) / den
+    vx = (sL * vxL + sR * vxR) / den
+    vy = (sL * vyL + sR * vyR) / den
     H = (sL * HL + sR * HR) / den
-    q2 = u * u + v * v
+    q2 = vx * vx + vy * vy
     c2 = (gamma - 1.0) * (H - 0.5 * q2)
     if c2 < FLOOR:
         c2 = FLOOR
     c = np.sqrt(c2)
-    un = u * nx + v * ny
+    vn = vx * nx + vy * ny
 
-    l1 = abs(un + c)
-    l2 = abs(un - c)
-    l3 = abs(un)
+    l1 = abs(vn + c)
+    l2 = abs(vn - c)
+    l3 = abs(vn)
     smax = l1 if l1 > l2 else l2
 
     eps = efix * c
@@ -111,13 +111,13 @@ def _roe(uL, uR, nx, ny, gamma, efix, out):
         if l3 < eps:
             l3 = (l3 * l3 + eps * eps) / (2.0 * eps)
 
-    d0 = uR[0] - uL[0]
-    d1 = uR[1] - uL[1]
-    d2 = uR[2] - uL[2]
-    d3 = uR[3] - uL[3]
+    d0 = UR[0] - UL[0]
+    d1 = UR[1] - UL[1]
+    d2 = UR[2] - UL[2]
+    d3 = UR[3] - UL[3]
 
-    G1 = (gamma - 1.0) * (0.5 * q2 * d0 - u * d1 - v * d2 + d3)
-    G2 = -un * d0 + d1 * nx + d2 * ny
+    G1 = (gamma - 1.0) * (0.5 * q2 * d0 - vx * d1 - vy * d2 + d3)
+    G2 = -vn * d0 + d1 * nx + d2 * ny
 
     s1 = 0.5 * (l1 + l2)
     s2 = 0.5 * (l1 - l2)
@@ -125,21 +125,21 @@ def _roe(uL, uR, nx, ny, gamma, efix, out):
     C2 = (G1 / c) * s2 + (s1 - l3) * G2
 
     out[0] = 0.5 * (fL0 + fR0) - 0.5 * (l3 * d0 + C1)
-    out[1] = 0.5 * (fL1 + fR1) - 0.5 * (l3 * d1 + C1 * u + C2 * nx)
-    out[2] = 0.5 * (fL2 + fR2) - 0.5 * (l3 * d2 + C1 * v + C2 * ny)
-    out[3] = 0.5 * (fL3 + fR3) - 0.5 * (l3 * d3 + C1 * H + C2 * un)
+    out[1] = 0.5 * (fL1 + fR1) - 0.5 * (l3 * d1 + C1 * vx + C2 * nx)
+    out[2] = 0.5 * (fL2 + fR2) - 0.5 * (l3 * d2 + C1 * vy + C2 * ny)
+    out[3] = 0.5 * (fL3 + fR3) - 0.5 * (l3 * d3 + C1 * H + C2 * vn)
     return smax
 
 
 @njit(inline="always", **_JIT)
-def _wall(ub, nx, ny, gamma, out):
-    rho = max(ub[0], FLOOR)
-    u = ub[1] / rho
-    v = ub[2] / rho
-    un = u * nx + v * ny
-    tx = u - un * nx
-    ty = v - un * ny
-    pb = (gamma - 1.0) * (ub[3] - 0.5 * rho * (tx * tx + ty * ty))
+def _wall(Ub, nx, ny, gamma, out):
+    rho = max(Ub[0], FLOOR)
+    vx = Ub[1] / rho
+    vy = Ub[2] / rho
+    vn = vx * nx + vy * ny
+    vtx = vx - vn * nx
+    vty = vy - vn * ny
+    pb = (gamma - 1.0) * (Ub[3] - 0.5 * rho * (vtx * vtx + vty * vty))
     if pb < FLOOR:
         pb = FLOOR
     out[0] = 0.0
@@ -150,14 +150,14 @@ def _wall(ub, nx, ny, gamma, out):
 
 
 @njit(inline="always", **_JIT)
-def _inflow(ub, nx, ny, gamma, at2, at, rho_t, ca, sa, out):
-    rho = max(ub[0], FLOOR)
-    u = ub[1] / rho
-    v = ub[2] / rho
-    p = _pressure(ub[0], ub[1], ub[2], ub[3], gamma)
+def _inflow(Ub, nx, ny, gamma, at2, at, rho_t, ca, sa, out):
+    rho = max(Ub[0], FLOOR)
+    vx = Ub[1] / rho
+    vy = Ub[2] / rho
+    p = _pressure(Ub[0], Ub[1], Ub[2], Ub[3], gamma)
     a = np.sqrt(gamma * p / rho)
-    un = u * nx + v * ny
-    Jp = un + 2.0 * a / (gamma - 1.0)
+    vn = vx * nx + vy * ny
+    Jp = vn + 2.0 * a / (gamma - 1.0)
 
     beta = (Jp / at) * (Jp / at)
     nd = nx * ca + ny * sa
@@ -189,42 +189,42 @@ def _inflow(ub, nx, ny, gamma, at2, at, rho_t, ca, sa, out):
     fac = 1.0 + 0.5 * (gamma - 1.0) * M * M
     ab = np.sqrt(at2 / fac)
     qb = M * ab
-    ubx = qb * ca
-    uby = qb * sa
+    vxb = qb * ca
+    vyb = qb * sa
     rhob = rho_t * fac ** (-1.0 / (gamma - 1.0))
     pb = rhob * ab * ab / gamma
     Hb = at2 / (gamma - 1.0)
-    unb = ubx * nx + uby * ny
+    vnb = vxb * nx + vyb * ny
 
-    out[0] = rhob * unb
-    out[1] = rhob * ubx * unb + pb * nx
-    out[2] = rhob * uby * unb + pb * ny
-    out[3] = rhob * Hb * unb
-    return abs(unb) + ab
+    out[0] = rhob * vnb
+    out[1] = rhob * vxb * vnb + pb * nx
+    out[2] = rhob * vyb * vnb + pb * ny
+    out[3] = rhob * Hb * vnb
+    return abs(vnb) + ab
 
 
 @njit(inline="always", **_JIT)
-def _outflow(ub, nx, ny, gamma, p_back, out):
-    rho = max(ub[0], FLOOR)
-    u = ub[1] / rho
-    v = ub[2] / rho
-    p = _pressure(ub[0], ub[1], ub[2], ub[3], gamma)
+def _outflow(Ub, nx, ny, gamma, p_back, out):
+    rho = max(Ub[0], FLOOR)
+    vx = Ub[1] / rho
+    vy = Ub[2] / rho
+    p = _pressure(Ub[0], Ub[1], Ub[2], Ub[3], gamma)
     a = np.sqrt(gamma * p / rho)
-    un = u * nx + v * ny
+    vn = vx * nx + vy * ny
 
-    if un / a >= 1.0:
+    if vn / a >= 1.0:
         # supersonic: no information enters, extrapolate
-        _normal_flux(ub[0], ub[1], ub[2], ub[3], nx, ny, gamma, out)
-        return abs(un) + a
+        _normal_flux(Ub[0], Ub[1], Ub[2], Ub[3], nx, ny, gamma, out)
+        return abs(vn) + a
 
     rhob = rho * (p_back / p) ** (1.0 / gamma)
     ab = np.sqrt(gamma * p_back / rhob)
-    unb = un + 2.0 / (gamma - 1.0) * (a - ab)
-    ubx = (u - un * nx) + unb * nx
-    uby = (v - un * ny) + unb * ny
-    Eb = p_back / ((gamma - 1.0) * rhob) + 0.5 * (ubx * ubx + uby * uby)
-    _normal_flux(rhob, rhob * ubx, rhob * uby, rhob * Eb, nx, ny, gamma, out)
-    return abs(unb) + ab
+    vnb = vn + 2.0 / (gamma - 1.0) * (a - ab)
+    vxb = (vx - vn * nx) + vnb * nx
+    vyb = (vy - vn * ny) + vnb * ny
+    Eb = p_back / ((gamma - 1.0) * rhob) + 0.5 * (vxb * vxb + vyb * vyb)
+    _normal_flux(rhob, rhob * vxb, rhob * vyb, rhob * Eb, nx, ny, gamma, out)
+    return abs(vnb) + ab
 
 
 @njit(parallel=True, **_JIT)
@@ -259,8 +259,8 @@ def edge_pass(
     smax = np.zeros(n_edge)
 
     for k in prange(n_edge):
-        uL = np.zeros(4)
-        uR = np.zeros(4)
+        UL = np.zeros(4)
+        UR = np.zeros(4)
         flux = np.zeros(4)
         best = 0.0
         if k < n_int:
@@ -270,17 +270,17 @@ def edge_pass(
             rf = iedge_face[k, 1]
             for q in range(nqf):
                 for s in range(4):
-                    uL[s] = 0.0
-                    uR[s] = 0.0
+                    UL[s] = 0.0
+                    UR[s] = 0.0
                 for i in range(nbf):
                     bl = phi_face[0, lf, i, q]
                     br = phi_face[1, rf, i, q]
                     for s in range(4):
-                        uL[s] += bl * U[le, i, s]
-                        uR[s] += br * U[re, i, s]
+                        UL[s] += bl * U[le, i, s]
+                        UR[s] += br * U[re, i, s]
                 nx = edge_normal[k, q, 0]
                 ny = edge_normal[k, q, 1]
-                sp = _roe(uL, uR, nx, ny, gamma, efix, flux)
+                sp = _roe(UL, UR, nx, ny, gamma, efix, flux)
                 if sp > best:
                     best = sp
                 scale = edge_jac[k, q] * w_face[q]
@@ -293,19 +293,19 @@ def edge_pass(
             tag = bedge_tag[b]
             for q in range(nqf):
                 for s in range(4):
-                    uL[s] = 0.0
+                    UL[s] = 0.0
                 for i in range(nbf):
                     bl = phi_face[0, bf, i, q]
                     for s in range(4):
-                        uL[s] += bl * U[be, i, s]
+                        UL[s] += bl * U[be, i, s]
                 nx = edge_normal[k, q, 0]
                 ny = edge_normal[k, q, 1]
                 if tag == _INFLOW:
-                    sp = _inflow(uL, nx, ny, gamma, at2, at, rho_t, ca, sa, flux)
+                    sp = _inflow(UL, nx, ny, gamma, at2, at, rho_t, ca, sa, flux)
                 elif tag == _OUTFLOW:
-                    sp = _outflow(uL, nx, ny, gamma, p_back, flux)
+                    sp = _outflow(UL, nx, ny, gamma, p_back, flux)
                 else:  # _WALL or _AXIS
-                    sp = _wall(uL, nx, ny, gamma, flux)
+                    sp = _wall(UL, nx, ny, gamma, flux)
                 if sp > best:
                     best = sp
                 scale = edge_jac[k, q] * w_face[q]
@@ -341,30 +341,30 @@ def element_pass(
     wave = np.zeros(nelem)
 
     for e in prange(nelem):
-        uq = np.zeros(4)
+        Uq = np.zeros(4)
         F = np.zeros(4)
         G = np.zeros(4)
         # ---- volume: R -= (grad_x . F + grad_y . G)
         for q in range(nqv):
             for s in range(4):
-                uq[s] = 0.0
+                Uq[s] = 0.0
             for i in range(nbf):
                 b = phi_vol[i, q]
                 for s in range(4):
-                    uq[s] += b * U[e, i, s]
-            rho = max(uq[0], FLOOR)
-            u = uq[1] / rho
-            v = uq[2] / rho
-            p = _pressure(uq[0], uq[1], uq[2], uq[3], gamma)
-            H = (uq[3] + p) / rho
-            F[0] = rho * u
-            F[1] = rho * u * u + p
-            F[2] = rho * u * v
-            F[3] = rho * u * H
-            G[0] = rho * v
-            G[1] = rho * u * v
-            G[2] = rho * v * v + p
-            G[3] = rho * v * H
+                    Uq[s] += b * U[e, i, s]
+            rho = max(Uq[0], FLOOR)
+            vx = Uq[1] / rho
+            vy = Uq[2] / rho
+            p = _pressure(Uq[0], Uq[1], Uq[2], Uq[3], gamma)
+            H = (Uq[3] + p) / rho
+            F[0] = rho * vx
+            F[1] = rho * vx * vx + p
+            F[2] = rho * vx * vy
+            F[3] = rho * vx * H
+            G[0] = rho * vy
+            G[1] = rho * vx * vy
+            G[2] = rho * vy * vy + p
+            G[3] = rho * vy * H
             for i in range(nbf):
                 gx = grad_x[e, i, q]
                 gy = grad_y[e, i, q]
@@ -403,7 +403,7 @@ def apply_inverse_mass(inv_mass, R):
 
 
 @njit(inline="always", **_JIT)
-def _probe_minima(Ue, ub0, ub1, ub2, ub3, theta, phi_vol, phi_face, fside, gamma):
+def _probe_minima(Ue, Ubar0, Ubar1, Ubar2, Ubar3, theta, phi_vol, phi_face, fside, gamma):
     """Minimum density and pressure over an element's probe points at scaling ``theta``.
 
     Probe points are the volume quadrature points plus the element's own trace at
@@ -423,48 +423,48 @@ def _probe_minima(Ue, ub0, ub1, ub2, ub3, theta, phi_vol, phi_face, fside, gamma
     p_min = 1.0e300
 
     for q in range(nqv):
-        u0 = 0.0
-        u1 = 0.0
-        u2 = 0.0
-        u3 = 0.0
+        U0 = 0.0
+        U1 = 0.0
+        U2 = 0.0
+        U3 = 0.0
         for i in range(nbf):
             b = phi_vol[i, q]
-            u0 += b * Ue[i, 0]
-            u1 += b * Ue[i, 1]
-            u2 += b * Ue[i, 2]
-            u3 += b * Ue[i, 3]
-        u0 = ub0 + theta * (u0 - ub0)
-        u1 = ub1 + theta * (u1 - ub1)
-        u2 = ub2 + theta * (u2 - ub2)
-        u3 = ub3 + theta * (u3 - ub3)
-        if u0 < rho_min:
-            rho_min = u0
-        r = u0 if u0 > 1e-300 else 1e-300
-        pp = (gamma - 1.0) * (u3 - 0.5 * (u1 * u1 + u2 * u2) / r)
+            U0 += b * Ue[i, 0]
+            U1 += b * Ue[i, 1]
+            U2 += b * Ue[i, 2]
+            U3 += b * Ue[i, 3]
+        U0 = Ubar0 + theta * (U0 - Ubar0)
+        U1 = Ubar1 + theta * (U1 - Ubar1)
+        U2 = Ubar2 + theta * (U2 - Ubar2)
+        U3 = Ubar3 + theta * (U3 - Ubar3)
+        if U0 < rho_min:
+            rho_min = U0
+        r = U0 if U0 > 1e-300 else 1e-300
+        pp = (gamma - 1.0) * (U3 - 0.5 * (U1 * U1 + U2 * U2) / r)
         if pp < p_min:
             p_min = pp
 
     for f in range(nface):
         sd = fside[f]
         for q in range(nqf):
-            u0 = 0.0
-            u1 = 0.0
-            u2 = 0.0
-            u3 = 0.0
+            U0 = 0.0
+            U1 = 0.0
+            U2 = 0.0
+            U3 = 0.0
             for i in range(nbf):
                 b = phi_face[sd, f, i, q]
-                u0 += b * Ue[i, 0]
-                u1 += b * Ue[i, 1]
-                u2 += b * Ue[i, 2]
-                u3 += b * Ue[i, 3]
-            u0 = ub0 + theta * (u0 - ub0)
-            u1 = ub1 + theta * (u1 - ub1)
-            u2 = ub2 + theta * (u2 - ub2)
-            u3 = ub3 + theta * (u3 - ub3)
-            if u0 < rho_min:
-                rho_min = u0
-            r = u0 if u0 > 1e-300 else 1e-300
-            pp = (gamma - 1.0) * (u3 - 0.5 * (u1 * u1 + u2 * u2) / r)
+                U0 += b * Ue[i, 0]
+                U1 += b * Ue[i, 1]
+                U2 += b * Ue[i, 2]
+                U3 += b * Ue[i, 3]
+            U0 = Ubar0 + theta * (U0 - Ubar0)
+            U1 = Ubar1 + theta * (U1 - Ubar1)
+            U2 = Ubar2 + theta * (U2 - Ubar2)
+            U3 = Ubar3 + theta * (U3 - Ubar3)
+            if U0 < rho_min:
+                rho_min = U0
+            r = U0 if U0 > 1e-300 else 1e-300
+            pp = (gamma - 1.0) * (U3 - 0.5 * (U1 * U1 + U2 * U2) / r)
             if pp < p_min:
                 p_min = pp
 
@@ -488,33 +488,33 @@ def positivity_limit(
     n_repair = np.zeros(nelem, dtype=np.int64)
 
     for e in prange(nelem):
-        ub0 = 0.0
-        ub1 = 0.0
-        ub2 = 0.0
-        ub3 = 0.0
+        Ubar0 = 0.0
+        Ubar1 = 0.0
+        Ubar2 = 0.0
+        Ubar3 = 0.0
         for i in range(nbf):
             w = mean_weights[e, i]
-            ub0 += w * U[e, i, 0]
-            ub1 += w * U[e, i, 1]
-            ub2 += w * U[e, i, 2]
-            ub3 += w * U[e, i, 3]
+            Ubar0 += w * U[e, i, 0]
+            Ubar1 += w * U[e, i, 1]
+            Ubar2 += w * U[e, i, 2]
+            Ubar3 += w * U[e, i, 3]
 
         # -- repair a non-physical cell average (last resort, not conservative)
-        rho_new = ub0 if ub0 > rho_floor else rho_floor
-        e_min = p_floor / (gamma - 1.0) + 0.5 * (ub1 * ub1 + ub2 * ub2) / rho_new
-        rhoE_new = ub3 if ub3 > e_min else e_min
-        d0 = rho_new - ub0
-        d3 = rhoE_new - ub3
+        rho_new = Ubar0 if Ubar0 > rho_floor else rho_floor
+        e_min = p_floor / (gamma - 1.0) + 0.5 * (Ubar1 * Ubar1 + Ubar2 * Ubar2) / rho_new
+        rhoE_new = Ubar3 if Ubar3 > e_min else e_min
+        d0 = rho_new - Ubar0
+        d3 = rhoE_new - Ubar3
         if d0 != 0.0 or d3 != 0.0:
             for i in range(nbf):
                 out[e, i, 0] += d0
                 out[e, i, 3] += d3
-            ub0 = rho_new
-            ub3 = rhoE_new
+            Ubar0 = rho_new
+            Ubar3 = rhoE_new
             n_repair[e] = 1
 
-        p_bar = (gamma - 1.0) * (ub3 - 0.5 * (ub1 * ub1 + ub2 * ub2) / ub0)
-        eps_rho = fraction * ub0
+        p_bar = (gamma - 1.0) * (Ubar3 - 0.5 * (Ubar1 * Ubar1 + Ubar2 * Ubar2) / Ubar0)
+        eps_rho = fraction * Ubar0
         if eps_rho < 0.5 * rho_floor:
             eps_rho = 0.5 * rho_floor
         eps_p = fraction * p_bar
@@ -523,32 +523,36 @@ def positivity_limit(
 
         Ue = out[e]
         fside = face_side[e]
-        rho_min, p_min = _probe_minima(Ue, ub0, ub1, ub2, ub3, 1.0, phi_vol, phi_face, fside, gamma)
+        rho_min, p_min = _probe_minima(
+            Ue, Ubar0, Ubar1, Ubar2, Ubar3, 1.0, phi_vol, phi_face, fside, gamma
+        )
         if rho_min >= eps_rho and p_min >= eps_p:
             continue  # the common case: nothing to do
 
         # -- density bound is linear in theta, solve it directly
         theta = 1.0
         if rho_min < eps_rho:
-            gap = ub0 - rho_min
+            gap = Ubar0 - rho_min
             if gap <= 0.0:
                 theta = 0.0
             else:
-                theta = (ub0 - eps_rho) / gap
+                theta = (Ubar0 - eps_rho) / gap
                 if theta < 0.0:
                     theta = 0.0
                 elif theta > 1.0:
                     theta = 1.0
 
         # -- pressure bound is quadratic, bisect
-        _, p_hi = _probe_minima(Ue, ub0, ub1, ub2, ub3, theta, phi_vol, phi_face, fside, gamma)
+        _, p_hi = _probe_minima(
+            Ue, Ubar0, Ubar1, Ubar2, Ubar3, theta, phi_vol, phi_face, fside, gamma
+        )
         if p_hi < eps_p:
             lo = 0.0
             hi = theta
             for _ in range(steps):
                 mid = 0.5 * (lo + hi)
                 _, pm = _probe_minima(
-                    Ue, ub0, ub1, ub2, ub3, mid, phi_vol, phi_face, fside, gamma
+                    Ue, Ubar0, Ubar1, Ubar2, Ubar3, mid, phi_vol, phi_face, fside, gamma
                 )
                 if pm >= eps_p:
                     lo = mid
@@ -557,10 +561,10 @@ def positivity_limit(
             theta = lo
 
         for i in range(nbf):
-            out[e, i, 0] = ub0 + theta * (Ue[i, 0] - ub0)
-            out[e, i, 1] = ub1 + theta * (Ue[i, 1] - ub1)
-            out[e, i, 2] = ub2 + theta * (Ue[i, 2] - ub2)
-            out[e, i, 3] = ub3 + theta * (Ue[i, 3] - ub3)
+            out[e, i, 0] = Ubar0 + theta * (Ue[i, 0] - Ubar0)
+            out[e, i, 1] = Ubar1 + theta * (Ue[i, 1] - Ubar1)
+            out[e, i, 2] = Ubar2 + theta * (Ue[i, 2] - Ubar2)
+            out[e, i, 3] = Ubar3 + theta * (Ue[i, 3] - Ubar3)
         n_scaled[e] = 1
 
     return out, n_scaled.sum(), n_repair.sum()
