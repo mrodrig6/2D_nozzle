@@ -116,6 +116,18 @@ def test_a_bad_interpreter_is_reported_not_ignored():
     assert "DG2D_PYTHON" in out.stderr
 
 
+def test_test_passes_a_path_filter_through(tmp_path):
+    """``test <path>`` must narrow the run, not quietly run everything.
+
+    The command defaults to the whole tree, and appending that default
+    unconditionally made a path argument look ignored.
+    """
+    out = run("test", "-q", "--collect-only", "tests/test_docs.py", timeout=180)
+    assert out.returncode == 0, out.stderr
+    assert "test_docs.py" in out.stdout
+    assert "test_physics.py" not in out.stdout
+
+
 def test_docs_points_at_the_formulation():
     out = run("docs")
     assert out.returncode == 0

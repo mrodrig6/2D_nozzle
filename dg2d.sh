@@ -248,7 +248,18 @@ cmd_run() {
 
 cmd_test() {
     translate "$@"
-    exec "$PY" -m pytest "$ROOT" ${TRANSLATED[@]+"${TRANSLATED[@]}"}
+    # Only default to the whole tree when no path was given -- appending $ROOT
+    # unconditionally made `dg2d.sh test tests/test_docs.py` run everything,
+    # which looks like the filter being ignored because it is.
+    local target=("$ROOT")
+    local arg
+    for arg in ${TRANSLATED[@]+"${TRANSLATED[@]}"}; do
+        if [[ -e $arg || $arg == *::* ]]; then
+            target=()
+            break
+        fi
+    done
+    exec "$PY" -m pytest ${target[@]+"${target[@]}"} ${TRANSLATED[@]+"${TRANSLATED[@]}"}
 }
 
 cmd_docs() {
