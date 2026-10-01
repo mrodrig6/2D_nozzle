@@ -29,6 +29,8 @@ plot = ["matplotlib>=3.7"]
 # everything a student needs for the lab
 all = ["numba>=0.58", "jax>=0.4.20", "matplotlib>=3.7"]
 dev = ["pytest>=7.4", "pytest-cov", "ruff"]
+# only for re-rendering the TikZ figures; also needs pdflatex on PATH
+docs = ["pymupdf>=1.23"]
 
 [project.scripts]
 dgnozzle = "dgnozzle.cli:main"

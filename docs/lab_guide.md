@@ -3,7 +3,7 @@
 A student-facing guide. You will not write solver code; you will **engineer the
 geometry** and explain what the flow does in response.
 
-Read [`theory.pdf`](theory.tex) alongside this — it defines every quantity used
+Read [`theory.md`](theory.md) alongside this — it defines every quantity used
 below, and the geometry figure in §3 names every design variable.
 
 ---

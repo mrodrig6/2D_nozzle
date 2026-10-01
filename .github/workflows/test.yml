@@ -57,11 +57,17 @@ jobs:
 
   docs:
     runs-on: ubuntu-latest
-    name: build theory.pdf
+    name: check the TikZ figures still compile
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
       # apt-get update first: a stale index gives 404s on the texlive packages.
+      # texlive-latex-extra supplies standalone.cls, which every figure needs.
       - name: Install TeX
         run: |
           sudo apt-get update -qq
@@ -70,26 +76,20 @@ jobs:
             texlive-latex-recommended texlive-latex-extra \
             texlive-fonts-recommended
 
-      # texlive-latex-extra supplies standalone.cls, which every figure needs.
-      - name: Build the standalone figures
-        working-directory: docs/tikz
-        run: |
-          for f in *.tex; do
-            pdflatex -interaction=nonstopmode -halt-on-error "$f"
-          done
+      - name: Install the rasteriser
+        run: pip install pymupdf
 
-      - name: Build the theory document
-        working-directory: docs
-        run: |
-          pdflatex -interaction=nonstopmode -halt-on-error theory.tex
-          pdflatex -interaction=nonstopmode -halt-on-error theory.tex
+      # docs/theory.md shows the committed PNGs under docs/figures/tikz/, so a
+      # TikZ source that no longer compiles would not break any build -- it
+      # would just quietly stop being the source of the figure on the page.
+      # Re-rendering here is what keeps the .tex files honest.
+      - name: Re-render every figure from its TikZ source
+        run: python docs/render_figures.py
 
       - uses: actions/upload-artifact@v4
         with:
-          name: documentation
-          path: |
-            docs/theory.pdf
-            docs/tikz/*.pdf
+          name: documentation-figures
+          path: docs/figures/tikz/*.png
 
   figures:
     runs-on: ubuntu-latest

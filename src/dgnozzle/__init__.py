@@ -48,7 +48,7 @@ The solver core is geometry-agnostic: it takes any conforming mesh of triangles
 or quadrilaterals with tagged boundaries.  Only :mod:`~dgnozzle.geometry` and the
 mesh generator in :mod:`~dgnozzle.mesh` know that the domain is a nozzle.
 
-See ``docs/theory.tex`` for the formulation and the geometry definition, and
+See ``docs/theory.md`` for the formulation and the geometry definition, and
 ``README.md`` for how to run everything.
 """
 
