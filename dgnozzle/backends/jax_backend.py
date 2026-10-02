@@ -86,7 +86,7 @@ class JaxBackend(Backend):
             wave_sum, self.ops, self.ops.ref.order, self.opts.cfl,
             self.opts.scheme, xp=self.jnp,
         )
-        return dt[:, None, None]
+        return self.positivity_scale() * dt[:, None, None]
 
     def norm(self, A):
         """Device-side RMS norm; kept as an array so it can live inside a loop."""

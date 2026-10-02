@@ -402,7 +402,10 @@ def inflow_flux(
     return FluxResult(flux, xp.abs(vnb) + ab)
 
 
-def outflow_flux(U, nx, ny, gamma: float, *, p_back: float, xp=np) -> FluxResult:
+def outflow_flux(
+    U, nx, ny, gamma: float, *, p_back: float,
+    rho_t: float = 0.0, p_t: float = 1.0, backflow_band: float = 0.05, xp=np,
+) -> FluxResult:
     r"""Pressure outflow that switches automatically to supersonic extrapolation.
 
     *Subsonic* outflow (:math:`v_n / a < 1`) admits one incoming characteristic,
@@ -424,6 +427,33 @@ def outflow_flux(U, nx, ny, gamma: float, *, p_back: float, xp=np) -> FluxResult
        Extrapolating unconditionally -- ignoring the subsonic branch -- would
        leave the back pressure with no effect on the flow at all, and with it
        every operating point whose exit is subsonic.
+
+    *Reverse flow* (:math:`v_n < 0`, the flow entering through the exit plane)
+    is a third case, and the subsonic-outflow formula above is **ill-posed**
+    there.  Count the characteristics with :math:`\mathbf{n}` outward: subsonic
+    outflow has :math:`v_n > 0` and :math:`v_n + a > 0` leaving and only
+    :math:`v_n - a < 0` entering, so exactly one condition may be imposed.
+    Reverse flow has :math:`v_n < 0` *and* :math:`v_n - a < 0` entering -- the
+    entropy wave, the shear wave and one acoustic wave, three in all -- leaving
+    only :math:`v_n + a > 0` to come from the interior.  Imposing pressure alone
+    under-determines it by two conditions.
+
+    So the backflow branch imposes three things from the reservoir that the back
+    pressure belongs to -- its entropy, through
+    :math:`\rho_b = \rho_t (p_b/p_t)^{1/\gamma}`; the static pressure
+    :math:`p_b`; and the direction, normal to the plane -- and takes the normal
+    velocity from the one outgoing invariant,
+    :math:`v_{n,b} = v_{n} + \tfrac{2}{\gamma-1}(a - a_b)`.
+
+    The two subsonic branches do not agree at :math:`v_n = 0` (one keeps the
+    interior entropy and tangential velocity, the other imposes the reservoir's
+    and zero), so they are blended smoothly across
+    :math:`0 \le v_n/a \le` ``backflow_band`` rather than switched.  A hard
+    switch at a boundary the solution is still moving across is exactly the kind
+    of discontinuity that parks a residual instead of converging.
+
+    ``rho_t = 0`` disables the branch and restores the previous behaviour, which
+    is what makes the change measurable rather than merely asserted.
     """
     rho, vx, vy, p, _ = primitives(U, gamma, xp=xp)
     a = xp.sqrt(gamma * p / rho)
@@ -442,6 +472,23 @@ def outflow_flux(U, nx, ny, gamma: float, *, p_back: float, xp=np) -> FluxResult
     vyb = vty + vnb * ny
     Eb = pb / ((gamma - 1.0) * rhob) + 0.5 * (vxb * vxb + vyb * vyb)
     U_sub = xp.stack([rhob, rhob * vxb, rhob * vyb, rhob * Eb], axis=-1)
+
+    # -- reverse flow: three conditions from the reservoir, one from inside ---
+    if rho_t > 0.0:
+        # reservoir entropy: rho_b = rho_t (p_b / p_t)^(1/gamma)
+        rho_bf = rho_t * (pb / p_t) ** (1.0 / gamma)
+        a_bf = xp.sqrt(gamma * pb / rho_bf)
+        vn_bf = vn + 2.0 / (gamma - 1.0) * (a - a_bf)
+        # direction normal to the plane: no tangential velocity carried in
+        vx_bf = vn_bf * nx
+        vy_bf = vn_bf * ny
+        E_bf = pb / ((gamma - 1.0) * rho_bf) + 0.5 * (vx_bf * vx_bf + vy_bf * vy_bf)
+        U_bf = xp.stack(
+            [rho_bf, rho_bf * vx_bf, rho_bf * vy_bf, rho_bf * E_bf], axis=-1
+        )
+        # smooth blend over 0 <= vn/a <= band, so nothing switches discontinuously
+        t = xp.clip((vn / a) / max(backflow_band, 1e-12), 0.0, 1.0)[..., None]
+        U_sub = t * U_sub + (1.0 - t) * U_bf
 
     # -- blend with the extrapolated (supersonic) state
     supersonic = (vn / a >= 1.0)[..., None]

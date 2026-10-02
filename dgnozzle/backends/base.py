@@ -66,6 +66,19 @@ class Backend(ABC):
     def limit(self, U):
         """Apply the configured limiter."""
 
+    def positivity_scale(self) -> float:
+        """Extra time-step factor while a limiter is active; 1.0 when disabled.
+
+        The Zhang-Shu theorem needs a step small enough that a forward-Euler
+        stage cannot drive the *cell average* non-physical.  Only applied when a
+        limiter is actually on, since with ``limiter='none'`` there is no theorem
+        to satisfy.
+        """
+        pc = getattr(self.opts, "positivity_cfl", 0.0)
+        if pc > 0.0 and self.opts.limiter != "none" and self.ops.ref.order > 0:
+            return float(pc)
+        return 1.0
+
     @abstractmethod
     def time_step(self, wave_sum):
         """Element-local pseudo-time step, shaped for broadcasting against ``U``."""

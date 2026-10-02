@@ -790,114 +790,17 @@ solver was never tuned to pass, and a good one to have students reproduce.
 
 ### Known limitation: shocked operating points
 
-Between the **first** and **second** critical pressure ratios — a normal shock
-standing in the diverging section — the pseudo-time march generally does **not**
-reach a steady state. Measured at `AR=2.5` with `ssprk3`, `geometry_order=2` and
-a 12,000-iteration cap, where the shocked band is `0.435 < p_b/p_t < 0.961`:
+Between the **first** and **second** critical pressure ratios a normal shock
+stands in the diverging section, and the pseudo-time march generally does not
+reach a steady state there: `p=0` stalls (and sometimes converges), `p>=1`
+diverges. The solver reports those runs as `converged=False` and does not
+present the numbers as trustworthy. Use `p=0` and check `converged`, or
+`solve_quasi1d` for the shock physics itself.
 
-| settings | `p_b/p_t=0.50` | `0.70` | `0.85` |
-|---|---|---|---|
-| `p=0`, `refine=0` | 5.8e-2 | 2.7e-2 | **converged** |
-| `p=0`, `refine=1` | **converged** | 1.4e-1 | **converged** |
-| `p=0`, `refine=2` | 1.4e-2 | 5.7e-2 | 6.4e-2 |
-| `p=1`, `refine=0`, `superbee` | 7.4e-1 | diverges | diverges |
-| `p=1`, `refine=1`, `superbee` | diverges | diverges | diverges |
-| `p=2`, `refine=0`, `superbee` | diverges | diverges | diverges |
+Everything shock-free is verified and converges: the design point,
+over-expanded and under-expanded operation, the whole area-ratio design space,
+and all sensitivity and optimisation work.
 
-Two things in that table are worth being precise about.
-
-**At `p=0` it is a stall, and sometimes not even that.** The floor does not fall
-with refinement, so this is not shock under-resolution. But three of the nine
-`p=0` entries now reach the tolerance, which they did not before the time step
-was recalibrated — the same point that parks at 1.1e-1 under the old fixed
-`cfl=1` parks at 2.7e-2 now. So `p=0` in the shocked band is worth *trying*:
-check `converged` and believe the answer when it is `True`.
-
-**At `p >= 1` it is a divergence, and that is not new.** The march leaves the
-physical state entirely and the solver stops it and says so. This is not
-something the Superbee limiter introduced: on the previous revision the same
-point at `p=1` with the positivity limiter alone went to `NaN` after 551 steps
-with 12,959 cell-average repairs. The Barth–Jespersen limiter that Superbee
-replaced did keep it bounded — at a residual of 2.9 (`refine=0`) and 4.6
-(`refine=1`), which is *two orders of magnitude worse than `p=0`*. It bought
-boundedness by flattening the solution, not a solution. Superbee is better
-behaved than either on the way down — at `cfl=0.3` it needs **zero**
-cell-average repairs where the positivity limiter alone needed 12,959 — but
-better-behaved divergence is still divergence. Reducing `cfl` does not rescue
-it (`0.3`, `0.5` and `0.7` all diverge), so this is not a time-step problem
-either.
-
-The solver reports every non-converged run above as `converged=False` with a
-message and does not present the numbers as trustworthy. For a shock in the
-nozzle, use `p=0` and check `converged`, or `solve_quasi1d` for the shock physics
-itself.
-
-**This is new capability failing, not old capability lost.** The predecessor
-MATLAB solver could not pose a shocked case at all. Its exit plane extrapolated
-the interior state unconditionally — the supersonic branch, whatever the local
-Mach number — and its `p_back_ratio` was set in the driver, stored, and then
-never read by the residual, the initial condition, the time march, the mesh or
-the post-processing. The back pressure was a dead input, so the operating point
-was fixed by geometry alone and a shock could never stand in the nozzle.
-
-This code added a real outflow condition that imposes static pressure on the
-subsonic branch, which is what turned `back_pressure_ratio` into a live design
-variable and opened the whole band `0.435 < p_b/p_t < 0.961`. Everything the
-older solver *could* compute, this one computes: run at its defaults
-(`area_ratio=2.50`, `throat_x=0.14`, `smooth`, `p=1`, `refine=1`, `Q=1`,
-triangles, **no limiter**) it converges in 1701 iterations to thrust 0.045889 and
-exit `M` 2.4502, and the full `p=0 -> 1 -> 2` continuation ladder it used
-converges at every stage with no limiter.
-
-So the honest statement is not "this used to work". It is that a steady explicit
-DG march whose only safeguard is a positivity limiter cannot capture a shock in
-steady state, and that limitation was previously hidden by a boundary condition
-that made the problem unreachable.
-
-**What the residual is doing.** Localising it at `p=0`, `refine=1`,
-`p_b/p_t = 0.70` (12,000 steps, no limiter):
-
-| where | share of squared residual |
-|---|---|
-| `x ∈ [0.2, 0.3)` | **85.1%** |
-| `x ∈ [0.3, 0.4)` | 8.3% |
-| everywhere else | < 2% per band |
-| outflow elements | **0.1%** |
-| inflow elements | 0.0% |
-
-This **rules out the boundary conditions.** The outflow plane carries a tenth of
-a percent of the residual, and its normal Mach number is subsonic at every
-quadrature point (max 0.75) with none near sonic — so the subsonic/supersonic
-branch switch in the outflow condition is not chattering. The residual instead
-concentrates in one narrow axial band, spread across the *full channel height*,
-which is where the captured shock sits.
-
-Two further observations point the same way. The DG shock settles near
-`x ≈ 0.25` while quasi-1D theory puts it at `x = 0.508`; and the exit plane shows
-**reverse flow** (minimum normal Mach −0.22), a recirculation that a
-one-dimensional model cannot represent at all. A normal shock in a diverging
-duct is not obviously a steady two-dimensional structure — in inviscid flow it
-tends to bifurcate — so it is quite possible there is no steady solution here to
-converge to. Settling that needs a time-accurate computation, which this solver
-does not do.
-
-**What still works:** everything shock-free — the design point, over-expanded
-and under-expanded operation (`back_pressure_ratio` below the second critical
-ratio), the whole area-ratio design space, and all sensitivity and optimisation
-work. Those are the cases the solver is verified on.
-
-**For shock physics**, use `dgnozzle.solve_quasi1d`, which solves the
-one-dimensional problem exactly, including the shock position:
-
-```python
-from dgnozzle import solve_quasi1d, NozzleGeometry, FlowConditions
-sol = solve_quasi1d(NozzleGeometry(contour="smooth"),
-                    FlowConditions(back_pressure_ratio=0.70))
-print(sol.summary())
-# quasi-1D: shock-in-nozzle, shock x = 0.5084 m (M1 = 1.929), M_exit = 0.3270
-```
-
----
 
 ## Verification
 

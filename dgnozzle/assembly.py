@@ -106,7 +106,11 @@ def edge_fluxes(U, ops: Operators, flow: FlowConditions, xp=np):
                 Rgas=flow.Rgas, alpha=flow.inflow_angle, xp=xp,
             )
         elif tag is BoundaryTag.OUTFLOW:
-            res = ph.outflow_flux(U_s, nxs, nys, flow.gamma, p_back=flow.back_pressure, xp=xp)
+            res = ph.outflow_flux(
+                U_s, nxs, nys, flow.gamma, p_back=flow.back_pressure,
+                rho_t=(flow.stagnation_density if flow.backflow else 0.0),
+                p_t=flow.total_pressure, xp=xp,
+            )
         else:  # WALL and AXIS share the inviscid slip flux
             res = ph.wall_flux(U_s, nxs, nys, flow.gamma, xp=xp)
         pieces.append(res.flux)

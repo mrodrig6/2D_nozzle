@@ -240,3 +240,71 @@ def test_hllc_needs_no_entropy_fix():
     vals = np.array([flux_at(m) for m in machs])
     second = np.diff(vals, 2)
     assert np.all(np.abs(second) < 1e-3), "flux should pass smoothly through M=1"
+
+
+# --------------------------------------------------------------------------
+# Reverse flow at the exit plane
+# --------------------------------------------------------------------------
+
+
+def test_backflow_is_inert_where_the_flow_leaves():
+    """With ``v_n > 0`` the branch must not touch the subsonic-outflow state."""
+    rho, p = 1.0, 1.0 / GAMMA
+    for mach in (0.3, 0.6, 0.9):
+        a = np.sqrt(GAMMA * p / rho)
+        u = mach * a
+        U = np.array([[rho, rho * u, 0.0, p / (GAMMA - 1) + 0.5 * rho * u * u]])
+        nx, ny = np.array([1.0]), np.array([0.0])
+        off = ph.outflow_flux(U, nx, ny, GAMMA, p_back=0.6 * p)
+        on = ph.outflow_flux(U, nx, ny, GAMMA, p_back=0.6 * p,
+                             rho_t=1.0, p_t=1.0)
+        assert np.allclose(off.flux, on.flux), f"branch leaked at M={mach}"
+
+
+def test_backflow_changes_the_flux_when_the_flow_enters():
+    """And it must actually do something when ``v_n < 0``, or it is dead code."""
+    rho, p = 1.0, 1.0 / GAMMA
+    a = np.sqrt(GAMMA * p / rho)
+    u = -0.25 * a                      # reverse flow through the exit plane
+    U = np.array([[rho, rho * u, 0.0, p / (GAMMA - 1) + 0.5 * rho * u * u]])
+    nx, ny = np.array([1.0]), np.array([0.0])
+    off = ph.outflow_flux(U, nx, ny, GAMMA, p_back=0.6 * p)
+    on = ph.outflow_flux(U, nx, ny, GAMMA, p_back=0.6 * p, rho_t=1.0, p_t=1.0)
+    assert not np.allclose(off.flux, on.flux)
+    assert np.all(np.isfinite(on.flux))
+
+
+def test_backflow_blends_continuously_through_zero_normal_velocity():
+    """A hard switch here would park the residual; the blend must be smooth.
+
+    The two subsonic branches genuinely disagree at ``v_n = 0`` -- one keeps the
+    interior entropy and tangential velocity, the other imposes the reservoir's
+    and zero -- so the blend is what keeps the boundary condition continuous as
+    the solution moves across it.
+    """
+    rho, p = 1.0, 1.0 / GAMMA
+    a = np.sqrt(GAMMA * p / rho)
+    nx, ny = np.array([1.0]), np.array([0.0])
+
+    def flux_at(mach):
+        u = mach * a
+        U = np.array([[rho, rho * u, 0.3 * rho * a,
+                       p / (GAMMA - 1) + 0.5 * rho * (u * u + (0.3 * a) ** 2)]])
+        return ph.outflow_flux(U, nx, ny, GAMMA, p_back=0.6 * p,
+                               rho_t=1.0, p_t=1.0).flux[0]
+
+    # continuity is tested by refinement, not by a threshold: halving the
+    # sample spacing must halve the largest step.  A real switch would leave it
+    # constant.  The flux is nonlinear in the blended state, so the variation is
+    # steep near v_n = 0 without being discontinuous -- an absolute bound would
+    # only measure that steepness.
+    steps = []
+    for n in (121, 241, 481):
+        machs = np.linspace(-0.08, 0.13, n)
+        vals = np.array([flux_at(m) for m in machs])
+        steps.append(np.abs(np.diff(vals, axis=0)).max())
+    for coarse, fine in zip(steps[:-1], steps[1:], strict=True):
+        assert 1.8 < coarse / fine < 2.2, (
+            f"step ratio {coarse / fine:.2f} is not first order; "
+            "the branch is switching rather than blending"
+        )

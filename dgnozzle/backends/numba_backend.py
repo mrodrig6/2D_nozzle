@@ -65,6 +65,11 @@ class NumbaBackend(Backend):
             )
         self._flux_id = _KERNEL_FLUXES[_flux]
         self._low_mach = float(getattr(flow, "hllc_low_mach", 0.0))
+        self._rho_t_bf = (
+            float(flow.stagnation_density) if getattr(flow, "backflow", False) else 0.0
+        )
+        self._p_t_bf = float(flow.total_pressure)
+        self._band_bf = 0.05
         ed = ops.topology.edges
         self._phi_face = _c(ops.ref.phi_face)
         self._phi_vol = _c(ops.ref.phi_vol)
@@ -164,6 +169,7 @@ class NumbaBackend(Backend):
             self._bedge_elem, self._bedge_face, self._bedge_tag,
             self._edge_normal, self._edge_jac, self._w_face,
             self._gamma, self._efix, self._flux_id, self._low_mach,
+            self._rho_t_bf, self._p_t_bf, self._band_bf,
             self._at2, self._at, self._rho_t,
             self._ca, self._sa, self._p_back, self._fw, self._smax,
         )
@@ -180,7 +186,8 @@ class NumbaBackend(Backend):
     def _dt_into(self) -> np.ndarray:
         nk.local_dt(
             self._wave, self._elem_area,
-            asm.step_coefficient(self.ops.ref.order, self.opts.cfl, self.opts.scheme),
+            self.positivity_scale()
+            * asm.step_coefficient(self.ops.ref.order, self.opts.cfl, self.opts.scheme),
             self._dt,
         )
         return self._dt

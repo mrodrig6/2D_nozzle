@@ -290,35 +290,14 @@ Read the message. Every failure names both cause and remedy.
 
 **Shocked operating points usually do not converge.** For
 `back_pressure_ratio` between the second and first critical ratios the march
-generally stalls at `p=0` and diverges at `p>=1`. Measured at `AR=2.5` with
-`ssprk3` and a 12,000-iteration cap:
-
-| settings | `p_b/p_t=0.50` | `0.70` | `0.85` |
-|---|---|---|---|
-| `p=0`, `refine=0` | 5.8e-2 | 2.7e-2 | **converged** |
-| `p=0`, `refine=1` | **converged** | 1.4e-1 | **converged** |
-| `p=0`, `refine=2` | 1.4e-2 | 5.7e-2 | 6.4e-2 |
-| `p=1`, `refine=0`, `superbee` | 7.4e-1 | diverges | diverges |
-| `p=1`, `refine=1`, `superbee` | diverges | diverges | diverges |
-
-So **try `p=0` and check `converged`** — some shocked points do reach the
-tolerance. At `p>=1` the march leaves the physical state and the solver stops
-it; reducing `cfl` does not rescue it, so this is not a time-step problem, and
-it predates the Superbee limiter (the positivity limiter alone went to `NaN` at
-the same point).
-
-The `p=0` floor is mesh-independent, so this is not shock under-resolution.
-Localising the residual shows 85% of it in the single axial band
-`x ∈ [0.2, 0.3)` — where the shock sits — and only 0.1% at the outflow, which
-rules out the boundary conditions. The exit plane also shows reverse flow
-(minimum normal Mach −0.22): a 2D recirculation quasi-1D theory cannot
-represent. The solver reports the non-converged runs as `converged=False` and
-does not pass the numbers off as trustworthy. Use `solve_quasi1d` for shock
-physics.
+generally stalls at `p=0` and diverges at `p>=1`. Try `p=0` and check
+`converged` — some shocked points do reach the tolerance. Use `solve_quasi1d`
+for shock physics.
 
 Everything shock-free is verified and converges cleanly: the design point,
 over-expanded and under-expanded operation, the whole area-ratio design space,
 and all sensitivity and optimisation work.
+
 
 ---
 

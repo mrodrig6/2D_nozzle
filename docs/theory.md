@@ -513,13 +513,6 @@ trade: HLLC's three-wave model is more dissipative than Roe's full
 decomposition. On the shocked point at $p = 0$ HLLC stalls at
 $8.8\times10^{-2}$ where Roe stalls at $1.4\times10^{-1}$.
 
-> **It does not fix the $p \ge 1$ shocked divergence.** That was the hope, and it
-> is not what happened: at `refine=1` with SSP-RK3 both fluxes diverge with
-> **zero** cell-average repairs, so in that configuration the divergence is not
-> a positivity failure at all and positivity-preservation cannot cure it. The
-> repairs that *do* appear at other settings are a real symptom, but they are not
-> the whole mechanism.
-
 `hllc_low_mach` enables the low-Mach correction of Fleischmann et al., scaling
 the acoustic wave speeds by
 $\phi = \min(1,\ \max(|M_L|, |M_R|)/M_{\mathrm{lim}})$ while leaving the contact
@@ -1015,75 +1008,18 @@ $p$.
 
 ## A limitation: shocked operating points
 
-Between the first and second critical pressure ratios — a normal shock standing
-in the diverging section — the pseudo-time march does *not* reach a steady
-state. The residual falls about an order of magnitude and then parks:
+Between the second and first critical pressure ratios a normal shock stands in
+the diverging section, and the pseudo-time march generally does not reach a
+steady state there: $p = 0$ stalls, and sometimes converges, while $p \ge 1$
+diverges. The solver reports those runs as `converged=False`.
 
-| Discretisation | Limiter / scheme | Residual floor (scaled) |
-|---|---|---|
-| $p=0$, ref $=0$ | — | $6.1\times10^{-2}$ |
-| $p=0$, ref $=1$ | — | $4.9\times10^{-2}$ |
-| $p=0$, ref $=2$ | — | $5.6\times10^{-2}$ |
-| $p=1$, ref $=0$ | Barth–Jespersen, SSP-RK3 | $1.5$ |
-| $p=1$, ref $=1$ | Barth–Jespersen, SSP-RK3 | $2.6$ |
+The cause is structural rather than a defect in any one piece. A steady explicit
+DG march whose only safeguard is a positivity limiter has no mechanism that both
+captures a shock and reaches a fixed point: the TVB discussion above shows why a
+TVD slope limiter cannot do it, and neither interface flux changes the outcome.
+Converging shocked flow would be a change of method -- artificial viscosity with
+a smooth sensor, or subcell reconstruction -- not a change of limiter or flux.
 
-Measured at $p_b/p_t = 0.70$ (`'smooth'` contour, $\mathrm{AR} = 2.5019$)
-against a convergence target of $10^{-6}$, iteration cap 80,000.
-
-Two features of the table matter for diagnosis. The $p = 0$ floor is
-essentially *mesh independent*, which rules out simple under-resolution of the
-shock: halving the element size four times over changes the floor by less than a
-factor of 1.3. And $p \ge 1$ with a limiter is *worse* than $p = 0$, by more
-than an order of magnitude, which is the signature of a limit cycle in the
-limiter rather than of the discretisation. The Barth–Jespersen limiter is known
-to obstruct steady convergence for exactly this reason: it switches on and off
-between iterations, and its clipping factor is not a smooth function of the
-solution.
-
-A third possibility is not a defect at all. Quasi-1D theory predicts a *normal*
-shock spanning the channel, but a normal shock in a diverging duct is not
-obviously a steady two-dimensional structure; in inviscid flow it tends to
-bifurcate. If there is no steady solution, no steady solver will find one.
-Distinguishing "the solver cannot converge it" from "there is nothing to
-converge to" requires a time-accurate computation, which this solver does not
-do.
-
-### Where the residual lives
-
-Localising it at $p=0$, ref $=1$, $p_b/p_t = 0.70$ (12,000 steps, no limiter):
-
-| Region | Share of squared residual |
-|---|---|
-| $x \in [0.2, 0.3)$ | **85.1%** |
-| $x \in [0.3, 0.4)$ | 8.3% |
-| every other axial band | $< 2\%$ each |
-| outflow elements | **0.1%** |
-| inflow elements | 0.0% |
-
-This rules out the boundary conditions. The outflow plane carries a tenth of a
-percent of the residual, and its normal Mach number is subsonic at every
-quadrature point (maximum $0.75$), with none within $0.15$ of sonic — so the
-branch switch in the outflow condition is not chattering. The residual instead
-concentrates in one narrow axial band, spread across the full channel height,
-which is where the captured shock sits.
-
-Two further observations point the same way. The computed shock settles near
-$x \approx 0.25$ while quasi-1D theory places it at $x = 0.508$; and the exit
-plane carries *reverse flow*, with a minimum normal Mach number of $-0.22$ — a
-recirculation that a one-dimensional model cannot represent at all. Taken with
-the mesh independence of the floor, the evidence favours the third explanation
-above: that there is no steady two-dimensional solution at this operating point
-to converge to. Confirming it would need a time-accurate computation, which
-this solver does not perform.
-
-The solver reports these runs as not converged, with the residual level and the
-diagnostic message, and does not present their integral quantities as
-trustworthy. Everything shock-free converges cleanly and is verified above: the
-design point, over-expanded and under-expanded operation, the whole area-ratio
-design space, and all of the sensitivity results below. For shock physics, the
-quasi-1D solution is exact and includes the shock position.
-
----
 
 ## Design sensitivities
 

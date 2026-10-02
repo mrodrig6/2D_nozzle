@@ -41,7 +41,7 @@ class NumpyBackend(Backend):
             wave_sum, self.ops, self.ops.ref.order, self.opts.cfl,
             self.opts.scheme, xp=np,
         )
-        return dt[:, None, None]
+        return self.positivity_scale() * dt[:, None, None]
 
     def norm(self, A) -> float:
         # A diverging march overflows here by design; the caller checks for a

@@ -57,7 +57,7 @@ _GEOMETRY_KEYS = (
 _FLOW_KEYS = (
     "gamma", "Rgas", "total_temperature", "total_pressure",
     "back_pressure_ratio", "inflow_angle", "entropy_fix",
-    "flux", "hllc_low_mach",
+    "flux", "hllc_low_mach", "backflow",
 )
 _DISC_KEYS = (
     "element", "order", "geometry_order", "refine", "nx", "nr",
@@ -66,7 +66,7 @@ _DISC_KEYS = (
 _OPTS_KEYS = (
     "cfl", "tolerance", "max_iterations", "scheme", "limiter",
     "initial_condition", "p_continuation", "print_interval", "divergence_factor",
-    "tvb_constant",
+    "tvb_constant", "positivity_cfl",
 )
 
 

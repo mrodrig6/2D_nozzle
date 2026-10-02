@@ -49,6 +49,21 @@ class FlowConditions:
     entropy_fix
         Harten-Hyman entropy-fix parameter of the Roe flux, as a fraction of the
         Roe-averaged sound speed.  Read only when ``flux='roe'``.
+    backflow
+        Treat reverse flow at the exit plane with its own boundary branch.
+
+        With ``n`` outward, subsonic outflow has one incoming characteristic and
+        so admits one imposed condition, which is the static pressure.  Reverse
+        flow -- ``v_n < 0``, the flow entering through the exit -- has *three*
+        incoming, so imposing pressure alone under-determines it by two.  The
+        shocked cases measure a minimum normal Mach number of -0.22 at the exit,
+        which is squarely in that regime.
+
+        When on, the branch imposes the reservoir's entropy, the back pressure
+        and a normal direction, and takes the normal velocity from the one
+        outgoing invariant, blending smoothly into the subsonic-outflow branch
+        across ``0 <= v_n/a <= 0.05``.  Off by default so the effect is
+        measurable rather than assumed.
     flux
         The interface flux between two element traces.
 
@@ -78,6 +93,7 @@ class FlowConditions:
     entropy_fix: float = 0.05
     flux: str = "roe"
     hllc_low_mach: float = 0.0
+    backflow: bool = False
 
     def __post_init__(self) -> None:
         if self.gamma <= 1.0:
@@ -249,6 +265,18 @@ class SolverOptions:
         lower it and the limiter chatters and the residual parks; raise it and
         the limiter stops acting.  Shocked points do not converge at ``p >= 1``
         for this reason among others -- see the README.
+    positivity_cfl
+        Extra cap on the time step while a limiter is active, as a fraction of
+        the ordinary step.  ``0`` disables it.
+
+        The Zhang-Shu positivity limiter has a theorem, and it holds under a CFL
+        condition *stricter* than linear stability -- the step must be small
+        enough that a forward-Euler stage cannot drive the cell average
+        non-physical, since no scaling limiter can repair an average that has
+        already left the physical set.  This code's step is calibrated to linear
+        stability only, so that condition is not imposed anywhere.  This
+        parameter is the blunt version of imposing it: a measurable multiplier
+        rather than a constant asserted from the literature.
     initial_condition
         ``'quasi1d'`` projects the quasi-one-dimensional solution for this
         geometry and back pressure.  Measured against a uniform start on the
@@ -290,6 +318,7 @@ class SolverOptions:
     scheme: str = "rk4"
     limiter: str = "positivity"
     tvb_constant: float = 50.0
+    positivity_cfl: float = 0.0
     initial_condition: str = "quasi1d"
     p_continuation: bool = False
     check_interval: int = 50
@@ -313,6 +342,10 @@ class SolverOptions:
             raise ValueError(f"stall_ratio must lie in (0, 1), got {self.stall_ratio}")
         if self.scheme not in ("rk4", "ssprk3"):
             raise ValueError(f"scheme must be 'rk4' or 'ssprk3', got {self.scheme!r}")
+        if not 0.0 <= self.positivity_cfl <= 1.0:
+            raise ValueError(
+                f"positivity_cfl must lie in [0, 1], got {self.positivity_cfl}"
+            )
         if self.tvb_constant < 0.0:
             raise ValueError(f"tvb_constant must be non-negative, got {self.tvb_constant}")
         if self.limiter not in ("none", "positivity", "superbee"):

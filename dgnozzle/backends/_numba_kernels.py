@@ -319,7 +319,7 @@ def _inflow(Ub, nx, ny, gamma, at2, at, rho_t, ca, sa, out):
 
 
 @njit(inline="always", **_JIT)
-def _outflow(Ub, nx, ny, gamma, p_back, out):
+def _outflow(Ub, nx, ny, gamma, p_back, rho_t, p_t, band, out):
     rho = max(Ub[0], FLOOR)
     vx = Ub[1] / rho
     vy = Ub[2] / rho
@@ -338,6 +338,34 @@ def _outflow(Ub, nx, ny, gamma, p_back, out):
     vxb = (vx - vn * nx) + vnb * nx
     vyb = (vy - vn * ny) + vnb * ny
     Eb = p_back / ((gamma - 1.0) * rhob) + 0.5 * (vxb * vxb + vyb * vyb)
+
+    # reverse flow: three characteristics enter, so three conditions are imposed
+    # (reservoir entropy, the back pressure, a normal direction) and only the
+    # normal velocity comes from the interior.  Blended over 0 <= vn/a <= band so
+    # nothing switches discontinuously.
+    if rho_t > 0.0 and vn / a < band:
+        rho_f = rho_t * (p_back / p_t) ** (1.0 / gamma)
+        a_f = np.sqrt(gamma * p_back / rho_f)
+        vn_f = vn + 2.0 / (gamma - 1.0) * (a - a_f)
+        vx_f = vn_f * nx
+        vy_f = vn_f * ny
+        E_f = p_back / ((gamma - 1.0) * rho_f) + 0.5 * (vx_f * vx_f + vy_f * vy_f)
+        t = (vn / a) / band
+        if t < 0.0:
+            t = 0.0
+        # blend the two states as conserved variables, each formed from its own
+        # density before any blending
+        r_out, mx_out, my_out, en_out = rhob, rhob * vxb, rhob * vyb, rhob * Eb
+        r_in, mx_in, my_in, en_in = rho_f, rho_f * vx_f, rho_f * vy_f, rho_f * E_f
+        _normal_flux(
+            t * r_out + (1.0 - t) * r_in,
+            t * mx_out + (1.0 - t) * mx_in,
+            t * my_out + (1.0 - t) * my_in,
+            t * en_out + (1.0 - t) * en_in,
+            nx, ny, gamma, out,
+        )
+        return abs(vnb) + ab
+
     _normal_flux(rhob, rhob * vxb, rhob * vyb, rhob * Eb, nx, ny, gamma, out)
     return abs(vnb) + ab
 
@@ -368,6 +396,9 @@ def edge_pass(
     efix,
     flux_id,
     low_mach,
+    rho_t_bf,
+    p_t_bf,
+    band_bf,
     at2,
     at,
     rho_t,
@@ -436,7 +467,8 @@ def edge_pass(
                 if tag == _INFLOW:
                     sp = _inflow(UL, nx, ny, gamma, at2, at, rho_t, ca, sa, flux)
                 elif tag == _OUTFLOW:
-                    sp = _outflow(UL, nx, ny, gamma, p_back, flux)
+                    sp = _outflow(UL, nx, ny, gamma, p_back,
+                                  rho_t_bf, p_t_bf, band_bf, flux)
                 else:  # _WALL or _AXIS
                     sp = _wall(UL, nx, ny, gamma, flux)
                 if sp > best:
