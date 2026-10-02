@@ -76,6 +76,9 @@ class NumbaBackend(Backend):
         self._w_face = _c(ops.ref.w_face)
         self._grad_x = _c(ops.grad_x)
         self._grad_y = _c(ops.grad_y)
+        self._grad_x_m = _c(ops.grad_x_m)
+        self._grad_y_m = _c(ops.grad_y_m)
+        self._face_basis_m = _c(ops.face_basis_m)
         self._inv_mass = _c(ops.inv_mass)
         self._edge_normal = _c(ops.edge_normal)
         self._edge_jac = _c(ops.edge_jac)
@@ -175,12 +178,17 @@ class NumbaBackend(Backend):
         )
 
     def _rate_into(self, U, out) -> None:
-        """``out = -M^{-1} R(U)``, filling ``self._wave`` on the way."""
+        """``out = -M^{-1} R(U)``, filling ``self._wave`` on the way.
+
+        Uses the operators with ``M^{-1}`` folded in, so there is no mass solve
+        here at all.
+        """
         self._edges(U)
-        nk.element_pass(
-            U, self._fw, self._smax, self._phi_vol, self._grad_x, self._grad_y,
-            self._phi_face, self._face_edge, self._face_side, self._face_sign,
-            self._edge_length, self._gamma, self._inv_mass, True, out, self._wave,
+        nk.element_rate(
+            U, self._fw, self._smax, self._phi_vol,
+            self._grad_x_m, self._grad_y_m, self._face_basis_m,
+            self._face_edge, self._face_sign, self._edge_length,
+            self._gamma, out, self._wave,
         )
 
     def _dt_into(self) -> np.ndarray:

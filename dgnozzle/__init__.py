@@ -79,7 +79,9 @@ from .quasi1d import (
     Quasi1DSolution,
     Regime,
     critical_ratios,
+    is_shock_free,
     operating_regime,
+    shock_free_range,
     solve_quasi1d,
 )
 from .solver import SolveResult, solve_steady
@@ -118,7 +120,9 @@ __all__ = [
     "solve_quasi1d",
     "Quasi1DSolution",
     "critical_ratios",
+    "is_shock_free",
     "operating_regime",
+    "shock_free_range",
     "Regime",
     # studies
     "sweep",

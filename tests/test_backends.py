@@ -146,3 +146,40 @@ def test_the_numba_hllc_kernel_matches_the_shared_one():
                      verbose=False)
     assert a.iterations == b.iterations
     assert np.abs(a.U - b.U).max() / np.abs(a.U).max() < 1e-12
+
+
+def test_the_folded_rate_kernel_matches_the_unfolded_one():
+    """``element_rate`` must be the exact same rate, not merely a close one.
+
+    ``M**-1`` is folded into the operators at build time, so the two paths do the
+    same arithmetic in a different order.  Nothing but a test keeps them in step,
+    and the fast path is the one the march actually uses -- a drift here would be
+    invisible everywhere except the answer.
+    """
+    import numpy as np
+
+    from dgnozzle import Discretization
+    from dgnozzle.api import build_case
+    from dgnozzle.backends import _numba_kernels as nk
+    from dgnozzle.backends import get_backend
+    from dgnozzle.config import SolverOptions
+    from dgnozzle.initialize import initial_state
+
+    for order in (0, 1, 2):
+        cs = build_case(discretization=Discretization(order=order, refine=0))
+        ops, flow, geom = cs.operators_at(order), cs.flow, cs.geometry
+        bk = get_backend("numba", ops, flow, SolverOptions())
+        U = np.ascontiguousarray(initial_state(ops, flow, geom, "quasi1d"))
+
+        folded = np.empty_like(U)
+        bk._rate_into(U, folded)
+
+        unfolded = np.empty_like(U)
+        bk._edges(U)
+        nk.element_pass(
+            U, bk._fw, bk._smax, bk._phi_vol, bk._grad_x, bk._grad_y,
+            bk._phi_face, bk._face_edge, bk._face_side, bk._face_sign,
+            bk._edge_length, bk._gamma, bk._inv_mass, True, unfolded, bk._wave,
+        )
+        scale = max(np.abs(unfolded).max(), 1e-30)
+        assert np.abs(folded - unfolded).max() / scale < 1e-12, f"order {order}"

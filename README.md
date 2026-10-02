@@ -801,6 +801,15 @@ Everything shock-free is verified and converges: the design point,
 over-expanded and under-expanded operation, the whole area-ratio design space,
 and all sensitivity and optimisation work.
 
+**The solver tells you before the run.** `shock_free_range(area_ratio)` returns
+the two usable intervals, `is_shock_free(area_ratio, pb)` classifies a point,
+and `solve_nozzle` warns at setup if the operating point puts a shock in the
+diverging section — which saves finding out minutes later. For `AR=2.5` the
+usable set is `p_b/p_t < 0.4348` (choked, supersonic exit) or `>= 0.9608`
+(unchoked). That covers what a nozzle-design exercise wants: the over-expanded
+and under-expanded wave structure forms **outside** the exit plane, downstream
+of the computed domain.
+
 
 ## Verification
 

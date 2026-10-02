@@ -34,6 +34,7 @@ backwards.
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import Any
@@ -41,6 +42,7 @@ from typing import Any
 import numpy as np
 
 from . import initialize as ini
+from . import quasi1d as q1d_mod
 from .config import Discretization, FlowConditions, SolverOptions
 from .geometry import NozzleGeometry, check_contour
 from .mesh import MeshTopology, build_nozzle_mesh
@@ -284,6 +286,24 @@ def solve_nozzle(
 
     disc = cs.discretization
     target = disc.order
+
+    # A shock in the diverging section does not converge here, and the run can
+    # take minutes before saying so.  Warning at setup costs nothing and is the
+    # difference between a student mis-reading the result and knowing the
+    # operating point is outside what the solver can do.
+    if not q1d_mod.is_shock_free(cs.geometry.area_ratio, flw.back_pressure_ratio,
+                                 flw.gamma):
+        lo, hi = q1d_mod.shock_free_range(cs.geometry.area_ratio, flw.gamma)
+        warnings.warn(
+            f"back_pressure_ratio={flw.back_pressure_ratio:.4f} puts a normal "
+            f"shock inside the diverging section, which this solver does not "
+            f"converge.  Shock-free operation is p_b/p_t < {lo[1]:.4f} "
+            f"(choked, supersonic exit) or >= {hi[0]:.4f} (unchoked).  The "
+            f"over-expanded and under-expanded wave structure a design exercise "
+            f"wants happens outside the exit plane, below {lo[1]:.4f}.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
 
     if verbose:
         q1d = solve_quasi1d(cs.geometry, flw)

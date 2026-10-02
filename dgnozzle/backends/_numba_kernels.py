@@ -429,6 +429,8 @@ def edge_pass(
             lf = iedge_face[k, 0]
             re = iedge_elem[k, 1]
             rf = iedge_face[k, 1]
+            # the flux choice is loop-invariant, so it is tested once per edge
+            # rather than once per quadrature point
             for q in range(nqf):
                 for s in range(4):
                     UL[s] = 0.0
@@ -477,6 +479,87 @@ def edge_pass(
                 for s in range(4):
                     fw[k, q, s] = flux[s] * scale
         smax[k] = best
+
+
+@njit(parallel=True, **_JIT)
+def element_rate(
+    U,
+    fw,
+    smax,
+    phi_vol,
+    grad_x_m,
+    grad_y_m,
+    face_basis_m,
+    face_edge,
+    face_sign,
+    edge_length,
+    gamma,
+    out,
+    wave,
+):
+    r"""The rate :math:`-M^{-1}R` in one pass, with no mass solve.
+
+    Same arithmetic as :func:`element_pass` with ``apply_mass`` true, except
+    that :math:`M^{-1}` has already been folded into the operators at build
+    time (see :class:`~dgnozzle.operators.Operators`).  That removes an
+    ``nbf**2 * 4`` matvec per element per stage -- four per iteration -- and with
+    it the ``apply_mass`` branch and the ``face_side`` indirection, since
+    ``face_basis_m`` is already resolved per element.
+
+    The march only ever wants the rate, so this is the kernel it uses;
+    :func:`element_pass` stays for the residual itself, which the cross-backend
+    test compares and the sensitivity code differentiates.
+    """
+    nelem = U.shape[0]
+    nbf = U.shape[1]
+    nqv = phi_vol.shape[1]
+    nface = face_edge.shape[1]
+    nqf = fw.shape[1]
+
+    for e in prange(nelem):
+        Rm = np.zeros((nbf, 4))
+        Uq = np.zeros(4)
+        F = np.zeros(4)
+        G = np.zeros(4)
+        for q in range(nqv):
+            for s in range(4):
+                Uq[s] = 0.0
+            for i in range(nbf):
+                b = phi_vol[i, q]
+                for s in range(4):
+                    Uq[s] += b * U[e, i, s]
+            rho = max(Uq[0], FLOOR)
+            vx = Uq[1] / rho
+            vy = Uq[2] / rho
+            p = _pressure(Uq[0], Uq[1], Uq[2], Uq[3], gamma)
+            H = (Uq[3] + p) / rho
+            F[0] = rho * vx
+            F[1] = rho * vx * vx + p
+            F[2] = rho * vx * vy
+            F[3] = rho * vx * H
+            G[0] = rho * vy
+            G[1] = rho * vx * vy
+            G[2] = rho * vy * vy + p
+            G[3] = rho * vy * H
+            for i in range(nbf):
+                gx = grad_x_m[e, i, q]
+                gy = grad_y_m[e, i, q]
+                for s in range(4):
+                    Rm[i, s] -= gx * F[s] + gy * G[s]
+        acc = 0.0
+        for f in range(nface):
+            k = face_edge[e, f]
+            sg = face_sign[e, f]
+            for q in range(nqf):
+                for i in range(nbf):
+                    b = sg * face_basis_m[e, f, i, q]
+                    for s in range(4):
+                        Rm[i, s] += b * fw[k, q, s]
+            acc += smax[k] * edge_length[k]
+        wave[e] = acc
+        for i in range(nbf):
+            for s in range(4):
+                out[e, i, s] = -Rm[i, s]
 
 
 @njit(parallel=True, **_JIT)

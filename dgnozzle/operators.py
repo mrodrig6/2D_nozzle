@@ -159,6 +159,21 @@ class Operators:
     grad_x: Any  # (nelem, nbf, nqv)   w_vol * det_jac * dphi/dx
     grad_y: Any  # (nelem, nbf, nqv)
     inv_mass: Any  # (nelem, nbf, nbf)
+    grad_x_m: Any  # (nelem, nbf, nqv)   inv_mass @ grad_x
+    grad_y_m: Any  # (nelem, nbf, nqv)   inv_mass @ grad_y
+    face_basis_m: Any  # (nelem, nface, nbf, nqf)  inv_mass @ face_basis
+    r"""The same operators with :math:`M^{-1}` already folded in.
+
+    The march wants the *rate* :math:`-M^{-1}R`, never :math:`R` itself, and
+    :math:`M^{-1}` is a fixed per-element matrix.  Applying it to the operators
+    once at build time instead of to the accumulated residual on every stage
+    removes an ``nbf**2 * 4`` matvec per element per stage -- four per iteration.
+    The identity is exact, so the rate is unchanged to round-off.
+
+    The unfolded arrays are kept because the residual itself is still wanted:
+    :meth:`~dgnozzle.backends.base.Backend.residual` is what the cross-backend
+    test compares, and :mod:`dgnozzle.sensitivity` differentiates it.
+    """
     elem_area: Any  # (nelem,)
     mean_weights: Any  # (nelem, nbf) cell-average operator: ubar_s = sum_i mw_i U_is
     xy_vol: Any  # (nelem, nqv, 2) physical coords of volume quad points
@@ -297,6 +312,11 @@ def build_operators(
         rd.phi_face[edges.face_side, np.arange(nface)[None, :].repeat(topology.n_elem, axis=0)]
     )
 
+    # M^{-1} folded into the operators the rate path uses (see Operators)
+    grad_x_m = xp.einsum("eij,ejq->eiq", inv_mass, grad_x)
+    grad_y_m = xp.einsum("eij,ejq->eiq", inv_mass, grad_y)
+    face_basis_m = xp.einsum("eij,efjq->efiq", inv_mass, face_basis)
+
     return Operators(
         ref=rd,
         topology=topology,
@@ -306,6 +326,9 @@ def build_operators(
         grad_x=grad_x,
         grad_y=grad_y,
         inv_mass=inv_mass,
+        grad_x_m=grad_x_m,
+        grad_y_m=grad_y_m,
+        face_basis_m=face_basis_m,
         elem_area=elem_area,
         mean_weights=mean_weights,
         xy_vol=xy_vol,

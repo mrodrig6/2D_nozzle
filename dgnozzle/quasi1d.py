@@ -201,6 +201,42 @@ def critical_ratios(area_ratio: float, gamma: float = 1.4) -> CriticalRatios:
     )
 
 
+def shock_free_range(area_ratio: float, gamma: float = 1.4):
+    """The back-pressure ratios with **no shock inside the nozzle**.
+
+    Returns ``((0.0, second), (first, 1.0])`` as two closed-open intervals: the
+    choked, supersonic-exit branch below the second critical ratio, and the
+    unchoked subsonic branch above the first.  Between them a normal shock stands
+    in the diverging section.
+
+    This is the operating set a nozzle-design exercise actually wants.  A student
+    sizing a nozzle is trying to *avoid* a shock in the diverging section; the
+    interesting wave structure -- oblique shocks when over-expanded, a
+    Prandtl-Meyer fan when under-expanded -- happens **outside** the exit plane,
+    downstream of the computed domain.  Restricted to this set the solver
+    converges; inside the excluded band it does not (see the README).
+
+    >>> lo, hi = shock_free_range(2.5)
+    >>> f"{lo[1]:.4f}  {hi[0]:.4f}"
+    '0.4348  0.9608'
+    """
+    crit = critical_ratios(area_ratio, gamma)
+    return (0.0, crit.second), (crit.first, 1.0)
+
+
+def is_shock_free(area_ratio: float, back_pressure_ratio: float,
+                  gamma: float = 1.4) -> bool:
+    """True when no normal shock stands inside the diverging section.
+
+    The boundary ``p_b/p_t == second`` counts as *not* shock free: that is a
+    normal shock sitting exactly on the exit plane, which is both in the domain
+    and on the outflow condition's branch switch.
+    """
+    crit = critical_ratios(area_ratio, gamma)
+    pb = back_pressure_ratio
+    return pb < crit.second or pb >= crit.first
+
+
 def operating_regime(area_ratio: float, back_pressure_ratio: float, gamma: float = 1.4):
     """Classify an operating point.  Returns ``(regime, critical_ratios)``."""
     crit = critical_ratios(area_ratio, gamma)
