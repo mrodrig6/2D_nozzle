@@ -34,6 +34,14 @@ AREA_RATIO = 2.5
 CRIT = critical_ratios(AREA_RATIO)
 
 
+#: The unchoked branch needs a far larger budget, and not because anything is
+#: wrong with it.  At ``pb = 0.98`` the exit Mach number is 0.17 -- a nearly
+#: stagnant venturi flow -- while the residual is scaled by stagnation
+#: conditions, so the march creeps: p=2 converges at 47,901 iterations where the
+#: choked points take 1,000-4,000.  Measured, not guessed.
+MAX_ITERATIONS = 80_000
+
+
 def _solve(pb, order, refine, flux="roe", **kw):
     with warnings.catch_warnings():
         warnings.simplefilter("error", RuntimeWarning)   # no shocked-band warning
@@ -41,7 +49,8 @@ def _solve(pb, order, refine, flux="roe", **kw):
             contour="smooth", area_ratio=AREA_RATIO, back_pressure_ratio=pb,
             discretization=Discretization(order=order, refine=refine,
                                           geometry_order=2),
-            options=SolverOptions(max_iterations=40000, tolerance=1e-6, **kw),
+            options=SolverOptions(max_iterations=MAX_ITERATIONS, tolerance=1e-6,
+                                  **kw),
             flux=flux, verbose=False,
         )
 
@@ -74,22 +83,59 @@ def test_is_shock_free_classifies_each_regime(pb, free):
     assert is_shock_free(AREA_RATIO, pb) is free
 
 
-def test_the_shocked_band_warns_before_a_long_run():
-    """The warning is the point: the run would otherwise take minutes to fail."""
-    with pytest.warns(RuntimeWarning, match="normal shock inside"):
+@pytest.mark.parametrize("pb", [0.50, 0.70, 0.95, CRIT.second])
+def test_the_shocked_band_is_refused(pb):
+    """Refusing beats running: the run costs minutes and cannot converge.
+
+    ``CRIT.second`` is included deliberately -- a normal shock sitting exactly
+    on the exit plane is both inside the domain and on the outflow condition's
+    branch switch, so it is refused with the rest of the band.
+    """
+    with pytest.raises(ValueError, match="shock inside the diverging section"):
         solve_nozzle(
-            area_ratio=AREA_RATIO, back_pressure_ratio=0.70, order=0,
+            area_ratio=AREA_RATIO, back_pressure_ratio=pb, order=0,
             options=SolverOptions(max_iterations=5), verbose=False,
         )
 
 
-def test_shock_free_points_do_not_warn():
+def test_the_shocked_band_can_still_be_opted_into():
+    """Refusal must be a default, not a wall: the band is worth exploring."""
+    r = solve_nozzle(
+        area_ratio=AREA_RATIO, back_pressure_ratio=0.70, order=0,
+        allow_shock_in_nozzle=True,
+        options=SolverOptions(max_iterations=20), verbose=False,
+    )
+    assert not r.converged
+
+
+def test_shock_free_points_are_accepted():
     with warnings.catch_warnings():
         warnings.simplefilter("error", RuntimeWarning)
         solve_nozzle(
             area_ratio=AREA_RATIO, back_pressure_ratio=0.15, order=0,
             options=SolverOptions(max_iterations=5), verbose=False,
         )
+
+
+def test_a_sweep_across_the_band_records_it_instead_of_aborting():
+    """A back-pressure sweep runs straight through the band.
+
+    Aborting the whole sweep over one refused point would make the refusal
+    worse than the non-convergence it replaced, so the point is recorded as a
+    failure with the reason and the sweep carries on.
+    """
+    from dgnozzle import sweep
+
+    table = sweep(
+        back_pressure_ratio=[0.15, 0.70, 0.30],
+        area_ratio=AREA_RATIO, order=0,
+        options=SolverOptions(max_iterations=200, tolerance=1e-3),
+    )
+    failures = table.failures()
+    assert len(failures) == 1, "expected the 0.70 point to be the only failure"
+    point, why = failures[0]
+    assert point["back_pressure_ratio"] == pytest.approx(0.70)
+    assert "shock inside the diverging section" in why
 
 
 # --------------------------------------------------------------------------

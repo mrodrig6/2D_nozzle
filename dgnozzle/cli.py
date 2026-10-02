@@ -62,6 +62,9 @@ def _solver_args(p: argparse.ArgumentParser) -> None:
     g.add_argument("--positivity-cfl", type=float, default=0.0,
                    help="extra time-step cap while a limiter is active "
                         "(0 disables)")
+    g.add_argument("--allow-shock-in-nozzle", action="store_true",
+                   help="run an operating point whose shock sits inside the "
+                        "diverging section (it will not converge)")
     g.add_argument("--backflow", action="store_true",
                    help="treat reverse flow at the exit with its own branch")
     g.add_argument("--tvb-constant", type=float, default=50.0,
@@ -92,7 +95,7 @@ def _collect(args) -> dict:
         "element", "order", "geometry_order", "refine", "x_spacing",
         "flux",
         "cfl", "tolerance", "max_iterations", "scheme", "limiter",
-        "p_continuation", "tvb_constant", "positivity_cfl", "backflow",
+        "p_continuation", "tvb_constant", "positivity_cfl", "backflow", "allow_shock_in_nozzle",
     )
     out = {name: defined[name] for name in names if name in defined}
     if defined.get("theta_initial_deg") is not None:

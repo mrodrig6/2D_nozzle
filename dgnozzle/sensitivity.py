@@ -226,6 +226,14 @@ class DifferentiableCase:
             back_pressure = pb
             stagnation_sound_speed = self.flow.stagnation_sound_speed
             stagnation_density = self.flow.stagnation_density
+            # Every attribute assembly.residual reads has to be here.  This
+            # stand-in shadows FlowConditions rather than subclassing it, so a
+            # field added there is silently missing here until something asks
+            # for it -- which is exactly how `flux` went unnoticed.
+            flux = self.flow.flux
+            hllc_low_mach = self.flow.hllc_low_mach
+            backflow = self.flow.backflow
+            allow_shock_in_nozzle = self.flow.allow_shock_in_nozzle
 
         return _Flow()
 

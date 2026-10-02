@@ -55,6 +55,14 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         run: ruff check dgnozzle tests examples docs
 
+      # The ignore list in pyproject.toml is every false positive this raises in
+      # aerodynamics and LaTeX, checked individually -- Ue, nd, \oint, pres,
+      # "Numer. Anal.".  Without it the check is noise; with it, it is a real
+      # check on the prose, which in this repository is most of the content.
+      - name: Spell check
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        run: codespell dgnozzle tests examples docs README.md
+
   docs:
     runs-on: ubuntu-latest
     name: check the TikZ figures still compile

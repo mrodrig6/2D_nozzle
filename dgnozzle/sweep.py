@@ -220,6 +220,16 @@ def _split_grids(kwargs: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, A
     return axes, fixed
 
 
+@dataclass(frozen=True)
+class _RefusedPoint:
+    """Stands in for a sweep point the solver declined to attempt."""
+
+    message: str
+    converged: bool = False
+    geometry: Any = None
+    flow: Any = None
+
+
 def _solve_point(
     point: Mapping[str, float],
     fixed: Mapping[str, Any],
@@ -230,10 +240,20 @@ def _solve_point(
     backend: str,
     U0,
 ):
-    res = solve_nozzle(
-        geometry, flow, discretization, options,
-        backend=backend, U0=U0, verbose=False, **dict(fixed), **dict(point),
-    )
+    try:
+        res = solve_nozzle(
+            geometry, flow, discretization, options,
+            backend=backend, U0=U0, verbose=False, **dict(fixed), **dict(point),
+        )
+    except ValueError as exc:
+        if "shock inside the diverging section" not in str(exc):
+            raise
+        # A sweep across back pressure runs straight through the band where a
+        # normal shock stands in the diverging section, and that point is
+        # refused rather than solved.  Aborting the whole sweep over it would
+        # make the refusal worse than the non-convergence it replaced, so the
+        # point is recorded as a failure with the reason and the sweep goes on.
+        return _RefusedPoint(str(exc)), None
     perf = performance(res) if res.converged else None
     return res, perf
 
@@ -363,11 +383,17 @@ def sweep(
             )
             converged[fi] = res.converged
             messages[fi] = res.message
-            regimes[fi] = operating_regime(
-                res.geometry.realised_area_ratio(),
-                res.flow.back_pressure_ratio,
-                res.flow.gamma,
-            )[0].value
+            # a refused point never built a case, so there is no realised
+            # geometry to classify; the regime is left blank rather than guessed
+            regimes[fi] = (
+                operating_regime(
+                    res.geometry.realised_area_ratio(),
+                    res.flow.back_pressure_ratio,
+                    res.flow.gamma,
+                )[0].value
+                if res.geometry is not None and res.flow is not None
+                else ""
+            )
             if perf is not None:
                 for m, v in _extract(res, perf, res.geometry, res.flow).items():
                     values[m][fi] = v

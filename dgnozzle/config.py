@@ -49,6 +49,20 @@ class FlowConditions:
     entropy_fix
         Harten-Hyman entropy-fix parameter of the Roe flux, as a fraction of the
         Roe-averaged sound speed.  Read only when ``flux='roe'``.
+    allow_shock_in_nozzle
+        Permit an operating point that stands a normal shock inside the
+        diverging section, or exactly on the exit plane.
+
+        **Refused by default.**  Those points do not converge here, and a run
+        that cannot converge is worse than no run: it costs minutes and returns
+        numbers that look like an answer.  A nozzle-design exercise does not
+        want them either -- sizing a nozzle means *avoiding* a shock in the
+        diverging section, and the wave structure worth looking at (oblique
+        shocks when over-expanded, a Prandtl-Meyer fan when under-expanded)
+        forms outside the exit plane.
+
+        Set it to ``True`` to explore the band anyway; the solver will still
+        report ``converged=False``.
     backflow
         Treat reverse flow at the exit plane with its own boundary branch.
 
@@ -94,6 +108,7 @@ class FlowConditions:
     flux: str = "roe"
     hllc_low_mach: float = 0.0
     backflow: bool = False
+    allow_shock_in_nozzle: bool = False
 
     def __post_init__(self) -> None:
         if self.gamma <= 1.0:
