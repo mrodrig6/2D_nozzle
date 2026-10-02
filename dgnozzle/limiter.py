@@ -335,13 +335,14 @@ def superbee_limiter(
     small enough to be smooth data rather than an oscillation is left alone:
 
     .. math::
-        |d_{f,s}| \le M \,\frac{A_e}{A_\Omega}\,
+        |d_{f,s}| \le K_{\mathrm{TVB}} \,\frac{A_e}{A_\Omega}\,
             \max_{e'} |\bar{u}_{e',s}|
         \quad\Longrightarrow\quad
         \text{no limiting of component } s \text{ across } f .
 
-    Their threshold is :math:`M h^2` with :math:`M` a bound on a second
-    derivative, so *dimensional*: the same ``M`` means different things at
+    Their threshold is :math:`K_{\mathrm{TVB}} h^2` with that constant a
+    bound on a second
+    derivative, so *dimensional*: the same value means different things at
     different nozzle scales and in different non-dimensionalisations, and a value
     that works becomes a value that stalls when the problem is rescaled.  The
     form above is that threshold made dimensionless.  The element's share of the
@@ -355,7 +356,7 @@ def superbee_limiter(
     transverse momentum passes through zero along the nozzle axis, so the
     threshold vanishes on precisely the elements where the field is smoothest and
     the limiter can never switch off.  Measured, the residual stalled at
-    :math:`2.6\times 10^{-2}` after 4000 iterations even at ``M = 200``.  A global
+    :math:`2.6\times 10^{-2}` after 4000 iterations even at ``tvb_constant = 200``.  A global
     scale has no zero to fall into.
 
     Without a threshold at all (``tvb_constant = 0``, the pure TVD limiter) the
@@ -366,7 +367,7 @@ def superbee_limiter(
     :math:`10^{-6}`.  It is the same failure mode that made the Barth-Jespersen
     limiter this replaced worse than no slope limiter at all.
 
-    The shipped default ``M = 50`` is the smallest value that converges every
+    The shipped default ``tvb_constant = 50`` is the smallest value that converges every
     shock-free point tested, and at that value the limiter is nearly inactive
     even at a shock.  :class:`~dgnozzle.config.SolverOptions` documents that
     trade-off, which is the reason shocked points do not converge at ``p >= 1``.

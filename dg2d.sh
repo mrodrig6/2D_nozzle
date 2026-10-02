@@ -162,7 +162,9 @@ translate() {
             p|order)                              key=order ;;
             Q|geometry_order|geometry-order)      key=geometry-order ;;
             ref|refine)                           key=refine ;;
-            M|tvb|tvb_constant|tvb-constant)      key=tvb-constant ;;
+            # NOT `M`: in a compressible-flow code M is the Mach number,
+            # and the TVB constant is not a Mach number
+            tvb|tvb_constant|tvb-constant)        key=tvb-constant ;;
             ar|area_ratio|area-ratio)             key=area-ratio ;;
             pb|back_pressure|back_pressure_ratio) key=back-pressure-ratio ;;
             *)                                    key=${key//_/-} ;;
@@ -282,8 +284,9 @@ any subcommand that accepts the keys it holds -- 'solve', 'sweep' and 'bench'
 take the full set, 'geometry' only the geometry ones.
 
 Aliases: p=order, Q=geometry_order, ref=refine, ar=area_ratio,
-pb=back_pressure_ratio, M=tvb_constant.  Ordinary --flags work too, so
+pb=back_pressure_ratio, tvb=tvb_constant.  Ordinary --flags work too, so
 anything 'python -m dgnozzle --help' documents is still available.
+'M' is deliberately NOT an alias: in this code M always means Mach number.
 
 Cases ('run <name>'):
 $(list_cases)

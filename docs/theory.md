@@ -448,6 +448,75 @@ nozzle. The Harten–Hyman fix replaces small eigenvalues by a smooth quadratic,
 \qquad \epsilon = 0.05\,\hat{a}.
 ```
 
+Note what this fix is and is not. It is a *local repair* that rules out one
+specific non-physical solution, and it proves nothing globally. It is **not**
+entropy stability in the modern sense — a provable discrete entropy inequality,
+built from an entropy-conservative two-point flux (Ismail and Roe; Tadmor) on
+summation-by-parts operators. Roe contributed to both lines of work two decades
+apart, which makes them easy to conflate, but only the second is a theorem.
+
+### An alternative: AUSM$^{+}$-up
+
+`flux='ausm'` selects Liou's AUSM$^{+}$-up, which is not a Riemann solver at
+all. It splits the flux into a convective part carried by an interface mass flux
+and a pressure part, with no eigen-decomposition anywhere:
+
+```math
+\hat{\mathbf{F}} = \dot{m}_{1/2}\,\boldsymbol{\Psi}_{\mathrm{up}}
+                 + p_{1/2}\,(0,\ n_x,\ n_y,\ 0)^{T},
+\qquad \boldsymbol{\Psi} = (1,\ v_x,\ v_y,\ H)^{T},
+```
+
+with $\boldsymbol{\Psi}$ taken from whichever side the mass flux comes from. The
+interface Mach number and pressure come from split polynomials,
+
+```math
+\mathcal{M}^{\pm}_{(1)} = \tfrac{1}{2}(M \pm |M|), \qquad
+\mathcal{M}^{\pm}_{(2)} = \pm\tfrac{1}{4}(M \pm 1)^{2},
+```
+
+```math
+\mathcal{M}^{\pm}_{(4)} = \begin{cases}
+  \mathcal{M}^{\pm}_{(1)}, & |M| \ge 1,\\
+  \mathcal{M}^{\pm}_{(2)}\bigl(1 \mp 16\beta\,\mathcal{M}^{\mp}_{(2)}\bigr),
+    & |M| < 1,
+\end{cases} \qquad \beta = \tfrac{1}{8},
+```
+
+built so that $\mathcal{M}^{+}_{(4)}(M) + \mathcal{M}^{-}_{(4)}(M) = M$ and
+$\mathcal{P}^{+}_{(5)}(M) + \mathcal{P}^{-}_{(5)}(M) = 1$ *identically*, which is
+what makes the scheme consistent. The `-up` suffix is two diffusion terms — a
+pressure diffusion in $M_{1/2}$ and a velocity diffusion in $p_{1/2}$ — that
+supply the velocity–pressure coupling a plain AUSM lacks as $M \to 0$. The
+interface sound speed is the *numerical* one built from the critical speed,
+$a_*^2 = 2(\gamma-1)H/(\gamma+1)$ and
+$a_{1/2} = \min(a_{*L}^2/\max(a_{*L}, |v_{nL}|),\ \cdots)$, which is what lets
+the scheme capture a stationary normal shock without an interior point.
+
+> ⚠️ **Status: the flux is verified, the nozzle solve is not.** In isolation the
+> implementation is correct — consistency holds to $1.3\times10^{-15}$, the
+> supersonic limits are bit-exact, conservation holds to $2.5\times10^{-16}$, and
+> a Sod shock tube matches the Roe flux to 1.6% of the density range. On *this
+> nozzle* it converges the residual to $10^{-12}$ and lands on a steady state
+> carrying one non-physical element adjacent to the symmetry axis: at
+> $p = 0$, `refine=0`, $\min \rho = 4.16\times10^{-4}$ and
+> $\min p = -9.4\times10^{-2}$ at $(x, y) = (0.478, 0.017)$, while the rest of
+> the field is healthy. Ruled out: the time step ($\min\rho$ and $\min p$ agree
+> to four significant figures across $\mathrm{CFL}$ of 0.5, 0.2 and 0.05, so this
+> is a steady state and not an instability), the cutoff Mach number (scanned 0.2
+> to 1.0) and the boundary fluxes (bitwise identical between the two solvers).
+> The mechanism is not yet identified. Use `flux='roe'` for any number you intend
+> to trust; `flux='ausm'` is available for comparison and requires
+> `backend='numpy'`, because the Numba kernels inline the Roe flux and refuse
+> rather than return a Roe answer under an AUSM label.
+
+The parameter that carries the trap is $M_{co}$ (`ausm_cutoff_mach`). It is a
+reference Mach number of the order of the *smallest* Mach number in the flow,
+not a regularisation epsilon: $f_a = M_0(2 - M_0)$ appears as $K_p/f_a$, so a
+small $M_{co}$ makes that coefficient **large**. At $M_{co} = 0$ a 1% pressure
+jump between two states at rest gives a mass flux of $-9.8\times10^{4}$ where the
+Roe flux gives $-3.5\times10^{-3}$.
+
 ---
 
 ## Boundary conditions
@@ -698,18 +767,18 @@ a domain boundary, so the jump there is identically zero; limiting against it
 would drive $\theta_e$ to zero in exactly the elements carrying the wall and the
 exit plane, which is where thrust is integrated.
 
-*The TVB threshold.* A face whose increment is small enough to be smooth data
+*The TVB threshold.* Cockburn and Shu call this constant $M$. **This document does not**, because $M$ is the Mach number everywhere else in it and in the code; it is written $K_{\mathrm{TVB}}$ here and `tvb_constant` in the API. A face whose increment is small enough to be smooth data
 rather than an oscillation is left alone, following Cockburn and Shu. Their
-threshold is $M h^2$, with $M$ a bound on a second derivative; this code uses the
+threshold is $K_{\mathrm{TVB}} h^2$, with $K_{\mathrm{TVB}}$ a bound on a second derivative; this code uses the
 dimensionless equivalent
 
 ```math
-|d_{f,s}| \le M\, \frac{A_e}{A_\Omega}\, \max_{e'} |\bar{u}_{e',s}|
+|d_{f,s}| \le K_{\mathrm{TVB}}\, \frac{A_e}{A_\Omega}\, \max_{e'} |\bar{u}_{e',s}|
 \quad\Longrightarrow\quad
 \text{component } s \text{ is not limited across } f ,
 ```
 
-so that one `tvb_constant` $= M$ covers any geometry, any non-dimensionalisation
+so that one `tvb_constant` $= K_{\mathrm{TVB}}$ covers any geometry, any non-dimensionalisation
 and any refinement level. The element's share of the domain area stands in for
 $(h/L)^2$, so the threshold still shrinks as $h^2$ under refinement, which is
 what makes the limiter vanish in the limit and recovers the TVB argument. The
@@ -721,23 +790,23 @@ precisely the elements where the field is smoothest.
 The threshold is not optional. Without it a TVD limiter stays marginally active
 at every smooth extremum, clipping it on some iterations and not others, and a
 limiter that switches on and off between iterations parks the residual at a fixed
-level instead of converging. Measured at the shock-free design point, $M = 0$
+level instead of converging. Measured at the shock-free design point, $K_{\mathrm{TVB}} = 0$
 leaves 77 of 140 elements of an *already converged* field being clipped and the
 residual parks at $3.1$ instead of reaching $10^{-6}$. This is the same failure
 mode that made the Barth–Jespersen limiter this replaced *worse than no slope
 limiter at all*, by more than an order of magnitude on the shocked case.
 
-The shipped default is $M = 50$, and it is the smallest value that works.
+The shipped default is $K_{\mathrm{TVB}} = 50$, and it is the smallest value that works.
 Scanned over the design, over-expanded and under-expanded points, at
-$(p, \texttt{refine})$ of $(1,0)$, $(1,1)$ and $(2,0)$: $M = 10$ fails all nine,
-$M = 20$ fails the three at $\texttt{refine}=1$, and $M = 50$ converges all nine.
+$(p, \texttt{refine})$ of $(1,0)$, $(1,1)$ and $(2,0)$: $K_{\mathrm{TVB}} = 10$ fails all nine,
+$K_{\mathrm{TVB}} = 20$ fails the three at $\texttt{refine}=1$, and $K_{\mathrm{TVB}} = 50$ converges all nine.
 
 It is worth being honest about what that costs, because it is the central
-difficulty of this whole section. At $M = 50$ the slope limiter is nearly
+difficulty of this whole section. At $K_{\mathrm{TVB}} = 50$ the slope limiter is nearly
 inactive *even at a shock*: 200 steps into a shocked run it touches 0 of 140
-elements at $p_b/p_t = 0.50$ and 2 of 140 at $0.70$, where $M = 0$ touches 72 and
+elements at $p_b/p_t = 0.50$ and 2 of 140 at $0.70$, where $K_{\mathrm{TVB}} = 0$ touches 72 and
 92. For this problem the window in which one TVB constant both leaves a smooth
-steady solution alone and still bites on a shock is **empty**. Lower $M$ and the
+steady solution alone and still bites on a shock is **empty**. Lower $K_{\mathrm{TVB}}$ and the
 limiter chatters and the residual parks; raise it and the limiter stops acting.
 That is a property of asking a TVD limiter — designed for a time-accurate march,
 where a little chatter is harmless — to coexist with a *steady* pseudo-time march

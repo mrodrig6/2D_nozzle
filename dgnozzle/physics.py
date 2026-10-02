@@ -158,6 +158,209 @@ def roe_flux(UL, UR, nx, ny, gamma: float, *, entropy_fix: float = 0.05, xp=np) 
     return FluxResult(0.5 * (FL + FR) - 0.5 * diss, max_speed)
 
 
+def ausm_flux(
+    UL, UR, nx, ny, gamma: float, *,
+    cutoff_mach: float = 0.2, xp=np,
+) -> FluxResult:
+    r"""Liou's AUSM\ :sup:`+`-up flux: a flux-vector splitting, not a Riemann solver.
+
+    Where the Roe flux linearises the Riemann problem and forms
+    :math:`|\hat{\mathbf{A}}|\,\Delta\mathbf{U}`, AUSM splits the flux into a
+    *convective* part carried by an interface mass flux and a *pressure* part,
+
+    .. math::
+        \hat{\mathbf{F}} = \dot{m}_{1/2}\,\boldsymbol{\Psi}_{\mathrm{up}}
+                         + p_{1/2}\,(0,\ n_x,\ n_y,\ 0)^T ,
+        \qquad \boldsymbol{\Psi} = (1,\ v_x,\ v_y,\ H)^T ,
+
+    with :math:`\boldsymbol{\Psi}` taken from whichever side the mass flux comes
+    from.  There is no eigen-decomposition anywhere in it.
+
+    **The split polynomials.**  With :math:`M_{L,R} = v_{n\,L,R}/a_{1/2}`,
+
+    .. math::
+        \mathcal{M}^{\pm}_{(1)} = \tfrac{1}{2}(M \pm |M|), \qquad
+        \mathcal{M}^{\pm}_{(2)} = \pm\tfrac{1}{4}(M \pm 1)^2 ,
+
+    .. math::
+        \mathcal{M}^{\pm}_{(4)} = \begin{cases}
+            \mathcal{M}^{\pm}_{(1)} & |M| \ge 1\\
+            \mathcal{M}^{\pm}_{(2)}
+            \bigl(1 \mp 16\beta\,\mathcal{M}^{\mp}_{(2)}\bigr) & |M| < 1
+        \end{cases}
+        \qquad \beta = \tfrac{1}{8},
+
+    and a fifth-order pressure splitting :math:`\mathcal{P}^{\pm}_{(5)}` with
+    :math:`\alpha = \tfrac{3}{16}(5 f_a^2 - 4)`.  Both families are built so that
+    :math:`\mathcal{M}^{+}_{(4)}(M) + \mathcal{M}^{-}_{(4)}(M) = M` and
+    :math:`\mathcal{P}^{+}_{(5)}(M) + \mathcal{P}^{-}_{(5)}(M) = 1` *identically*
+    -- which is what makes the scheme consistent, and is pinned by a test.
+
+    **What "up" adds.**  Two diffusion terms, which is what makes the scheme
+    work at all speeds rather than only transonic:
+
+    .. math::
+        M_{1/2} = \mathcal{M}^{+}_{(4)}(M_L) + \mathcal{M}^{-}_{(4)}(M_R)
+            - \frac{K_p}{f_a}\max(1 - \sigma \bar{M}^2,\, 0)\,
+              \frac{p_R - p_L}{\rho_{1/2} a_{1/2}^2}
+
+    is the **p**\ ressure diffusion, which supplies the velocity--pressure
+    coupling a plain AUSM lacks as :math:`M \to 0`, and
+
+    .. math::
+        p_{1/2} = \mathcal{P}^{+}_{(5)}(M_L)\,p_L
+                + \mathcal{P}^{-}_{(5)}(M_R)\,p_R
+                - K_u\,\mathcal{P}^{+}_{(5)}\mathcal{P}^{-}_{(5)}
+                  (\rho_L + \rho_R)\,(f_a a_{1/2})\,(v_{n R} - v_{n L})
+
+    is the **u** velocity diffusion.  Constants are Liou's:
+    :math:`K_p = 0.25`, :math:`K_u = 0.75`, :math:`\sigma = 1`.
+
+    **The interface sound speed** is the *numerical* one built from the critical
+    speed, not an average:
+
+    .. math::
+        a_*^2 = \frac{2(\gamma-1)}{\gamma+1} H, \qquad
+        \tilde{a} = \frac{a_*^2}{\max(a_*,\ |v_n|)}, \qquad
+        a_{1/2} = \min(\tilde{a}_L,\ \tilde{a}_R).
+
+    This is the part that lets the scheme capture a stationary normal shock
+    without an interior point, and it is why ``a_half`` is not simply
+    :math:`\tfrac{1}{2}(a_L + a_R)`.
+
+    Why have it alongside the Roe flux
+    ----------------------------------
+    * **No carbuncle.**  The Roe flux admits the odd--even decoupling that shows
+      up as a carbuncle ahead of a blunt body; AUSM does not.  Nothing in this
+      nozzle has produced one, so this is insurance rather than a fix.
+    * **Low-Mach accuracy.**  The Roe flux loses accuracy as :math:`M \to 0`;
+      the ``-up`` terms are designed for exactly that, and the inlet here runs
+      at :math:`M \approx 0.1`--:math:`0.3`.
+    * **It is a genuinely different philosophy**, which makes "does the answer
+      depend on the flux?" a question a student can actually answer.
+
+    It is *not* expected to fix the shocked-case divergence: that is driven by
+    the cell average leaving the physical state, which no choice of interface
+    flux addresses.  See the README.
+
+    Parameters
+    ----------
+    cutoff_mach
+        Liou's :math:`M_{co}`: a reference Mach number of the order of the
+        *smallest* Mach number in the flow, which sets
+
+        .. math::
+            M_0 = \min\bigl(1,\ \max(\bar{M},\ M_{co})\bigr), \qquad
+            f_a = M_0 (2 - M_0) .
+
+        It is **not** a regularisation epsilon, and this is the one place the
+        scheme will bite you.  :math:`f_a` appears as :math:`K_p / f_a`, so a
+        small :math:`M_{co}` makes that coefficient *large*: with
+        :math:`M_{co} = 0`, a 1% pressure jump between two states **at rest**
+        gives a mass flux of :math:`-9.8\times 10^{4}` where the Roe flux gives
+        :math:`-3.5\times 10^{-3}`, and the march dies within 51 iterations.
+
+        Liou's own guidance is :math:`M_{co} \sim M_\infty`.  The default
+        ``0.2`` suits this nozzle, whose inlet runs at
+        :math:`M \approx 0.1`--:math:`0.3`.  Raising it towards 1 recovers plain
+        AUSM\ :sup:`+` by switching the low-Mach enhancement off; lowering it
+        below the actual minimum Mach number of the flow is what breaks it.
+    """
+    rhoL, vxL, vyL, pL, HL = primitives(UL, gamma, xp=xp)
+    rhoR, vxR, vyR, pR, HR = primitives(UR, gamma, xp=xp)
+
+    vnL = vxL * nx + vyL * ny
+    vnR = vxR * nx + vyR * ny
+
+    # -- interface sound speed from the critical speed (Liou's \tilde{a}) ----
+    k = 2.0 * (gamma - 1.0) / (gamma + 1.0)
+    astarL = xp.sqrt(xp.maximum(k * HL, FLOOR))
+    astarR = xp.sqrt(xp.maximum(k * HR, FLOOR))
+    aL = astarL * astarL / xp.maximum(astarL, xp.abs(vnL))
+    aR = astarR * astarR / xp.maximum(astarR, xp.abs(vnR))
+    a_half = xp.minimum(aL, aR)
+
+    ML = vnL / a_half
+    MR = vnR / a_half
+
+    # -- f_a, and the alpha it sets --------------------------------------------
+    mbar2 = 0.5 * (vnL * vnL + vnR * vnR) / (a_half * a_half)
+    # M_co is not an epsilon.  The pressure-diffusion term below carries
+    # K_p / f_a, so driving f_a towards zero makes that coefficient *diverge*:
+    # at a stagnation point with M_co = 0 and a 1% pressure jump, the mass flux
+    # comes out as -9.8e4 instead of -3.5e-3.  Liou's M_co is a reference Mach
+    # number of the order of the smallest Mach number in the flow, and it is
+    # what keeps f_a -- and so the coefficient -- O(1).
+    m0 = xp.sqrt(xp.minimum(1.0, xp.maximum(mbar2, cutoff_mach * cutoff_mach)))
+    fa = m0 * (2.0 - m0)
+    alpha = 0.1875 * (5.0 * fa * fa - 4.0)
+
+    beta = 0.125
+    m2p = 0.25 * (ML + 1.0) ** 2        # M^+_(2) evaluated at ML
+    m2m = -0.25 * (MR - 1.0) ** 2       # M^-_(2) evaluated at MR
+
+    m4p = xp.where(
+        xp.abs(ML) >= 1.0,
+        0.5 * (ML + xp.abs(ML)),
+        0.25 * (ML + 1.0) ** 2 * (1.0 + 4.0 * beta * (ML - 1.0) ** 2),
+    )
+    m4m = xp.where(
+        xp.abs(MR) >= 1.0,
+        0.5 * (MR - xp.abs(MR)),
+        -0.25 * (MR - 1.0) ** 2 * (1.0 + 4.0 * beta * (MR + 1.0) ** 2),
+    )
+
+    # -- interface Mach number, with the pressure-diffusion term --------------
+    rho_half = 0.5 * (rhoL + rhoR)
+    kp, ku, sigma = 0.25, 0.75, 1.0
+    mp = -(kp / fa) * xp.maximum(1.0 - sigma * mbar2, 0.0) * (pR - pL) / (
+        rho_half * a_half * a_half
+    )
+    m_half = m4p + m4m + mp
+
+    # -- interface pressure, with the velocity-diffusion term -----------------
+    p5p = xp.where(
+        xp.abs(ML) >= 1.0,
+        0.5 * (1.0 + xp.sign(ML)),
+        m2p * ((2.0 - ML) + 4.0 * alpha * ML * (ML - 1.0) ** 2),
+    )
+    p5m = xp.where(
+        xp.abs(MR) >= 1.0,
+        0.5 * (1.0 - xp.sign(MR)),
+        -m2m * ((2.0 + MR) - 4.0 * alpha * MR * (MR + 1.0) ** 2),
+    )
+    p_half = (
+        p5p * pL + p5m * pR
+        - ku * p5p * p5m * (rhoL + rhoR) * (fa * a_half) * (vnR - vnL)
+    )
+
+    # -- assemble: the convective part is fully upwind ------------------------
+    forward = (m_half > 0.0)
+    rho_up = xp.where(forward, rhoL, rhoR)
+    mdot = a_half * m_half * rho_up
+
+    f = forward[..., None]
+    psi = xp.where(
+        f,
+        xp.stack([xp.ones_like(vxL), vxL, vyL, HL], axis=-1),
+        xp.stack([xp.ones_like(vxR), vxR, vyR, HR], axis=-1),
+    )
+    nvec = xp.stack(
+        [xp.zeros_like(nx * xp.ones_like(pL)), nx * xp.ones_like(pL),
+         ny * xp.ones_like(pL), xp.zeros_like(pL)],
+        axis=-1,
+    )
+    flux = mdot[..., None] * psi + p_half[..., None] * nvec
+
+    # the signal speed the time step needs is the same physical quantity the Roe
+    # flux reports, so it is computed from the true sound speeds rather than from
+    # the numerical interface one
+    cL = xp.sqrt(xp.maximum(gamma * pL / rhoL, FLOOR))
+    cR = xp.sqrt(xp.maximum(gamma * pR / rhoR, FLOOR))
+    max_speed = xp.maximum(xp.abs(vnL) + cL, xp.abs(vnR) + cR)
+    return FluxResult(flux, max_speed)
+
+
 # --------------------------------------------------------------------------
 # Boundary conditions
 # --------------------------------------------------------------------------

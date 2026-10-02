@@ -71,15 +71,21 @@ def edge_fluxes(U, ops: Operators, flow: FlowConditions, xp=np):
     nrm = ops.edge_normal
     ni = ops.n_interior
 
-    # ---- interior edges: Roe flux between the two traces
+    # ---- interior edges: the chosen interface flux between the two traces
     lelem, relem = edges.iedge_elem[:, 0], edges.iedge_elem[:, 1]
     lface, rface = edges.iedge_face[:, 0], edges.iedge_face[:, 1]
     UL = xp.einsum("kiq,kis->kqs", phi_face[0][lface], U[lelem])
     UR = xp.einsum("kiq,kis->kqs", phi_face[1][rface], U[relem])
     nx_i, ny_i = nrm[:ni, :, 0], nrm[:ni, :, 1]
-    interior = ph.roe_flux(
-        UL, UR, nx_i, ny_i, flow.gamma, entropy_fix=flow.entropy_fix, xp=xp
-    )
+    if flow.flux == "ausm":
+        interior = ph.ausm_flux(
+            UL, UR, nx_i, ny_i, flow.gamma,
+            cutoff_mach=flow.ausm_cutoff_mach, xp=xp,
+        )
+    else:
+        interior = ph.roe_flux(
+            UL, UR, nx_i, ny_i, flow.gamma, entropy_fix=flow.entropy_fix, xp=xp
+        )
 
     # ---- boundary edges: one call per tag, on a contiguous slice
     belem, bface = edges.bedge_elem, edges.bedge_face

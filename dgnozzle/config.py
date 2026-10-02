@@ -48,7 +48,24 @@ class FlowConditions:
         Inflow direction in radians, measured from the ``+x`` axis.
     entropy_fix
         Harten-Hyman entropy-fix parameter of the Roe flux, as a fraction of the
-        Roe-averaged sound speed.
+        Roe-averaged sound speed.  Read only when ``flux='roe'``.
+    flux
+        The interface flux between two element traces.
+
+        ``'roe'``
+            Roe's approximate Riemann solver with the Harten-Hyman entropy fix.
+            The default, and what every number in the documentation was produced
+            with.
+        ``'ausm'``
+            Liou's AUSM+-up flux-vector splitting.  Not a Riemann solver at all:
+            it splits the flux into a convective part carried by an interface
+            mass flux and a pressure part, with no eigen-decomposition anywhere.
+            Immune to the carbuncle the Roe flux admits, and more accurate as
+            ``M -> 0``, which is where the inlet of this nozzle runs.
+
+        The two agree to discretisation error on a smooth solution, so switching
+        is a way to ask how much of an answer is the flux rather than the mesh.
+        Neither one makes a shocked operating point converge.
     """
 
     gamma: float = 1.4
@@ -58,6 +75,8 @@ class FlowConditions:
     back_pressure_ratio: float = 0.15
     inflow_angle: float = 0.0
     entropy_fix: float = 0.05
+    flux: str = "roe"
+    ausm_cutoff_mach: float = 0.2
 
     def __post_init__(self) -> None:
         if self.gamma <= 1.0:
@@ -70,6 +89,12 @@ class FlowConditions:
             )
         if self.entropy_fix < 0.0:
             raise ValueError("entropy_fix must be non-negative")
+        if self.flux not in ("roe", "ausm"):
+            raise ValueError(f"flux must be 'roe' or 'ausm', got {self.flux!r}")
+        if not 0.0 <= self.ausm_cutoff_mach <= 1.0:
+            raise ValueError(
+                f"ausm_cutoff_mach must lie in [0, 1], got {self.ausm_cutoff_mach}"
+            )
 
     @property
     def back_pressure(self) -> float:
@@ -200,29 +225,29 @@ class SolverOptions:
         the Cockburn-Shu TVB threshold, which also damps shock oscillations).
         Ignored at ``p = 0``, which cannot oscillate within an element.
     tvb_constant
-        The ``M`` of the Cockburn-Shu TVB threshold, used by ``'superbee'``: a
-        face whose increment is below ``M (A_e/A_Omega) max|u_s|`` is left
+        The constant of the Cockburn-Shu TVB threshold, used by ``'superbee'``: a
+        face whose increment is below ``tvb_constant * (A_e/A_Omega) * max|u_s|`` is left
         unlimited, which stops a TVD limiter toggling on and off at smooth
         extrema.  Only read when ``limiter='superbee'``.
 
         The default of ``50`` is measured, not guessed, and it is the *minimum*
         that works.  At a shock-free point the slope limiter has to be idle on
         the converged field or the residual cannot reach the tolerance: at
-        ``M = 0`` (the pure TVD limiter) 77 of 140 elements of an already
+        ``tvb_constant = 0`` (the pure TVD limiter) 77 of 140 elements of an already
         converged field are still being clipped and the residual parks at
         ``3.1`` instead of ``10^-6``.  Scanned over the design, over-expanded
         and under-expanded points at ``(p, refine)`` of ``(1,0)``, ``(1,1)``
-        and ``(2,0)``, ``M = 10`` fails all nine, ``M = 20`` fails the three at
-        ``refine = 1``, and ``M = 50`` converges all nine.
+        and ``(2,0)``: ``10`` fails all nine, ``20`` fails the three at
+        ``refine = 1``, and ``50`` converges all nine.
 
-        Be aware of what that buys and what it costs.  At ``M = 50`` the slope
+        Be aware of what that buys and what it costs.  At ``tvb_constant = 50`` the slope
         limiter is nearly inactive even *at a shock*: 200 steps into a shocked
         run it touches 0 of 140 elements at ``p_b/p_t = 0.50`` and 2 of 140 at
-        ``0.70``, where ``M = 0`` touches 72 and 92.  The window in which this
+        ``0.70``, where ``tvb_constant = 0`` touches 72 and 92.  The window in which this
         limiter both leaves a smooth steady solution alone and still bites on a
         shock is, for this problem, empty.  That is a property of asking a TVD
         limiter to coexist with a steady pseudo-time march, not of Superbee:
-        lower ``M`` and the limiter chatters and the residual parks; raise it and
+        lower it and the limiter chatters and the residual parks; raise it and
         the limiter stops acting.  Shocked points do not converge at ``p >= 1``
         for this reason among others -- see the README.
     initial_condition

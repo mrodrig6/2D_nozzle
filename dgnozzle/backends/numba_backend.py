@@ -51,6 +51,17 @@ class NumbaBackend(Backend):
 
     def __init__(self, ops, flow, opts):
         super().__init__(ops, flow, opts)
+        if getattr(flow, "flux", "roe") != "roe":
+            # Refusing is the point.  The kernels inline the Roe flux, so
+            # falling back to it silently would hand back a Roe answer under an
+            # AUSM label -- the one failure mode a student could not detect.
+            raise NotImplementedError(
+                f"the numba kernels implement the Roe flux only, so "
+                f"flux={flow.flux!r} would silently give you a Roe answer here. "
+                f"Use backend='numpy' (and read the 'Interface fluxes' section "
+                f"of docs/theory.md first: flux='ausm' does not currently "
+                f"produce a physical solution on this nozzle)."
+            )
         ed = ops.topology.edges
         self._phi_face = _c(ops.ref.phi_face)
         self._phi_vol = _c(ops.ref.phi_vol)

@@ -132,12 +132,22 @@ names as the Python API, so there is one vocabulary to learn rather than two.
 ```
 
 Short aliases: `p`=`order`, `Q`=`geometry_order`, `ref`=`refine`,
-`ar`=`area_ratio`, `pb`=`back_pressure_ratio`, `M`=`tvb_constant`. Ordinary
+`ar`=`area_ratio`, `pb`=`back_pressure_ratio`, `tvb`=`tvb_constant`. Ordinary
 `--flags` pass through untouched, so anything `python -m dgnozzle --help`
-documents still works.
+documents still works. `M` is deliberately **not** an alias — in this code `M`
+always means Mach number, and the TVB constant is not a Mach number.
 
 `geometry` runs no flow solve — use it to check a contour before committing to
 a simulation.
+
+**Interface flux.** `flux=roe` (the default) is Roe's approximate Riemann solver
+with the Harten–Hyman entropy fix, and is what every number in this README was
+produced with. `flux=ausm` selects Liou's AUSM⁺-up flux-vector splitting, which
+is **verified in isolation but does not currently give a physical solution on
+this nozzle** — see the status note in
+[`docs/theory.md`](docs/theory.md#an-alternative-ausm-up). It needs
+`backend=numpy`; the Numba kernels inline the Roe flux and refuse rather than
+hand back a Roe answer under an AUSM label.
 
 ### The cases
 
