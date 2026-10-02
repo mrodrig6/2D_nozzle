@@ -51,17 +51,21 @@ class NumbaBackend(Backend):
 
     def __init__(self, ops, flow, opts):
         super().__init__(ops, flow, opts)
-        if getattr(flow, "flux", "roe") != "roe":
-            # Refusing is the point.  The kernels inline the Roe flux, so
-            # falling back to it silently would hand back a Roe answer under an
-            # AUSM label -- the one failure mode a student could not detect.
+        # Refusing is the point for a flux the kernels do not implement: falling
+        # back to Roe silently would hand back a Roe answer under another
+        # label -- the one failure mode a student could not detect.
+        _KERNEL_FLUXES = {"roe": 0, "hllc": 1}
+        _flux = getattr(flow, "flux", "roe")
+        if _flux not in _KERNEL_FLUXES:
             raise NotImplementedError(
-                f"the numba kernels implement the Roe flux only, so "
-                f"flux={flow.flux!r} would silently give you a Roe answer here. "
-                f"Use backend='numpy' (and read the 'Interface fluxes' section "
+                f"the numba kernels implement {sorted(_KERNEL_FLUXES)}, so "
+                f"flux={_flux!r} would silently give you a Roe answer here. "
+                f"Use backend='numpy' (and read the 'Numerical flux' section "
                 f"of docs/theory.md first: flux='ausm' does not currently "
                 f"produce a physical solution on this nozzle)."
             )
+        self._flux_id = _KERNEL_FLUXES[_flux]
+        self._low_mach = float(getattr(flow, "hllc_low_mach", 0.0))
         ed = ops.topology.edges
         self._phi_face = _c(ops.ref.phi_face)
         self._phi_vol = _c(ops.ref.phi_vol)
@@ -160,7 +164,8 @@ class NumbaBackend(Backend):
             U, self._phi_face, self._iedge_elem, self._iedge_face,
             self._bedge_elem, self._bedge_face, self._bedge_tag,
             self._edge_normal, self._edge_jac, self._w_face,
-            self._gamma, self._efix, self._at2, self._at, self._rho_t,
+            self._gamma, self._efix, self._flux_id, self._low_mach,
+            self._at2, self._at, self._rho_t,
             self._ca, self._sa, self._p_back, self._fw, self._smax,
         )
 

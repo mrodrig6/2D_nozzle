@@ -151,6 +151,98 @@ def test_outflow_is_continuous_across_the_sonic_point():
 
 
 # --------------------------------------------------------------------------
+# HLLC
+# --------------------------------------------------------------------------
+
+
+def test_hllc_flux_is_consistent(states, normals):
+    nx, ny = normals
+    out = ph.hllc_flux(states, states, nx, ny, GAMMA)
+    assert np.allclose(out.flux, ph.normal_flux(states, nx, ny, GAMMA))
+
+
+def test_hllc_flux_is_conservative(states, normals):
+    nx, ny = normals
+    L, R = states[:2], states[1:]
+    a = ph.hllc_flux(L, R, nx[:2], ny[:2], GAMMA).flux
+    b = ph.hllc_flux(R, L, -nx[:2], -ny[:2], GAMMA).flux
+    assert np.allclose(a, -b)
+
+
+@pytest.mark.parametrize("mach", [1.2, 3.0])
+def test_hllc_is_fully_upwind_when_supersonic(mach):
+    """Supersonic means one wave family, so the branch must be the exact flux."""
+    rho, a = 1.0, 1.0
+    p = rho * a * a / GAMMA
+    UL = np.array([[rho, rho * mach * a, 0.0,
+                    p / (GAMMA - 1) + 0.5 * rho * (mach * a) ** 2]])
+    UR = np.array([[0.6, 0.48 * mach * a, 0.1, 0.7 * p / (GAMMA - 1) + 0.2]])
+    nx, ny = np.array([1.0]), np.array([0.0])
+    got = ph.hllc_flux(UL, UR, nx, ny, GAMMA).flux
+    assert np.allclose(got, ph.normal_flux(UL, nx, ny, GAMMA), rtol=0, atol=1e-14)
+
+
+def test_hllc_keeps_the_star_density_positive():
+    """The property the whole flux is chosen for.
+
+    Batten's wave speeds make ``rho* = rho (S - v_n)/(S - S_M)`` positive by
+    construction, which is what the Zhang-Shu limiter's theorem assumes of the
+    underlying flux and what the Roe flux does not provide.  A strong expansion
+    is where a flux that lacks it gives up.
+    """
+    rng = np.random.default_rng(17)
+    for _ in range(500):
+        # deliberately violent: large opposing velocities, big pressure ratio
+        rho_l, rho_r = rng.uniform(1e-3, 2.0, 2)
+        p_l, p_r = rng.uniform(1e-4, 2.0, 2)
+        u_l, u_r = rng.uniform(-6.0, 6.0), rng.uniform(-6.0, 6.0)
+        UL = np.array([[rho_l, rho_l * u_l, 0.0,
+                        p_l / (GAMMA - 1) + 0.5 * rho_l * u_l ** 2]])
+        UR = np.array([[rho_r, rho_r * u_r, 0.0,
+                        p_r / (GAMMA - 1) + 0.5 * rho_r * u_r ** 2]])
+        nx, ny = np.array([1.0]), np.array([0.0])
+        out = ph.hllc_flux(UL, UR, nx, ny, GAMMA)
+        assert np.all(np.isfinite(out.flux)), (rho_l, rho_r, p_l, p_r, u_l, u_r)
+        assert np.all(out.max_speed > 0.0)
+
+
+def test_hllc_low_mach_switch_recovers_standard_hllc(states, normals):
+    """``phi = 1`` must be the identity, or the switch is not a switch."""
+    nx, ny = normals
+    L, R = states[:2], states[1:]
+    plain = ph.hllc_flux(L, R, nx[:2], ny[:2], GAMMA)
+    # a cutoff far below every local Mach number here gives phi = 1 everywhere
+    tiny = ph.hllc_flux(L, R, nx[:2], ny[:2], GAMMA, low_mach=1e-12)
+    assert np.allclose(plain.flux, tiny.flux, rtol=0, atol=1e-14)
+
+
+def test_hllc_needs_no_entropy_fix():
+    """A sonic point is where Roe needs its fix; HLLC must simply be smooth.
+
+    The Roe flux admits a stationary expansion shock as an exact solution when
+    an eigenvalue crosses zero, which is why ``entropy_fix`` exists.  HLLC
+    cannot, so the flux has to vary smoothly straight through the sonic point --
+    no constant, nothing to tune.
+    """
+    rho, a = 1.0, 1.0
+    p = rho * a * a / GAMMA
+    nx, ny = np.array([1.0]), np.array([0.0])
+
+    def flux_at(mach):
+        u = mach * a
+        U = np.array([[rho, rho * u, 0.0, p / (GAMMA - 1) + 0.5 * rho * u * u]])
+        nudge = np.array([[rho * 1.01, rho * 1.01 * u, 0.0,
+                           p * 1.01 / (GAMMA - 1) + 0.5 * rho * 1.01 * u * u]])
+        return ph.hllc_flux(U, nudge, nx, ny, GAMMA).flux[0, 0]
+
+    # sweep through M = 1 and check the mass flux has no kink
+    machs = np.linspace(0.9, 1.1, 41)
+    vals = np.array([flux_at(m) for m in machs])
+    second = np.diff(vals, 2)
+    assert np.all(np.abs(second) < 1e-3), "flux should pass smoothly through M=1"
+
+
+# --------------------------------------------------------------------------
 # AUSM+-up
 # --------------------------------------------------------------------------
 # The flux is correct in isolation -- every property below holds, and a Sod

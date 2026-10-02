@@ -56,12 +56,21 @@ class FlowConditions:
             Roe's approximate Riemann solver with the Harten-Hyman entropy fix.
             The default, and what every number in the documentation was produced
             with.
+        ``'hllc'``
+            HLLC with Batten's wave speeds.  Three waves -- two acoustic and the
+            contact -- instead of a full eigen-decomposition.  **Provably
+            positivity-preserving** under a CFL condition, which the Roe flux is
+            not, and which is the assumption the Zhang-Shu positivity limiter's
+            theorem needs.  It also needs no entropy fix, because the HLL family
+            cannot produce an expansion shock, so there is no constant to tune.
         ``'ausm'``
             Liou's AUSM+-up flux-vector splitting.  Not a Riemann solver at all:
             it splits the flux into a convective part carried by an interface
             mass flux and a pressure part, with no eigen-decomposition anywhere.
             Immune to the carbuncle the Roe flux admits, and more accurate as
-            ``M -> 0``, which is where the inlet of this nozzle runs.
+            ``M -> 0``, which is where the inlet of this nozzle runs.  **Does not
+            currently give a physical solution on this nozzle** -- see
+            ``docs/theory.md``.
 
         The two agree to discretisation error on a smooth solution, so switching
         is a way to ask how much of an answer is the flux rather than the mesh.
@@ -77,6 +86,7 @@ class FlowConditions:
     entropy_fix: float = 0.05
     flux: str = "roe"
     ausm_cutoff_mach: float = 0.2
+    hllc_low_mach: float = 0.0
 
     def __post_init__(self) -> None:
         if self.gamma <= 1.0:
@@ -89,8 +99,12 @@ class FlowConditions:
             )
         if self.entropy_fix < 0.0:
             raise ValueError("entropy_fix must be non-negative")
-        if self.flux not in ("roe", "ausm"):
-            raise ValueError(f"flux must be 'roe' or 'ausm', got {self.flux!r}")
+        if self.flux not in ("roe", "hllc", "ausm"):
+            raise ValueError(
+                f"flux must be 'roe', 'hllc' or 'ausm', got {self.flux!r}"
+            )
+        if self.hllc_low_mach < 0.0:
+            raise ValueError("hllc_low_mach must be non-negative")
         if not 0.0 <= self.ausm_cutoff_mach <= 1.0:
             raise ValueError(
                 f"ausm_cutoff_mach must lie in [0, 1], got {self.ausm_cutoff_mach}"

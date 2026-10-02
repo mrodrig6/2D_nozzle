@@ -37,8 +37,9 @@ def _flow_args(p: argparse.ArgumentParser) -> None:
 def _disc_args(p: argparse.ArgumentParser) -> None:
     g = p.add_argument_group("discretisation")
     g.add_argument("--element", default="tri", choices=("tri", "quad"))
-    g.add_argument("--flux", default="roe", choices=("roe", "ausm"),
-                   help="interface flux: Roe's solver, or Liou's AUSM+-up")
+    g.add_argument("--flux", default="roe", choices=("roe", "hllc", "ausm"),
+                   help="interface flux: Roe, HLLC (positivity-preserving), "
+                        "or Liou's AUSM+-up")
     g.add_argument("-p", "--order", type=int, default=1, help="polynomial order p")
     g.add_argument("-Q", "--geometry-order", type=int, default=1, help="geometry order Q")
     g.add_argument("-r", "--refine", type=int, default=0, help="refinement level")

@@ -56,7 +56,8 @@ _GEOMETRY_KEYS = (
 )
 _FLOW_KEYS = (
     "gamma", "Rgas", "total_temperature", "total_pressure",
-    "back_pressure_ratio", "inflow_angle", "entropy_fix", "flux", "ausm_cutoff_mach",
+    "back_pressure_ratio", "inflow_angle", "entropy_fix",
+    "flux", "ausm_cutoff_mach", "hllc_low_mach",
 )
 _DISC_KEYS = (
     "element", "order", "geometry_order", "refine", "nx", "nr",

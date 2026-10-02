@@ -140,14 +140,21 @@ always means Mach number, and the TVB constant is not a Mach number.
 `geometry` runs no flow solve — use it to check a contour before committing to
 a simulation.
 
-**Interface flux.** `flux=roe` (the default) is Roe's approximate Riemann solver
-with the Harten–Hyman entropy fix, and is what every number in this README was
-produced with. `flux=ausm` selects Liou's AUSM⁺-up flux-vector splitting, which
-is **verified in isolation but does not currently give a physical solution on
-this nozzle** — see the status note in
-[`docs/theory.md`](docs/theory.md#an-alternative-ausm-up). It needs
-`backend=numpy`; the Numba kernels inline the Roe flux and refuse rather than
-hand back a Roe answer under an AUSM label.
+**Interface flux.** Three are available, and the choice is a real one:
+
+| `flux=` | What it is | Use it when |
+|---|---|---|
+| `roe` (default) | Roe's approximate Riemann solver with the Harten–Hyman entropy fix | **Accuracy.** Consistently the lowest entropy error, and what every number in this README was produced with |
+| `hllc` | HLLC with Batten's wave speeds | **Robustness.** Provably positivity-preserving, needs no entropy fix and so has no constant to tune, and is cheaper |
+| `ausm` | Liou's AUSM⁺-up flux-vector splitting | **Nothing, yet** — verified in isolation but it does not give a physical solution on this nozzle |
+
+Measured at the design point: HLLC converges in 451 iterations against Roe's 751
+at `p=0` and agrees to ~1% in thrust, while Roe is the more accurate of the two
+(entropy error 3.8e-3 against 6.2e-3 at `p=1`). Neither fixes the `p>=1` shocked
+divergence. See [`docs/theory.md`](docs/theory.md#hllc-and-why-it-is-the-robust-choice).
+
+`roe` and `hllc` both run on the Numba fast path. `ausm` needs `backend=numpy`;
+the kernels refuse rather than hand back a Roe answer under an AUSM label.
 
 ### The cases
 

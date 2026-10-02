@@ -127,3 +127,22 @@ def test_reusing_the_buffers_does_not_leak_between_runs(setup):
     kept = np.asarray(once).copy()
     bk.run(U.copy(), 4, "rk4")
     assert np.abs(np.asarray(once) - kept).max() == 0.0
+
+
+def test_the_numba_hllc_kernel_matches_the_shared_one():
+    """Two copies of a flux is two chances to get it wrong, so pin them.
+
+    ``_numba_kernels._hllc`` is a hand transcription of
+    :func:`dgnozzle.physics.hllc_flux`, including the low-Mach branch and every
+    guarded division; nothing but a test keeps them in step.
+    """
+    import numpy as np
+
+    from dgnozzle.api import solve_nozzle
+
+    a = solve_nozzle(order=1, refine=0, flux="hllc", backend="numpy",
+                     verbose=False)
+    b = solve_nozzle(order=1, refine=0, flux="hllc", backend="numba",
+                     verbose=False)
+    assert a.iterations == b.iterations
+    assert np.abs(a.U - b.U).max() / np.abs(a.U).max() < 1e-12

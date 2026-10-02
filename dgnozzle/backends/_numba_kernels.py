@@ -132,6 +132,121 @@ def _roe(UL, UR, nx, ny, gamma, efix, out):
 
 
 @njit(inline="always", **_JIT)
+def _hllc(UL, UR, nx, ny, gamma, low_mach, out):
+    """HLLC with Batten's wave speeds.  Returns the max signal speed.
+
+    Mirrors :func:`dgnozzle.physics.hllc_flux`; ``tests/test_backends.py`` pins
+    the two against each other, because two copies of a flux is two chances to
+    get it wrong.
+    """
+    rL = max(UL[0], FLOOR)
+    vxL = UL[1] / rL
+    vyL = UL[2] / rL
+    pL = _pressure(UL[0], UL[1], UL[2], UL[3], gamma)
+    HL = (UL[3] + pL) / rL
+
+    rR = max(UR[0], FLOOR)
+    vxR = UR[1] / rR
+    vyR = UR[2] / rR
+    pR = _pressure(UR[0], UR[1], UR[2], UR[3], gamma)
+    HR = (UR[3] + pR) / rR
+
+    vnL = vxL * nx + vyL * ny
+    vnR = vxR * nx + vyR * ny
+    aL = np.sqrt(max(gamma * pL / rL, FLOOR))
+    aR = np.sqrt(max(gamma * pR / rR, FLOOR))
+
+    # Roe average, for Batten's estimates
+    sL_ = np.sqrt(rL)
+    sR_ = np.sqrt(rR)
+    den = sL_ + sR_
+    vx = (sL_ * vxL + sR_ * vxR) / den
+    vy = (sL_ * vyL + sR_ * vyR) / den
+    H = (sL_ * HL + sR_ * HR) / den
+    vn_t = vx * nx + vy * ny
+    c2 = (gamma - 1.0) * (H - 0.5 * (vx * vx + vy * vy))
+    if c2 < FLOOR:
+        c2 = FLOOR
+    a_t = np.sqrt(c2)
+
+    SL = min(vnL - aL, vn_t - a_t)
+    SR = max(vnR + aR, vn_t + a_t)
+
+    if low_mach > 0.0:
+        mach = max(abs(vnL) / aL, abs(vnR) / aR)
+        phi = min(1.0, mach / low_mach)
+        baseL = min(vnL, vn_t)
+        baseR = max(vnR, vn_t)
+        SL = baseL - phi * (baseL - SL)
+        SR = baseR + phi * (SR - baseR)
+
+    smax = max(abs(SL), abs(SR))
+
+    fL0 = rL * vnL
+    fL1 = rL * vxL * vnL + pL * nx
+    fL2 = rL * vyL * vnL + pL * ny
+    fL3 = rL * HL * vnL
+    if SL >= 0.0:
+        out[0] = fL0
+        out[1] = fL1
+        out[2] = fL2
+        out[3] = fL3
+        return smax
+
+    fR0 = rR * vnR
+    fR1 = rR * vxR * vnR + pR * nx
+    fR2 = rR * vyR * vnR + pR * ny
+    fR3 = rR * HR * vnR
+    if SR <= 0.0:
+        out[0] = fR0
+        out[1] = fR1
+        out[2] = fR2
+        out[3] = fR3
+        return smax
+
+    mL = rL * (SL - vnL)
+    mR = rR * (SR - vnR)
+    dm = mR - mL
+    if abs(dm) < FLOOR:
+        dm = FLOOR
+    SM = (rR * vnR * (SR - vnR) - rL * vnL * (SL - vnL) + pL - pR) / dm
+
+    if SM >= 0.0:
+        den2 = SL - SM
+        if abs(den2) < FLOOR:
+            den2 = FLOOR
+        fac = (SL - vnL) / den2
+        rs = rL * fac
+        vxs = vxL + (SM - vnL) * nx
+        vys = vyL + (SM - vnL) * ny
+        den3 = rL * (SL - vnL)
+        if abs(den3) < FLOOR:
+            den3 = FLOOR
+        Es = UL[3] / rL + (SM - vnL) * (SM + pL / den3)
+        out[0] = fL0 + SL * (rs - UL[0])
+        out[1] = fL1 + SL * (rs * vxs - UL[1])
+        out[2] = fL2 + SL * (rs * vys - UL[2])
+        out[3] = fL3 + SL * (rs * Es - UL[3])
+    else:
+        den2 = SR - SM
+        if abs(den2) < FLOOR:
+            den2 = FLOOR
+        fac = (SR - vnR) / den2
+        rs = rR * fac
+        vxs = vxR + (SM - vnR) * nx
+        vys = vyR + (SM - vnR) * ny
+        den3 = rR * (SR - vnR)
+        if abs(den3) < FLOOR:
+            den3 = FLOOR
+        Es = UR[3] / rR + (SM - vnR) * (SM + pR / den3)
+        out[0] = fR0 + SR * (rs - UR[0])
+        out[1] = fR1 + SR * (rs * vxs - UR[1])
+        out[2] = fR2 + SR * (rs * vys - UR[2])
+        out[3] = fR3 + SR * (rs * Es - UR[3])
+    return smax
+
+
+@njit(inline="always", **_JIT)
 def _wall(Ub, nx, ny, gamma, out):
     rho = max(Ub[0], FLOOR)
     vx = Ub[1] / rho
@@ -251,6 +366,8 @@ def edge_pass(
     w_face,
     gamma,
     efix,
+    flux_id,
+    low_mach,
     at2,
     at,
     rho_t,
@@ -293,7 +410,10 @@ def edge_pass(
                         UR[s] += br * U[re, i, s]
                 nx = edge_normal[k, q, 0]
                 ny = edge_normal[k, q, 1]
-                sp = _roe(UL, UR, nx, ny, gamma, efix, flux)
+                if flux_id == 1:
+                    sp = _hllc(UL, UR, nx, ny, gamma, low_mach, flux)
+                else:
+                    sp = _roe(UL, UR, nx, ny, gamma, efix, flux)
                 if sp > best:
                     best = sp
                 scale = edge_jac[k, q] * w_face[q]

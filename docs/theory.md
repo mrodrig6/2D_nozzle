@@ -455,6 +455,78 @@ built from an entropy-conservative two-point flux (Ismail and Roe; Tadmor) on
 summation-by-parts operators. Roe contributed to both lines of work two decades
 apart, which makes them easy to conflate, but only the second is a theorem.
 
+### HLLC, and why it is the robust choice
+
+`flux='hllc'` selects HLLC with Batten's wave-speed estimates: three waves —
+two acoustic and the contact — instead of a full eigen-decomposition.
+
+```math
+\hat{\mathbf{F}} = \begin{cases}
+    \mathbf{F}_L, & 0 \le S_L,\\
+    \mathbf{F}_L + S_L(\mathbf{U}^{*}_L - \mathbf{U}_L), & S_L \le 0 \le S_M,\\
+    \mathbf{F}_R + S_R(\mathbf{U}^{*}_R - \mathbf{U}_R), & S_M \le 0 \le S_R,\\
+    \mathbf{F}_R, & S_R \le 0,
+\end{cases}
+```
+
+with the star states carrying the contact's normal velocity and each side's own
+tangential velocity,
+
+```math
+\rho^{*}_K = \rho_K \frac{S_K - v_{nK}}{S_K - S_M}, \qquad
+\mathbf{v}^{*}_K = \mathbf{v}_K + (S_M - v_{nK})\,\mathbf{n},
+```
+
+```math
+E^{*}_K = E_K + (S_M - v_{nK})
+    \left(S_M + \frac{p_K}{\rho_K (S_K - v_{nK})}\right),
+```
+
+and Batten's estimates, which are what make the scheme positivity-preserving:
+
+```math
+S_L = \min(v_{nL} - a_L,\ \tilde{v}_n - \tilde{a}), \qquad
+S_R = \max(v_{nR} + a_R,\ \tilde{v}_n + \tilde{a}).
+```
+
+Restoring the contact wave is what separates HLLC from HLL, whose missing middle
+wave smears every shear layer.
+
+**It supplies an assumption this code was relying on without having.** The
+Zhang–Shu positivity limiter has a theorem, and that theorem *assumes* the
+underlying first-order flux is positivity-preserving. HLLC with Batten's speeds
+provably is; the Roe flux, with or without the entropy fix, is not. Under
+`flux='roe'` the limiter has therefore been running without its central
+hypothesis.
+
+**And there is nothing to tune.** The HLL family cannot produce an
+entropy-violating expansion shock, so HLLC needs no entropy fix and carries no
+constant — `entropy_fix` is simply unread. A test checks the mass flux passes
+smoothly through $M = 1$, which is exactly where the Roe flux needs its patch.
+
+Measured against Roe on the shock-free design point, the answers agree to about
+1% in thrust, HLLC converges in 451 iterations against Roe's 751 at $p = 0$, and
+Roe is consistently the **more accurate** of the two — entropy error
+$3.8\times10^{-3}$ against $6.2\times10^{-3}$ at $p = 1$, and
+$1.3\times10^{-3}$ against $3.7\times10^{-3}$ at $p = 2$. That is the expected
+trade: HLLC's three-wave model is more dissipative than Roe's full
+decomposition. On the shocked point at $p = 0$ HLLC stalls at
+$8.8\times10^{-2}$ where Roe stalls at $1.4\times10^{-1}$.
+
+> **It does not fix the $p \ge 1$ shocked divergence.** That was the hope, and it
+> is not what happened: at `refine=1` with SSP-RK3 both fluxes diverge with
+> **zero** cell-average repairs, so in that configuration the divergence is not
+> a positivity failure at all and positivity-preservation cannot cure it. The
+> repairs that *do* appear at other settings are a real symptom, but they are not
+> the whole mechanism.
+
+`hllc_low_mach` enables the low-Mach correction of Fleischmann et al., scaling
+the acoustic wave speeds by
+$\phi = \min(1,\ \max(|M_L|, |M_R|)/M_{\mathrm{lim}})$ while leaving the contact
+untouched. `0` disables it and gives standard HLLC, which is the verified path;
+the form follows the paper, so check the cutoff constant against it before
+relying on that branch quantitatively.
+
 ### An alternative: AUSM$^{+}$-up
 
 `flux='ausm'` selects Liou's AUSM$^{+}$-up, which is not a Riemann solver at

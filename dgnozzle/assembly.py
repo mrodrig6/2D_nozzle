@@ -77,7 +77,12 @@ def edge_fluxes(U, ops: Operators, flow: FlowConditions, xp=np):
     UL = xp.einsum("kiq,kis->kqs", phi_face[0][lface], U[lelem])
     UR = xp.einsum("kiq,kis->kqs", phi_face[1][rface], U[relem])
     nx_i, ny_i = nrm[:ni, :, 0], nrm[:ni, :, 1]
-    if flow.flux == "ausm":
+    if flow.flux == "hllc":
+        interior = ph.hllc_flux(
+            UL, UR, nx_i, ny_i, flow.gamma,
+            low_mach=flow.hllc_low_mach, xp=xp,
+        )
+    elif flow.flux == "ausm":
         interior = ph.ausm_flux(
             UL, UR, nx_i, ny_i, flow.gamma,
             cutoff_mach=flow.ausm_cutoff_mach, xp=xp,

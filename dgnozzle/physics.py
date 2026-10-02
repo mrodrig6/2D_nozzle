@@ -158,6 +158,154 @@ def roe_flux(UL, UR, nx, ny, gamma: float, *, entropy_fix: float = 0.05, xp=np) 
     return FluxResult(0.5 * (FL + FR) - 0.5 * diss, max_speed)
 
 
+def hllc_flux(
+    UL, UR, nx, ny, gamma: float, *,
+    low_mach: float = 0.0, xp=np,
+) -> FluxResult:
+    r"""HLLC with Batten's wave speeds, optionally with a low-Mach correction.
+
+    Three waves instead of Roe's full eigen-decomposition: a left acoustic wave
+    at :math:`S_L`, a right one at :math:`S_R`, and the contact at :math:`S_M`
+    between them.  Restoring that contact is what separates HLLC from HLL, whose
+    missing middle wave smears every shear layer and contact discontinuity.
+
+    .. math::
+        \hat{\mathbf{F}} = \begin{cases}
+            \mathbf{F}_L, & 0 \le S_L,\\
+            \mathbf{F}_L + S_L(\mathbf{U}^{*}_L - \mathbf{U}_L),
+                & S_L \le 0 \le S_M,\\
+            \mathbf{F}_R + S_R(\mathbf{U}^{*}_R - \mathbf{U}_R),
+                & S_M \le 0 \le S_R,\\
+            \mathbf{F}_R, & S_R \le 0,
+        \end{cases}
+
+    with the star states carrying the contact's normal velocity and each side's
+    own tangential velocity,
+
+    .. math::
+        \rho^{*}_K = \rho_K \frac{S_K - v_{nK}}{S_K - S_M}, \qquad
+        \mathbf{v}^{*}_K = \mathbf{v}_K + (S_M - v_{nK})\,\mathbf{n},
+
+    .. math::
+        E^{*}_K = E_K + (S_M - v_{nK})
+            \left(S_M + \frac{p_K}{\rho_K (S_K - v_{nK})}\right).
+
+    Why this is the one to reach for
+    -------------------------------
+    **It is positivity-preserving, and the limiter needs that.**  With Batten's
+    wave-speed estimates,
+
+    .. math::
+        S_L = \min(v_{nL} - a_L,\ \tilde{v}_n - \tilde{a}), \qquad
+        S_R = \max(v_{nR} + a_R,\ \tilde{v}_n + \tilde{a}),
+
+    (the tilde being the Roe average) HLLC provably keeps density and pressure
+    positive under a CFL condition.  The Roe flux does **not**, with or without
+    the entropy fix.  That matters more here than it sounds: the Zhang-Shu
+    positivity limiter this code relies on by default has a theorem, and the
+    theorem *assumes* the underlying first-order flux is positivity-preserving.
+    Under ``flux='roe'`` that assumption is simply unmet, which is the honest
+    explanation for the cell-average repairs the shocked cases report.
+
+    **There is nothing to tune.**  An unmodified Roe flux admits an entropy-
+    violating expansion shock wherever an eigenvalue crosses zero -- at the
+    throat of every choked nozzle -- so it needs the Harten-Hyman fix and that
+    fix needs a constant (``entropy_fix = 0.05``).  The HLL family cannot
+    produce an expansion shock at all, so there is no fix and no constant.
+
+    **It is cheaper**, because no eigenvector matrix is ever formed.
+
+    Parameters
+    ----------
+    low_mach
+        Cutoff Mach number :math:`M_{\mathrm{lim}}` for the low-Mach correction
+        of Fleischmann et al.  ``0`` (the default) disables it and gives
+        standard HLLC.  When positive, the *acoustic* wave speeds are scaled by
+
+        .. math::
+            \phi = \min\!\left(1,\ \frac{\max(|M_L|,\ |M_R|)}
+                                        {M_{\mathrm{lim}}}\right),
+
+        which shrinks the acoustic dissipation where the flow is slow while
+        leaving the contact wave untouched.  ``phi = 1`` recovers standard HLLC
+        identically, which is pinned by a test.
+
+        .. warning::
+           The *form* here follows Fleischmann et al.; check the cutoff constant
+           against the paper before relying on the low-Mach branch
+           quantitatively.  The ``low_mach = 0`` path is the verified one.
+    """
+    rhoL, vxL, vyL, pL, HL = primitives(UL, gamma, xp=xp)
+    rhoR, vxR, vyR, pR, HR = primitives(UR, gamma, xp=xp)
+
+    vnL = vxL * nx + vyL * ny
+    vnR = vxR * nx + vyR * ny
+    aL = xp.sqrt(xp.maximum(gamma * pL / rhoL, FLOOR))
+    aR = xp.sqrt(xp.maximum(gamma * pR / rhoR, FLOOR))
+
+    # -- Roe average, for Batten's estimates --------------------------------
+    sL_, sR_ = xp.sqrt(rhoL), xp.sqrt(rhoR)
+    den = sL_ + sR_
+    vx = (sL_ * vxL + sR_ * vxR) / den
+    vy = (sL_ * vyL + sR_ * vyR) / den
+    H = (sL_ * HL + sR_ * HR) / den
+    vn_t = vx * nx + vy * ny
+    a_t = xp.sqrt(
+        xp.maximum((gamma - 1.0) * (H - 0.5 * (vx * vx + vy * vy)), FLOOR)
+    )
+
+    SL = xp.minimum(vnL - aL, vn_t - a_t)
+    SR = xp.maximum(vnR + aR, vn_t + a_t)
+
+    if low_mach > 0.0:
+        # shrink only the acoustic part of each estimate, about the fluid speed
+        mach = xp.maximum(xp.abs(vnL) / aL, xp.abs(vnR) / aR)
+        phi = xp.minimum(1.0, mach / low_mach)
+        SL = xp.minimum(vnL, vn_t) - phi * (xp.minimum(vnL, vn_t) - SL)
+        SR = xp.maximum(vnR, vn_t) + phi * (SR - xp.maximum(vnR, vn_t))
+
+    # -- contact speed -------------------------------------------------------
+    mL = rhoL * (SL - vnL)
+    mR = rhoR * (SR - vnR)
+    SM = (rhoR * vnR * (SR - vnR) - rhoL * vnL * (SL - vnL) + pL - pR) / xp.where(
+        xp.abs(mR - mL) > FLOOR, mR - mL, FLOOR
+    )
+
+    FL = normal_flux(UL, nx, ny, gamma, xp=xp)
+    FR = normal_flux(UR, nx, ny, gamma, xp=xp)
+
+    def star(U, rho, vx_, vy_, p, vn, S):
+        """``U* `` for one side: contact normal velocity, own tangential part."""
+        fac = (S - vn) / xp.where(xp.abs(S - SM) > FLOOR, S - SM, FLOOR)
+        rho_s = rho * fac
+        vxs = vx_ + (SM - vn) * nx
+        vys = vy_ + (SM - vn) * ny
+        E = U[..., 3] / rho
+        Es = E + (SM - vn) * (
+            SM + p / xp.where(xp.abs(rho * (S - vn)) > FLOOR, rho * (S - vn), FLOOR)
+        )
+        return xp.stack([rho_s, rho_s * vxs, rho_s * vys, rho_s * Es], axis=-1)
+
+    UsL = star(UL, rhoL, vxL, vyL, pL, vnL, SL)
+    UsR = star(UR, rhoR, vxR, vyR, pR, vnR, SR)
+
+    FsL = FL + SL[..., None] * (UsL - UL)
+    FsR = FR + SR[..., None] * (UsR - UR)
+
+    # branchless selection, so the same code runs under jax.jit
+    flux = xp.where(
+        (SL >= 0.0)[..., None],
+        FL,
+        xp.where(
+            (SR <= 0.0)[..., None],
+            FR,
+            xp.where((SM >= 0.0)[..., None], FsL, FsR),
+        ),
+    )
+    max_speed = xp.maximum(xp.abs(SL), xp.abs(SR))
+    return FluxResult(flux, max_speed)
+
+
 def ausm_flux(
     UL, UR, nx, ny, gamma: float, *,
     cutoff_mach: float = 0.2, xp=np,
