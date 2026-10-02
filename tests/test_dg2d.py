@@ -73,9 +73,14 @@ def test_unknown_command_fails_and_explains():
 
 
 def test_list_names_every_case():
+    """``list`` prints two sections; the cases are the entries without an ``@``."""
     out = run("list")
     assert out.returncode == 0
-    listed = [line.split()[0] for line in out.stdout.splitlines() if line.strip()]
+    listed = [
+        line.split()[0]
+        for line in out.stdout.splitlines()
+        if line.startswith("  ") and line.strip() and not line.strip().startswith("@")
+    ]
     assert listed == list(CASES)
 
 
@@ -186,3 +191,106 @@ def test_run_executes_a_case(tmp_path):
     out = run("run", "solve", cwd=tmp_path, timeout=900)
     assert out.returncode == 0, out.stderr
     assert "running examples/01_solve.py" in out.stdout
+
+
+# --------------------------------------------------------------------------
+# Argument decks
+# --------------------------------------------------------------------------
+# These check expansion, not the solver, so they lean on `geometry` -- which
+# does no flow solve and echoes the contour it was given -- and on the error
+# message argparse prints for a key a subcommand does not take.  That message
+# names the keys it rejected, which makes it a readout of exactly what the
+# launcher passed through.
+
+DECKS = ("design", "overexpanded", "shocked", "converged", "contour")
+
+
+def test_the_shipped_decks_are_listed(tmp_path):
+    out = run("list", cwd=tmp_path)
+    assert out.returncode == 0, out.stderr
+    for name in DECKS:
+        assert f"@{name}" in out.stdout, f"{name} missing from `list`"
+
+
+def test_every_shipped_deck_has_a_summary_line(tmp_path):
+    """The summary is the deck's first comment, so a deck without one is silent."""
+    out = run("list", cwd=tmp_path)
+    for line in out.stdout.splitlines():
+        if line.strip().startswith("@"):
+            name, _, summary = line.strip().partition(" ")
+            assert summary.strip(), f"{name} has no summary comment"
+
+
+def test_a_deck_expands_to_the_values_it_holds(tmp_path):
+    """``geometry @contour`` must behave as if the lines had been typed."""
+    deck = run("geometry", "@contour", cwd=tmp_path)
+    typed = run("geometry", "contour=bell", "ar=2.5", "theta_initial_deg=30",
+                cwd=tmp_path)
+    assert deck.returncode == 0, deck.stderr
+    assert deck.stdout == typed.stdout
+
+
+def test_a_later_argument_overrides_the_deck(tmp_path):
+    """The whole point of a deck is that it is a starting point, not a cage."""
+    deck = run("geometry", "@contour", "ar=4.0", cwd=tmp_path)
+    typed = run("geometry", "contour=bell", "ar=4.0", "theta_initial_deg=30",
+                cwd=tmp_path)
+    assert deck.returncode == 0, deck.stderr
+    assert deck.stdout == typed.stdout
+    assert "AR=4.0" in deck.stdout
+
+
+def test_a_deck_can_include_another_deck(tmp_path):
+    """``overexpanded`` is ``design`` with one value changed."""
+    out = run("geometry", "@overexpanded", cwd=tmp_path)
+    # geometry rejects the solver keys, and in doing so lists what it was given
+    assert "--area-ratio" not in out.stderr  # geometry *does* take this one
+    assert "--order" in out.stderr, out.stderr
+    assert out.returncode != 0
+
+
+def test_a_deck_resolves_by_name_or_by_path(tmp_path):
+    by_name = run("geometry", "@contour", cwd=tmp_path)
+    by_path = run("geometry", f"@{ROOT / 'cases' / 'contour.dg'}", cwd=tmp_path)
+    assert by_name.stdout == by_path.stdout
+    assert by_name.returncode == 0, by_name.stderr
+
+
+def test_an_unknown_deck_names_the_ones_that_exist(tmp_path):
+    out = run("geometry", "@nosuchdeck", cwd=tmp_path)
+    assert out.returncode == 2
+    assert "no deck named nosuchdeck" in out.stderr
+    assert "@design" in out.stderr, "the error should list what is available"
+
+
+def test_comments_and_blank_lines_are_ignored(tmp_path, monkeypatch):
+    deck = tmp_path / "noisy.dg"
+    deck.write_text(
+        "# a summary\n"
+        "\n"
+        "contour=bell   # trailing comment\n"
+        "   \n"
+        "# a whole-line comment\n"
+        "  ar=2.5  \n",
+        encoding="utf-8",
+    )
+    noisy = run("geometry", f"@{deck}", cwd=tmp_path)
+    plain = run("geometry", "contour=bell", "ar=2.5", cwd=tmp_path)
+    assert noisy.returncode == 0, noisy.stderr
+    assert noisy.stdout == plain.stdout
+
+
+def test_a_self_including_deck_fails_instead_of_hanging(tmp_path):
+    """A deck that includes itself must hit the depth limit, not spin forever."""
+    deck = tmp_path / "loop.dg"
+    deck.write_text(f"# recursive\n@{deck}\n", encoding="utf-8")
+    out = run("geometry", f"@{deck}", cwd=tmp_path, timeout=60)
+    assert out.returncode == 2
+    assert "nested more than" in out.stderr, out.stderr
+
+
+def test_a_pytest_node_id_is_not_mistaken_for_a_deck(tmp_path):
+    """``test tests/x.py::name`` must not try to expand anything."""
+    out = run("test", "tests/test_dg2d.py::test_the_shipped_decks_are_listed",
+              "--collect-only", "-q", cwd=tmp_path)
+    assert "no deck named" not in out.stderr

@@ -21,6 +21,8 @@ print(performance(result).summary())
 
 - [Quick start](#quick-start)
 - [The launcher](#the-launcher)
+  - [The cases](#the-cases)
+  - [Case files you pass as an argument](#case-files-you-pass-as-an-argument)
 - [Install](#install)
 - [Run it from Python](#run-it-from-python)
 - [Documentation](#documentation)
@@ -112,7 +114,7 @@ names as the Python API, so there is one vocabulary to learn rather than two.
 | Command | What it does |
 |---|---|
 | `./dg2d.sh check` | report the Python, the version, and which backends work |
-| `./dg2d.sh list` | list the cases `run` can execute |
+| `./dg2d.sh list` | list the cases `run` can execute and the decks `@` expands |
 | `./dg2d.sh run <case>` | run one of the scripts in [`examples/`](examples/) |
 | `./dg2d.sh solve ...` | one operating point |
 | `./dg2d.sh sweep <var> <lo> <hi> <n> ...` | sweep one design variable |
@@ -130,8 +132,9 @@ names as the Python API, so there is one vocabulary to learn rather than two.
 ```
 
 Short aliases: `p`=`order`, `Q`=`geometry_order`, `ref`=`refine`,
-`ar`=`area_ratio`, `pb`=`back_pressure_ratio`. Ordinary `--flags` pass through
-untouched, so anything `python -m dgnozzle --help` documents still works.
+`ar`=`area_ratio`, `pb`=`back_pressure_ratio`, `M`=`tvb_constant`. Ordinary
+`--flags` pass through untouched, so anything `python -m dgnozzle --help`
+documents still works.
 
 `geometry` runs no flow solve — use it to check a contour before committing to
 a simulation.
@@ -149,6 +152,62 @@ a simulation.
 
 They are meant to be copied and edited: changing the geometry in one of them is
 the normal way to start a study.
+
+### Case files you pass as an argument
+
+A case you run often does not have to live in your shell history. A `@name`
+argument is replaced by the lines of [`cases/name.dg`](cases/), so:
+
+```bash
+./dg2d.sh solve @design              # exactly the lines in cases/design.dg
+./dg2d.sh solve @design pb=0.12      # the same deck, with one value changed
+./dg2d.sh sweep back_pressure_ratio 0.05 0.3 12 @design
+./dg2d.sh bench @converged
+```
+
+A deck is the same `name=value` lines you would have typed — there is no second
+vocabulary and no schema to keep in step with the code:
+
+```
+# the design point: shock-free, fully expanded, the case to start from
+ar=2.5
+pb=0.064
+p=1
+Q=2
+ref=0
+```
+
+`#` starts a comment, blank lines are ignored, and **a deck may name another
+deck** to build on it, which is all `cases/overexpanded.dg` is:
+
+```
+# over-expanded: the exit plane sits below ambient, still shock-free
+@design
+pb=0.15
+```
+
+**Later arguments win.** That is what makes `@design pb=0.12` an override rather
+than a conflict, and it is a property of the underlying parser rather than
+something the launcher arranges, so it holds for every key.
+
+| Deck | What it is |
+|---|---|
+| `@design` | the design point: shock-free, fully expanded |
+| `@overexpanded` | exit plane below ambient, still shock-free |
+| `@converged` | the design point at `p=2`, `refine=1` — quote numbers from this |
+| `@shocked` | a shock in the diverging section, at `p=0` because `p>=1` diverges |
+| `@contour` | geometry only, for `geometry` |
+
+Because this is argument expansion and nothing more, a deck works with any
+subcommand that accepts the keys it holds: `solve`, `sweep` and `bench` take the
+full set, while `geometry` takes only the geometry keys and will say
+`unrecognized arguments` if handed a deck carrying solver options — which is
+also what a typo gets, rather than being silently ignored.
+
+Decks cover one operating point on one mesh. For a sweep with a loop in it, a
+sensitivity study or an optimisation, write a Python case file instead — that is
+what [`examples/`](examples/) is, and the names are the same either way, so
+nothing has to be unlearned when you outgrow a deck.
 
 ---
 

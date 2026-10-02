@@ -69,12 +69,12 @@ def _substitute(text: str, new_coords: str, sign: str, expected: int, what: str)
 def main() -> int:
     geom = NozzleGeometry(contour="bell", area_ratio=2.5019, throat_x=0.1388)
     upper, lower = coordinate_lists(geom)
-    text = TARGET.read_text()
+    text = TARGET.read_text(encoding="utf-8")
 
     print(f"contour: {geom.describe()}")
     text = _substitute(text, upper, r"", EXPECTED_UPPER, "upper")
     text = _substitute(text, lower, r"-", EXPECTED_LOWER, "lower")
-    TARGET.write_text(text)
+    TARGET.write_text(text, encoding="utf-8")
     print(f"rewrote {EXPECTED_UPPER} upper and {EXPECTED_LOWER} lower "
           f"coordinate list(s) in {TARGET.name}")
     print("done -- re-render with: python docs/render_figures.py")

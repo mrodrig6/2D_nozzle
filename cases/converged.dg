@@ -1,0 +1,4 @@
+# the design point, resolved: slower, and the case to quote numbers from
+@design
+p=2
+ref=1

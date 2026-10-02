@@ -141,6 +141,6 @@ def test_sweep_subcommand_writes_a_csv(tmp_path):
         "--order", "0", "--contour", "smooth", "--quiet", "--csv", str(csv),
     ])
     assert code == 0
-    lines = csv.read_text().strip().splitlines()
+    lines = csv.read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 3
     assert "area_ratio" in lines[0]

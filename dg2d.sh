@@ -59,6 +59,86 @@ setup_import_path() {
 }
 
 # --------------------------------------------------------------------------
+# Argument decks
+# --------------------------------------------------------------------------
+# `@name` is replaced by the `name=value` lines in that file, so a case you run
+# often lives in a file instead of in your shell history:
+#
+#     ./dg2d.sh solve @design              # cases/design.dg
+#     ./dg2d.sh solve @design pb=0.12      # the same deck, one value overridden
+#     ./dg2d.sh sweep back_pressure_ratio 0.05 0.3 12 @design
+#
+# A deck holds exactly what you would have typed, so there is no second
+# vocabulary to learn and no schema to keep in step with the code: `#` starts a
+# comment, blank lines are ignored, and a deck may name another deck to include
+# it.  Later arguments win, which is what makes the override above work.
+#
+# Because this is argument expansion and nothing more, a deck works with any
+# subcommand that accepts the keys in it: `solve`, `sweep` and `bench` take the
+# full set, while `geometry` takes only the geometry keys and will say
+# `unrecognized arguments` if handed a deck carrying solver options.  That is
+# the intended behaviour -- it names the keys it rejected rather than ignoring
+# them, which is what a typo needs too.
+DECK_DIR="$ROOT/cases"
+DECK_EXT=".dg"
+DECK_MAX_DEPTH=8
+
+list_decks() {
+    local path stem found=0
+    for path in "$DECK_DIR"/*"$DECK_EXT"; do
+        [[ -e $path ]] || continue
+        found=1
+        stem=$(basename "$path" "$DECK_EXT")
+        printf '  @%-13s %s\n' "$stem" "$(deck_summary "$path")"
+    done
+    (( found )) || printf '  (none in %s)\n' "${DECK_DIR#"$ROOT"/}"
+}
+
+deck_summary() {
+    # the summary is the first comment line, which is why decks start with one
+    sed -n '1{/^[[:space:]]*#/{s/^[[:space:]]*#[[:space:]]*//;p;};q;}' "$1"
+}
+
+resolve_deck() {
+    local want=$1 candidate
+    for candidate in \
+        "$want" "$want$DECK_EXT" \
+        "$DECK_DIR/$want" "$DECK_DIR/$want$DECK_EXT"
+    do
+        if [[ -f $candidate ]]; then printf '%s\n' "$candidate"; return 0; fi
+    done
+    printf '%s: no deck named %s.  Available:\n' "$SELF" "$want" >&2
+    list_decks >&2
+    return 1
+}
+
+# Replace every `@deck` token with that deck's lines, recursively.
+# EXPANDED is set as a side effect; bash functions cannot return arrays.
+expand_decks() {
+    local depth=$1; shift
+    (( depth <= DECK_MAX_DEPTH )) || die \
+        "decks nested more than $DECK_MAX_DEPTH deep -- does a deck include itself?"
+    local out=() lines=() token path line
+    for token in ${@+"$@"}; do
+        if [[ $token != @* || $token == *::* ]]; then
+            out+=("$token")
+            continue
+        fi
+        path=$(resolve_deck "${token#@}") || exit 2
+        lines=()
+        while IFS= read -r line || [[ -n $line ]]; do
+            line=${line%%#*}                        # drop comments
+            line=${line#"${line%%[![:space:]]*}"}   # trim left
+            line=${line%"${line##*[![:space:]]}"}   # trim right
+            [[ -n $line ]] && lines+=("$line")
+        done < "$path"
+        expand_decks $((depth + 1)) ${lines[@]+"${lines[@]}"}
+        out+=(${EXPANDED[@]+"${EXPANDED[@]}"})
+    done
+    EXPANDED=(${out[@]+"${out[@]}"})
+}
+
+# --------------------------------------------------------------------------
 # Argument translation
 # --------------------------------------------------------------------------
 # `key=value` becomes `--key-with-dashes value`, so the names you type are the
@@ -68,8 +148,10 @@ setup_import_path() {
 #
 # TRANSLATED is set as a side effect; bash functions cannot return arrays.
 translate() {
+    expand_decks 1 ${@+"$@"}
+    set -- ${EXPANDED[@]+"${EXPANDED[@]}"}
     local out=() token key value
-    for token in "$@"; do
+    for token in ${@+"$@"}; do
         if [[ $token == -* || $token != *=* ]]; then
             out+=("$token")
             continue
@@ -164,7 +246,7 @@ Usage: ./$SELF <command> [arguments]
 Getting started
   install            install the package and its optional extras with pip
   check              report the Python, the version, and which backends work
-  list               list the cases 'run' can execute
+  list               list the cases 'run' can execute and the decks '@' expands
 
 Running
   run <case> [...]   run one of the case scripts in examples/
@@ -184,12 +266,30 @@ Arguments are 'name=value', using the same names as the Python API:
   ./$SELF geometry contour=bezier bezier_w1=0.7
   ./$SELF run sensitivity
 
+A '@name' argument is replaced by the lines of cases/name.dg, so a case you run
+often lives in a file rather than in your shell history.  Later arguments win,
+so a deck is a starting point you can override:
+
+  ./$SELF solve @design                 # exactly the lines in cases/design.dg
+  ./$SELF solve @design pb=0.12         # the deck, with one value changed
+  ./$SELF sweep back_pressure_ratio 0.05 0.3 12 @design
+  ./$SELF bench @converged
+  ./$SELF geometry @contour              # a geometry-only deck
+
+Decks are the same 'name=value' lines you would have typed, '#' starts a
+comment, and a deck may name another deck to build on it.  A deck works with
+any subcommand that accepts the keys it holds -- 'solve', 'sweep' and 'bench'
+take the full set, 'geometry' only the geometry ones.
+
 Aliases: p=order, Q=geometry_order, ref=refine, ar=area_ratio,
 pb=back_pressure_ratio, M=tvb_constant.  Ordinary --flags work too, so
 anything 'python -m dgnozzle --help' documents is still available.
 
-Cases:
+Cases ('run <name>'):
 $(list_cases)
+
+Decks ('@name'):
+$(list_decks)
 
 Environment
   DG2D_PYTHON        the interpreter to use (default: python3, then python)
@@ -287,7 +387,8 @@ main() {
     case $command in
         install)   cmd_install ${1+"$1"} ;;
         check)     setup_import_path; cmd_check ;;
-        list)      list_cases ;;
+        list)      printf "Cases ('run <name>'):\n"; list_cases
+                   printf "\nDecks ('@name'):\n"; list_decks ;;
         docs)      cmd_docs ;;
         run)       setup_import_path; cmd_run "$@" ;;
         test)      setup_import_path; cmd_test "$@" ;;

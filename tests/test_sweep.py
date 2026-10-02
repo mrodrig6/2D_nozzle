@@ -100,7 +100,7 @@ def test_csv_round_trip(tmp_path):
     table = sweep(area_ratio=[2.0, 2.5], order=0, contour="smooth", progress=False)
     path = tmp_path / "sweep.csv"
     table.to_csv(str(path))
-    lines = path.read_text().strip().splitlines()
+    lines = path.read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 3
     header = lines[0].split(",")
     assert "area_ratio" in header and "thrust" in header and "converged" in header
