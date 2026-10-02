@@ -51,18 +51,17 @@ class NumbaBackend(Backend):
 
     def __init__(self, ops, flow, opts):
         super().__init__(ops, flow, opts)
-        # Refusing is the point for a flux the kernels do not implement: falling
-        # back to Roe silently would hand back a Roe answer under another
-        # label -- the one failure mode a student could not detect.
+        # Every flux the package offers has a kernel, so this guard only fires
+        # if one is added without one.  It raises rather than falling back,
+        # because silently returning a Roe answer under another label is the one
+        # failure mode a student could not detect.
         _KERNEL_FLUXES = {"roe": 0, "hllc": 1}
         _flux = getattr(flow, "flux", "roe")
         if _flux not in _KERNEL_FLUXES:
             raise NotImplementedError(
                 f"the numba kernels implement {sorted(_KERNEL_FLUXES)}, so "
                 f"flux={_flux!r} would silently give you a Roe answer here. "
-                f"Use backend='numpy' (and read the 'Numerical flux' section "
-                f"of docs/theory.md first: flux='ausm' does not currently "
-                f"produce a physical solution on this nozzle)."
+                f"Add a kernel for it, or use backend='numpy'."
             )
         self._flux_id = _KERNEL_FLUXES[_flux]
         self._low_mach = float(getattr(flow, "hllc_low_mach", 0.0))

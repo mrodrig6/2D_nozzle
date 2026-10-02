@@ -82,11 +82,6 @@ def edge_fluxes(U, ops: Operators, flow: FlowConditions, xp=np):
             UL, UR, nx_i, ny_i, flow.gamma,
             low_mach=flow.hllc_low_mach, xp=xp,
         )
-    elif flow.flux == "ausm":
-        interior = ph.ausm_flux(
-            UL, UR, nx_i, ny_i, flow.gamma,
-            cutoff_mach=flow.ausm_cutoff_mach, xp=xp,
-        )
     else:
         interior = ph.roe_flux(
             UL, UR, nx_i, ny_i, flow.gamma, entropy_fix=flow.entropy_fix, xp=xp

@@ -140,21 +140,19 @@ always means Mach number, and the TVB constant is not a Mach number.
 `geometry` runs no flow solve — use it to check a contour before committing to
 a simulation.
 
-**Interface flux.** Three are available, and the choice is a real one:
+**Interface flux.** Two are available, and the choice is a real one:
 
 | `flux=` | What it is | Use it when |
 |---|---|---|
 | `roe` (default) | Roe's approximate Riemann solver with the Harten–Hyman entropy fix | **Accuracy.** Consistently the lowest entropy error, and what every number in this README was produced with |
 | `hllc` | HLLC with Batten's wave speeds | **Robustness.** Provably positivity-preserving, needs no entropy fix and so has no constant to tune, and is cheaper |
-| `ausm` | Liou's AUSM⁺-up flux-vector splitting | **Nothing, yet** — verified in isolation but it does not give a physical solution on this nozzle |
 
 Measured at the design point: HLLC converges in 451 iterations against Roe's 751
 at `p=0` and agrees to ~1% in thrust, while Roe is the more accurate of the two
 (entropy error 3.8e-3 against 6.2e-3 at `p=1`). Neither fixes the `p>=1` shocked
 divergence. See [`docs/theory.md`](docs/theory.md#hllc-and-why-it-is-the-robust-choice).
 
-`roe` and `hllc` both run on the Numba fast path. `ausm` needs `backend=numpy`;
-the kernels refuse rather than hand back a Roe answer under an AUSM label.
+Both run on the Numba fast path.
 
 ### The cases
 
@@ -833,6 +831,28 @@ The solver reports every non-converged run above as `converged=False` with a
 message and does not present the numbers as trustworthy. For a shock in the
 nozzle, use `p=0` and check `converged`, or `solve_quasi1d` for the shock physics
 itself.
+
+**This is new capability failing, not old capability lost.** The predecessor
+MATLAB solver could not pose a shocked case at all. Its exit plane extrapolated
+the interior state unconditionally — the supersonic branch, whatever the local
+Mach number — and its `p_back_ratio` was set in the driver, stored, and then
+never read by the residual, the initial condition, the time march, the mesh or
+the post-processing. The back pressure was a dead input, so the operating point
+was fixed by geometry alone and a shock could never stand in the nozzle.
+
+This code added a real outflow condition that imposes static pressure on the
+subsonic branch, which is what turned `back_pressure_ratio` into a live design
+variable and opened the whole band `0.435 < p_b/p_t < 0.961`. Everything the
+older solver *could* compute, this one computes: run at its defaults
+(`area_ratio=2.50`, `throat_x=0.14`, `smooth`, `p=1`, `refine=1`, `Q=1`,
+triangles, **no limiter**) it converges in 1701 iterations to thrust 0.045889 and
+exit `M` 2.4502, and the full `p=0 -> 1 -> 2` continuation ladder it used
+converges at every stage with no limiter.
+
+So the honest statement is not "this used to work". It is that a steady explicit
+DG march whose only safeguard is a positivity limiter cannot capture a shock in
+steady state, and that limitation was previously hidden by a boundary condition
+that made the problem unreachable.
 
 **What the residual is doing.** Localising it at `p=0`, `refine=1`,
 `p_b/p_t = 0.70` (12,000 steps, no limiter):
