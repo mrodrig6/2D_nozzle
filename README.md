@@ -9,7 +9,7 @@ solver — it is already written, verified, and fast.
 ![Mach field, mesh, wall and exit profiles at the design point](docs/figures/overview_design.png)
 
 ```python
-from dgnozzle import solve_nozzle, performance
+from src import solve_nozzle, performance
 
 result = solve_nozzle(area_ratio=3.0, back_pressure_ratio=0.12, order=1)
 print(performance(result).summary())
@@ -55,7 +55,7 @@ cd dg
 
 ```
 python   3.12.3  (/usr/bin/python3)
-dgnozzle 1.0.0  (/home/you/dg/dgnozzle)
+dgnozzle 1.0.0  (/home/you/dg/src)
 backends numba, numpy, jax
   yes  numba        the fast solver
   yes  jax          gradients and sensitivity
@@ -64,7 +64,7 @@ backends numba, numpy, jax
 ```
 
 **There is no install step and nothing to compile.** The package sits at the
-repository root, so `python -m dgnozzle ...` works as soon as you are standing in
+repository root, so `python -m src ...` works as soon as you are standing in
 the clone. `dg2d.sh` adds that it works from *any* directory, puts the repository
 on the import path when the package is not installed, and gives you shorter
 arguments. It uses whatever environment you have loaded — set
@@ -133,7 +133,7 @@ names as the Python API, so there is one vocabulary to learn rather than two.
 
 Short aliases: `p`=`order`, `Q`=`geometry_order`, `ref`=`refine`,
 `ar`=`area_ratio`, `pb`=`back_pressure_ratio`, `tvb`=`tvb_constant`. Ordinary
-`--flags` pass through untouched, so anything `python -m dgnozzle --help`
+`--flags` pass through untouched, so anything `python -m src --help`
 documents still works. `M` is deliberately **not** an alias — in this code `M`
 always means Mach number, and the TVB constant is not a Mach number.
 
@@ -228,7 +228,7 @@ nothing has to be unlearned when you outgrow a deck.
 
 ## Install
 
-Only needed if you want `import dgnozzle` to work outside the launcher:
+Only needed if you want `import src` to work outside the launcher:
 
 ```bash
 ./dg2d.sh install            # pip install -e ".[all]"
@@ -266,7 +266,7 @@ rest alone.
 #!/usr/bin/env python3
 """My first nozzle: one design point, solved and reported."""
 
-from dgnozzle import performance, solve_nozzle
+from src import performance, solve_nozzle
 
 result = solve_nozzle(
     contour="smooth",           # wall family
@@ -341,7 +341,7 @@ sweep, a gradient and an optimisation.
 ### Plotting
 
 ```python
-from dgnozzle.plotting import overview, plot_field, plot_centreline
+from src.plotting import overview, plot_field, plot_centreline
 import matplotlib.pyplot as plt
 
 overview(result)              # four-panel summary
@@ -360,7 +360,7 @@ plt.show()
 | **[`docs/theory.md`](docs/theory.md)** | **The formulation and the geometry definition.** Governing equations, the DG weak form, the Roe flux, every boundary condition, the limiters, quasi-1D theory, the thrust and entropy-error definitions, and the verification evidence. Markdown with LaTeX equations — it renders on GitHub, so there is nothing to build. Start here. |
 | [`docs/lab_guide.md`](docs/lab_guide.md) | The student-facing lab: exercises, what to look for, what to report. |
 | [`docs/tikz/`](docs/tikz/) | TikZ sources for every figure in `theory.md`. |
-| Docstrings | Every module carries its own derivation and rationale. `help(dgnozzle.physics)` is worth reading. |
+| Docstrings | Every module carries its own derivation and rationale. `help(src.physics)` is worth reading. |
 
 `./dg2d.sh docs` prints the same list.
 
@@ -368,7 +368,7 @@ The geometry figure is generated from the *actual* contour the solver uses, not
 sketched by hand. Regenerate it after changing the contour families:
 
 ```bash
-python docs/make_tikz.py        # coordinates, from dgnozzle.geometry
+python docs/make_tikz.py        # coordinates, from src.geometry
 python docs/render_figures.py   # TikZ -> the PNGs theory.md shows
 ```
 
@@ -421,7 +421,7 @@ isentropic tables apply directly.
 values divide the map — ask for them before you run anything:
 
 ```python
-from dgnozzle import critical_ratios
+from src import critical_ratios
 print(critical_ratios(2.5019).describe())
 # first=0.9609 (choking), second=0.4345 (shock at exit), third=0.0639 (design, M_exit=2.444)
 ```
@@ -458,7 +458,7 @@ In Python:
 
 ```python
 import numpy as np
-from dgnozzle import sweep
+from src import sweep
 
 table = sweep(
     area_ratio=np.linspace(2.0, 4.0, 9),   # iterable  -> a sweep axis
@@ -486,11 +486,11 @@ grid = sweep(
     back_pressure_ratio=np.linspace(0.08, 0.40, 6),
     order=1,
 )
-from dgnozzle.plotting import plot_sweep
+from src.plotting import plot_sweep
 plot_sweep(grid, "thrust_coefficient")     # 2D contour map
 ```
 
-Every point records 19 metrics (`dgnozzle.METRICS`), including the quasi-1D
+Every point records 19 metrics (`src.METRICS`), including the quasi-1D
 reference values so you can see where two-dimensionality starts to matter.
 Points that fail are recorded, not hidden:
 
@@ -509,7 +509,7 @@ Exact derivatives by the **discrete adjoint** — one solve, any number of desig
 variables:
 
 ```python
-from dgnozzle import differentiable_case
+from src import differentiable_case
 
 dc = differentiable_case(order=1, contour="bezier", back_pressure_ratio=0.15)
 
@@ -523,7 +523,7 @@ print(value, grad)
 Verify it against finite differences — and make your students do this once:
 
 ```python
-from dgnozzle import check_gradient
+from src import check_gradient
 check_gradient(dc, "thrust", names=("area_ratio", "throat_x"))
 ```
 
@@ -552,7 +552,7 @@ The gradient plugs straight into SciPy:
 ```python
 import numpy as np
 from scipy.optimize import minimize
-from dgnozzle import differentiable_case
+from src import differentiable_case
 
 dc = differentiable_case(order=1, contour="bezier")
 names = ("area_ratio", "bezier_w1", "bezier_w2")
@@ -845,7 +845,7 @@ defect, and the reason to use `smooth` for convergence work.
 
 | Symptom | What it means |
 |---|---|
-| `No module named dgnozzle` | You ran `python -m dgnozzle` from somewhere other than the clone. Either `cd` into it, use `./dg2d.sh`, which works from anywhere, or `./dg2d.sh install`. |
+| `No module named src` | You ran `python -m src` from somewhere other than the clone. Either `cd` into it, use `./dg2d.sh`, which works from anywhere, or `./dg2d.sh install`. |
 | `dg2d.sh: Permission denied` | `chmod +x dg2d.sh`, or run it as `bash dg2d.sh ...`. |
 | `dg2d.sh: no python3 on PATH` | Load your Python environment first, or set `DG2D_PYTHON` to the interpreter you want. |
 | *"the residual has stalled … That is a limit cycle"* | The mesh cannot resolve a shock or strong expansion. **`refine=+1`** usually fixes it. |

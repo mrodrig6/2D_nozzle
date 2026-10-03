@@ -10,7 +10,7 @@ first.
 This file asserts that the solver converges across that whole set.  It is the
 counterpart to the known limitation: inside the excluded band a shock stands in
 the diverging section and the march does not reach a steady state, which
-``dgnozzle.is_shock_free`` reports and :func:`dgnozzle.solve_nozzle` warns about.
+``src.is_shock_free`` reports and :func:`src.solve_nozzle` warns about.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ import warnings
 import numpy as np
 import pytest
 
-from dgnozzle import (
+from src import (
     Discretization,
     SolverOptions,
     critical_ratios,
@@ -124,7 +124,7 @@ def test_a_sweep_across_the_band_records_it_instead_of_aborting():
     worse than the non-convergence it replaced, so the point is recorded as a
     failure with the reason and the sweep carries on.
     """
-    from dgnozzle import sweep
+    from src import sweep
 
     table = sweep(
         back_pressure_ratio=[0.15, 0.70, 0.30],

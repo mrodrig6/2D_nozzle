@@ -6,20 +6,20 @@ geometry, sweep the design space, take sensitivities, explain the trends.
 
 Quick start
 -----------
->>> from dgnozzle import solve_nozzle, performance          # doctest: +SKIP
+>>> from src import solve_nozzle, performance          # doctest: +SKIP
 >>> result = solve_nozzle(area_ratio=3.0, back_pressure_ratio=0.12, order=1)
 >>> print(performance(result).summary())
 
 Sweep a design variable:
 
 >>> import numpy as np                                      # doctest: +SKIP
->>> from dgnozzle import sweep
+>>> from src import sweep
 >>> table = sweep(area_ratio=np.linspace(2.0, 4.0, 9), order=1)
 >>> print(table.table())
 
 Take an exact shape derivative:
 
->>> from dgnozzle import differentiable_case                 # doctest: +SKIP
+>>> from src import differentiable_case                 # doctest: +SKIP
 >>> dc = differentiable_case(order=1, contour='bezier')
 >>> value, grad, _ = dc.value_and_gradient('thrust',
 ...     names=('area_ratio', 'bezier_w1', 'bezier_w2'))
@@ -27,26 +27,26 @@ Take an exact shape derivative:
 Layout
 ------
 =========================  ==================================================
-:mod:`~dgnozzle.geometry`  nozzle contour families (the only nozzle-aware part
+:mod:`~src.geometry`  nozzle contour families (the only nozzle-aware part
                            of the discretisation)
-:mod:`~dgnozzle.mesh`      topology and node coordinates, triangles or quads
-:mod:`~dgnozzle.operators` metrics, mass matrices, normals
-:mod:`~dgnozzle.physics`   Euler fluxes, Roe solver, boundary conditions
-:mod:`~dgnozzle.assembly`  the vectorised DG residual
-:mod:`~dgnozzle.backends`  ``numba`` / ``numpy`` / ``jax`` execution
-:mod:`~dgnozzle.limiter`   positivity and slope limiting
-:mod:`~dgnozzle.solver`    the pseudo-time march
-:mod:`~dgnozzle.quasi1d`   exact quasi-1D theory, for reference and for the
+:mod:`~src.mesh`      topology and node coordinates, triangles or quads
+:mod:`~src.operators` metrics, mass matrices, normals
+:mod:`~src.physics`   Euler fluxes, Roe solver, boundary conditions
+:mod:`~src.assembly`  the vectorised DG residual
+:mod:`~src.backends`  ``numba`` / ``numpy`` / ``jax`` execution
+:mod:`~src.limiter`   positivity and slope limiting
+:mod:`~src.solver`    the pseudo-time march
+:mod:`~src.quasi1d`   exact quasi-1D theory, for reference and for the
                            initial condition
-:mod:`~dgnozzle.postprocess` thrust, entropy error, line-outs
-:mod:`~dgnozzle.sweep`     parameter sweeps with warm starting
-:mod:`~dgnozzle.sensitivity` discrete-adjoint design gradients
-:mod:`~dgnozzle.plotting`  matplotlib figures
+:mod:`~src.postprocess` thrust, entropy error, line-outs
+:mod:`~src.sweep`     parameter sweeps with warm starting
+:mod:`~src.sensitivity` discrete-adjoint design gradients
+:mod:`~src.plotting`  matplotlib figures
 =========================  ==================================================
 
 The solver core is geometry-agnostic: it takes any conforming mesh of triangles
-or quadrilaterals with tagged boundaries.  Only :mod:`~dgnozzle.geometry` and the
-mesh generator in :mod:`~dgnozzle.mesh` know that the domain is a nozzle.
+or quadrilaterals with tagged boundaries.  Only :mod:`~src.geometry` and the
+mesh generator in :mod:`~src.mesh` know that the domain is a nozzle.
 
 See ``docs/theory.md`` for the formulation and the geometry definition, and
 ``README.md`` for how to run everything.
@@ -137,7 +137,7 @@ def __getattr__(name: str):
     """Import the optional-dependency modules lazily.
 
     ``sensitivity`` needs JAX and ``plotting`` needs matplotlib.  Deferring them
-    keeps ``import dgnozzle`` working -- and fast -- when neither is installed.
+    keeps ``import src`` working -- and fast -- when neither is installed.
     """
     if name in ("differentiable_case", "check_gradient", "finite_difference_gradient",
                 "DifferentiableCase", "OBJECTIVES"):

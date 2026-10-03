@@ -3,7 +3,7 @@
 Every subcommand is invoked here, because the absence of that coverage is how a
 real defect survived: ``_collect`` read solver attributes by direct attribute
 access, but the ``geometry`` subparser declares no solver options, so
-``python -m dgnozzle geometry`` raised ``AttributeError`` before doing any work.
+``python -m src geometry`` raised ``AttributeError`` before doing any work.
 Nothing that only inspects ``--help`` would have caught it.
 
 Only ``geometry`` runs here without a flow solve; the subcommands that do are
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-from dgnozzle.cli import _collect, build_parser, main
+from src.cli import _collect, build_parser, main
 
 SUBCOMMANDS = ("solve", "sweep", "geometry", "bench")
 
@@ -97,7 +97,7 @@ def test_every_x_spacing_the_cli_offers_actually_builds_a_mesh():
     The choices are read off the parser rather than written out here, so this
     keeps checking the real invariant if they are ever renamed.
     """
-    from dgnozzle import NozzleGeometry, build_case
+    from src import NozzleGeometry, build_case
 
     choices = _choices_for("x_spacing")
     assert choices, "the CLI declares no x_spacing choices"
@@ -109,7 +109,7 @@ def test_every_x_spacing_the_cli_offers_actually_builds_a_mesh():
 
 
 def test_every_contour_the_cli_offers_is_a_real_contour():
-    from dgnozzle import CONTOURS
+    from src import CONTOURS
 
     # --contour is free text rather than a choice list, so check the default
     parser = build_parser()

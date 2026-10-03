@@ -1,7 +1,7 @@
 """The ``dg2d.sh`` launcher.
 
 This is the entry point students are told to use.  The package sits at the
-repository root, so ``python -m dgnozzle`` works when you are standing in a
+repository root, so ``python -m src`` works when you are standing in a
 clone; what the launcher adds is that it works from *anywhere*, with no install
 and without having to know where the clone is.  So the tests here run the script
 the way a student would -- from an arbitrary directory, with no arguments beyond

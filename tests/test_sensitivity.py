@@ -13,7 +13,7 @@ pytestmark = [pytest.mark.slow, pytest.mark.jax]
 
 pytest.importorskip("jax")
 
-from dgnozzle.sensitivity import (  # noqa: E402
+from src.sensitivity import (  # noqa: E402
     ALL_DESIGN_PARAMETERS,
     OBJECTIVES,
     check_gradient,
@@ -70,7 +70,7 @@ def test_back_pressure_gradient_vanishes_at_a_supersonic_exit(dcase):
     A gradient of exactly zero here is physics, not a failure to propagate.
     """
     _, grad, result = dcase.value_and_gradient("thrust", names=("back_pressure",))
-    from dgnozzle.postprocess import performance
+    from src.postprocess import performance
 
     assert performance(result).exit_mach_area_averaged > 1.0
     assert abs(grad["back_pressure"]) < 1e-12

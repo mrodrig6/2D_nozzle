@@ -80,7 +80,7 @@ from .operators import ReferenceData, build_operators, reference_data
 from .solver import SolveResult
 
 #: Design variables accepted in a parameter dict, in addition to the geometric
-#: ones in :data:`dgnozzle.geometry.DESIGN_PARAMETERS`.
+#: ones in :data:`src.geometry.DESIGN_PARAMETERS`.
 FLOW_DESIGN_PARAMETERS = ("back_pressure",)
 
 ALL_DESIGN_PARAMETERS = tuple(DESIGN_PARAMETERS) + FLOW_DESIGN_PARAMETERS
@@ -281,7 +281,7 @@ class DifferentiableCase:
         """Converge the flow for these design variables, on the frozen logical grid.
 
         The grid is deliberately *not* regenerated: see
-        :func:`dgnozzle.api.case_from_grids` for why that matters for gradients.
+        :func:`src.api.case_from_grids` for why that matters for gradients.
         """
         from .api import solve_nozzle
 
@@ -467,7 +467,7 @@ def differentiable_case(
 ) -> DifferentiableCase:
     """Build a :class:`DifferentiableCase`.
 
-    Accepts the same keyword shortcuts as :func:`dgnozzle.api.solve_nozzle`.
+    Accepts the same keyword shortcuts as :func:`src.api.solve_nozzle`.
     """
     from .api import _split_overrides, build_case
 

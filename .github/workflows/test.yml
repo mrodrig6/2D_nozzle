@@ -38,7 +38,7 @@ jobs:
         run: pip install "jax[cpu]>=0.4.20"
 
       - name: Report which backends are active
-        run: python -c "from dgnozzle.backends import available_backends; print(available_backends())"
+        run: python -c "from src.backends import available_backends; print(available_backends())"
 
       - name: Fast tests
         run: pytest -q --fast
@@ -53,7 +53,7 @@ jobs:
 
       - name: Lint
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        run: ruff check dgnozzle tests examples docs
+        run: ruff check src tests examples docs
 
       # The ignore list in pyproject.toml is every false positive this raises in
       # aerodynamics and LaTeX, checked individually -- Ue, nd, \oint, pres,
@@ -61,7 +61,7 @@ jobs:
       # check on the prose, which in this repository is most of the content.
       - name: Spell check
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        run: codespell dgnozzle tests examples docs README.md
+        run: codespell src tests examples docs README.md
 
   docs:
     runs-on: ubuntu-latest

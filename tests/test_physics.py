@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dgnozzle import physics as ph
+from src import physics as ph
 
 GAMMA = 1.4
 

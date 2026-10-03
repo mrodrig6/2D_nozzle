@@ -21,8 +21,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import minimize
 
-from dgnozzle import NozzleGeometry, differentiable_case
-from dgnozzle.plotting import plot_contour
+from src import NozzleGeometry, differentiable_case
+from src.plotting import plot_contour
 
 NAMES = ("area_ratio", "bezier_w1", "bezier_w2")
 BOUNDS = [(1.8, 4.5), (0.05, 0.95), (0.30, 0.99)]

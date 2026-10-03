@@ -322,7 +322,7 @@ def sweep(
         ``True`` prints a line per point, ``False`` is silent, or pass a callable
         ``(index, total, point) -> None``.
     **grids
-        Keywords accepted by :func:`dgnozzle.api.solve_nozzle`.  A keyword whose
+        Keywords accepted by :func:`src.api.solve_nozzle`.  A keyword whose
         value is an **iterable** becomes a sweep axis
         (``area_ratio=np.linspace(2.0, 4.0, 9)``); a **scalar** is a fixed setting
         applied at every point (``order=1``, ``contour='smooth'``).  Several axes
@@ -335,7 +335,7 @@ def sweep(
     Examples
     --------
     >>> import numpy as np
-    >>> from dgnozzle import sweep                          # doctest: +SKIP
+    >>> from src import sweep                          # doctest: +SKIP
     >>> r = sweep(area_ratio=np.linspace(2.0, 4.0, 5), order=1)   # doctest: +SKIP
     >>> print(r.table())                                    # doctest: +SKIP
     """

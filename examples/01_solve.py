@@ -17,8 +17,8 @@ from __future__ import annotations
 
 import matplotlib.pyplot as plt
 
-from dgnozzle import critical_ratios, performance, solve_nozzle, solve_quasi1d
-from dgnozzle.plotting import overview
+from src import critical_ratios, performance, solve_nozzle, solve_quasi1d
+from src.plotting import overview
 
 
 def main() -> None:

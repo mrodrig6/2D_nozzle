@@ -171,8 +171,8 @@ class Operators:
     The identity is exact, so the rate is unchanged to round-off.
 
     The unfolded arrays are kept because the residual itself is still wanted:
-    :meth:`~dgnozzle.backends.base.Backend.residual` is what the cross-backend
-    test compares, and :mod:`dgnozzle.sensitivity` differentiates it.
+    :meth:`~src.backends.base.Backend.residual` is what the cross-backend
+    test compares, and :mod:`src.sensitivity` differentiates it.
     """
     elem_area: Any  # (nelem,)
     mean_weights: Any  # (nelem, nbf) cell-average operator: ubar_s = sum_i mw_i U_is
@@ -220,7 +220,7 @@ def build_operators(
     Parameters
     ----------
     topology
-        Integer connectivity from :mod:`dgnozzle.mesh`.
+        Integer connectivity from :mod:`src.mesh`.
     node_coords
         ``(n_nodes, 2)`` coordinates; may be a traced JAX array.
     order
@@ -257,7 +257,7 @@ def build_operators(
                 f"{bad} quadrature point(s) have a non-positive Jacobian determinant "
                 f"(worst element {worst}, det={float(det.min()):.3e}). The mesh is "
                 "inverted or tangled -- usually a contour that goes negative or "
-                "doubles back. Run dgnozzle.geometry.check_contour on the geometry."
+                "doubles back. Run src.geometry.check_contour on the geometry."
             )
 
     # inverse Jacobian: d(xi, eta) / d(x, y)

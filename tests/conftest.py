@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dgnozzle import Discretization, FlowConditions, NozzleGeometry, SolverOptions, build_case
+from src import Discretization, FlowConditions, NozzleGeometry, SolverOptions, build_case
 
 
 @pytest.fixture(scope="session")

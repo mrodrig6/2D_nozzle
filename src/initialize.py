@@ -110,7 +110,7 @@ def initial_state(
     *,
     xp=np,
 ):
-    """Dispatch on :attr:`dgnozzle.config.SolverOptions.initial_condition`."""
+    """Dispatch on :attr:`src.config.SolverOptions.initial_condition`."""
     if kind == "quasi1d":
         return quasi1d_initial(ops, flow, geom, xp=xp)
     if kind == "uniform":

@@ -23,7 +23,7 @@ Nothing has to be installed first; `./dg2d.sh help` lists every command, and
 Then get comfortable with the one function you need:
 
 ```python
-from dgnozzle import solve_nozzle, performance
+from src import solve_nozzle, performance
 
 result = solve_nozzle(area_ratio=2.5, back_pressure_ratio=0.15, order=1)
 assert result.converged, result.message
@@ -49,7 +49,7 @@ control it:
 Before running anything, ask the solver what regimes exist for your geometry:
 
 ```python
-from dgnozzle import critical_ratios
+from src import critical_ratios
 print(critical_ratios(2.5).describe())
 # first=0.9609 (choking), second=0.4345 (shock at exit), third=0.0639 (design)
 ```
@@ -74,7 +74,7 @@ thrust? Why is it not simply the largest one?
 
 ```python
 import numpy as np
-from dgnozzle import sweep
+from src import sweep
 
 table = sweep(area_ratio=np.linspace(2.0, 4.5, 11),
               contour="smooth", order=1, refine=1,
@@ -100,7 +100,7 @@ Sweep only the **shock-free** range — below the second critical ratio — beca
 shocked points do not converge (see *Limitations* at the end of this guide):
 
 ```python
-from dgnozzle import critical_ratios
+from src import critical_ratios
 crit = critical_ratios(2.5)
 table = sweep(back_pressure_ratio=np.linspace(0.05, crit.second * 0.95, 12),
               area_ratio=2.5, contour="smooth", order=1)
@@ -116,7 +116,7 @@ including the shocked part, so use it to show where the mass flow *would* start
 to respond:
 
 ```python
-from dgnozzle import solve_quasi1d, NozzleGeometry, FlowConditions
+from src import solve_quasi1d, NozzleGeometry, FlowConditions
 for pb in (0.999, 0.99, 0.97, 0.9, 0.5, 0.15):
     s = solve_quasi1d(NozzleGeometry(contour="smooth", area_ratio=2.5),
                       FlowConditions(back_pressure_ratio=pb))
@@ -135,7 +135,7 @@ to back pressure?
 Quasi-1D theory answers this exactly:
 
 ```python
-from dgnozzle import solve_quasi1d, NozzleGeometry, FlowConditions
+from src import solve_quasi1d, NozzleGeometry, FlowConditions
 geom = NozzleGeometry(contour="smooth", area_ratio=2.5)
 for pb in (0.9, 0.7, 0.5):
     s = solve_quasi1d(geom, FlowConditions(back_pressure_ratio=pb))
@@ -154,7 +154,7 @@ r = solve_nozzle(back_pressure_ratio=0.70, order=0, refine=1,
                  contour="smooth", max_iterations=40000)
 print(r.converged, r.message)
 import matplotlib.pyplot as plt
-from dgnozzle.plotting import plot_convergence
+from src.plotting import plot_convergence
 plot_convergence(r)     # the residual falls, then parks
 plt.show()
 ```
@@ -221,7 +221,7 @@ Two consequences you should internalise:
 **Question.** Which design variable does thrust care about most?
 
 ```python
-from dgnozzle import differentiable_case, check_gradient
+from src import differentiable_case, check_gradient
 
 dc = differentiable_case(contour="bezier", order=1,
                          back_pressure_ratio=0.15, tolerance=1e-11)

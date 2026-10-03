@@ -1,4 +1,4 @@
-"""Entry point for ``python -m dgnozzle``."""
+"""Entry point for ``python -m src``."""
 
 from .cli import main
 

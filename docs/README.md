@@ -48,6 +48,6 @@ cd docs/tikz && pdflatex nozzle_geometry.tex
 | `mesh_map.tex` | the fixed logical grid and the design-dependent map onto it |
 
 The wall in `nozzle_geometry.tex` is the **actual** contour the solver
-produces, sampled from `dgnozzle.geometry` — not a freehand sketch. `make_tikz.py`
+produces, sampled from `src.geometry` — not a freehand sketch. `make_tikz.py`
 fails loudly rather than silently doing nothing if the figure source changes
 shape, which is what makes the CI staleness check on it worth having.

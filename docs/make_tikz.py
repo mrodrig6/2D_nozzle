@@ -3,7 +3,7 @@
 
 The geometry figure draws the *actual* contour the solver uses rather than a
 freehand sketch, so it stays honest when the contour families change.  Run this
-after editing :mod:`dgnozzle.geometry`, then recompile the figure::
+after editing :mod:`src.geometry`, then recompile the figure::
 
     python docs/make_tikz.py
     python docs/render_figures.py
@@ -24,7 +24,7 @@ sys.path.insert(0, str(ROOT))
 
 import numpy as np  # noqa: E402
 
-from dgnozzle.geometry import NozzleGeometry  # noqa: E402
+from src.geometry import NozzleGeometry  # noqa: E402
 
 SCALE = 12.0
 TARGET = ROOT / "docs" / "tikz" / "nozzle_geometry.tex"

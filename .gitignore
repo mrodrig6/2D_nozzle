@@ -29,3 +29,4 @@ docs/tikz/*.pdf
 !docs/figures/*.csv
 example_*.png
 sweep*.csv
+external_waves.png

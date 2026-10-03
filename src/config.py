@@ -4,7 +4,7 @@ Three small frozen dataclasses carry everything a run needs:
 :class:`FlowConditions` (the gas and the operating point),
 :class:`Discretization` (the mesh and polynomial order) and
 :class:`SolverOptions` (how the pseudo-time march is driven).  The nozzle shape
-lives separately in :class:`dgnozzle.geometry.NozzleGeometry`.
+lives separately in :class:`src.geometry.NozzleGeometry`.
 
 Non-dimensionalisation
 ----------------------
@@ -43,7 +43,7 @@ class FlowConditions:
         operating point: large values keep the nozzle subsonic, small values
         produce a shock in the diverging section, and at the design value the
         nozzle runs shock-free.  See
-        :func:`dgnozzle.quasi1d.operating_regime`.
+        :func:`src.quasi1d.operating_regime`.
     inflow_angle
         Inflow direction in radians, measured from the ``+x`` axis.
     entropy_fix
@@ -230,12 +230,12 @@ class SolverOptions:
         with ``1/(2p+1)`` the standard restriction for explicit DG.
 
         ``None``, the default, means
-        :func:`dgnozzle.assembly.recommended_cfl` -- 70% of the largest ``cfl``
+        :func:`src.assembly.recommended_cfl` -- 70% of the largest ``cfl``
         measured to converge at this order and scheme, so the *margin* is 30%
         whatever ``p`` is.  That matters because the textbook restriction is
         over-conservative above ``p = 0``: a fixed ``cfl = 1`` sits at 62% of the
         stable step at ``p = 0`` but only 38% at ``p = 1``, which left most of a
-        factor of two unused.  :data:`dgnozzle.assembly.STABILITY_LIMIT` has the
+        factor of two unused.  :data:`src.assembly.STABILITY_LIMIT` has the
         measured limits.
     tolerance
         Convergence threshold on the residual norm, measured against the

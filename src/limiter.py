@@ -35,7 +35,7 @@ Two limiters are provided.
     the limiter from toggling on and off in smooth regions and parking the
     residual in a limit cycle.  The threshold is the deciding parameter and it
     cuts both ways -- see :func:`superbee_limiter` and ``tvb_constant`` in
-    :class:`~dgnozzle.config.SolverOptions`.
+    :class:`~src.config.SolverOptions`.
 
 Both act by scaling the deviation from the mean:
 
@@ -369,7 +369,7 @@ def superbee_limiter(
 
     The shipped default ``tvb_constant = 50`` is the smallest value that converges every
     shock-free point tested, and at that value the limiter is nearly inactive
-    even at a shock.  :class:`~dgnozzle.config.SolverOptions` documents that
+    even at a shock.  :class:`~src.config.SolverOptions` documents that
     trade-off, which is the reason shocked points do not converge at ``p >= 1``.
     """
     if ops.ref.order == 0:

@@ -1,7 +1,7 @@
 r"""Numba nopython kernels for the DG residual.
 
 This is the performance path.  The mathematics is identical to
-:mod:`dgnozzle.assembly`; only the execution strategy differs.  Where the
+:mod:`src.assembly`; only the execution strategy differs.  Where the
 vectorised backend expresses each step as an ``einsum`` over big temporaries,
 these kernels fuse everything into two ``prange`` loops and keep intermediates in
 registers:
@@ -27,7 +27,7 @@ from numba import njit, prange
 
 FLOOR = 1e-10
 
-# Boundary tags, mirroring dgnozzle.mesh.BoundaryTag (Numba cannot see IntEnum).
+# Boundary tags, mirroring src.mesh.BoundaryTag (Numba cannot see IntEnum).
 _INFLOW = 1
 _OUTFLOW = 2
 _WALL = 3
@@ -135,7 +135,7 @@ def _roe(UL, UR, nx, ny, gamma, efix, out):
 def _hllc(UL, UR, nx, ny, gamma, low_mach, out):
     """HLLC with Batten's wave speeds.  Returns the max signal speed.
 
-    Mirrors :func:`dgnozzle.physics.hllc_flux`; ``tests/test_backends.py`` pins
+    Mirrors :func:`src.physics.hllc_flux`; ``tests/test_backends.py`` pins
     the two against each other, because two copies of a flux is two chances to
     get it wrong.
     """
@@ -501,7 +501,7 @@ def element_rate(
 
     Same arithmetic as :func:`element_pass` with ``apply_mass`` true, except
     that :math:`M^{-1}` has already been folded into the operators at build
-    time (see :class:`~dgnozzle.operators.Operators`).  That removes an
+    time (see :class:`~src.operators.Operators`).  That removes an
     ``nbf**2 * 4`` matvec per element per stage -- four per iteration -- and with
     it the ``apply_mass`` branch and the ``face_side`` indirection, since
     ``face_basis_m`` is already resolved per element.

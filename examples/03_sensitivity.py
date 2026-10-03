@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import time
 
-from dgnozzle import check_gradient, differentiable_case
+from src import check_gradient, differentiable_case
 
 
 def main() -> None:

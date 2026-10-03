@@ -1,8 +1,8 @@
 r"""JAX backend: differentiable, and the one students take gradients through.
 
 The residual is the *same* vectorised code as the NumPy backend -- only the array
-module differs.  That is the payoff of writing :mod:`dgnozzle.assembly` and
-:mod:`dgnozzle.physics` against an injected ``xp``: there is no second
+module differs.  That is the payoff of writing :mod:`src.assembly` and
+:mod:`src.physics` against an injected ``xp``: there is no second
 implementation of the physics to keep in sync, so a gradient taken here is a
 gradient of the scheme that actually ran.
 
@@ -17,7 +17,7 @@ Performance notes
 * JAX defaults to 32-bit.  :func:`enable_float64` is called on import, because a
   steady-state residual cannot be driven to 1e-6 relative in single precision.
 
-For gradients with respect to the nozzle shape, see :mod:`dgnozzle.sensitivity`,
+For gradients with respect to the nozzle shape, see :mod:`src.sensitivity`,
 which wraps the converged solve in a ``custom_vjp`` implementing the discrete
 adjoint -- far cheaper and far more accurate than differentiating through the
 pseudo-time history.

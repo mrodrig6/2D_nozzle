@@ -5,8 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dgnozzle import FlowConditions, NozzleGeometry, Regime, critical_ratios, solve_quasi1d
-from dgnozzle.quasi1d import (
+from src import FlowConditions, NozzleGeometry, Regime, critical_ratios, solve_quasi1d
+from src.quasi1d import (
     area_over_throat,
     mach_from_area,
     mach_from_pressure_ratio,

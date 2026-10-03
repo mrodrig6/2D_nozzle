@@ -1,4 +1,4 @@
-"""Command-line interface: ``python -m dgnozzle ...``.
+"""Command-line interface: ``python -m src ...``.
 
 Four subcommands, covering the workflows the lab needs without writing a script:
 
@@ -217,7 +217,7 @@ def _cmd_bench(args) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="python -m dgnozzle",
+        prog="python -m src",
         description="2D Euler DG nozzle solver",
     )
     sub = parser.add_subparsers(dest="command", required=True)

@@ -5,8 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dgnozzle import METRICS, sweep
-from dgnozzle.sweep import _is_axis, _serpentine, _split_grids
+from src import METRICS, sweep
+from src.sweep import _is_axis, _serpentine, _split_grids
 
 pytestmark = pytest.mark.slow
 

@@ -3,7 +3,7 @@ r"""The high-level interface.
 This is the layer students use.  One call takes design variables to a converged
 solution and its performance numbers::
 
-    from dgnozzle import solve_nozzle
+    from src import solve_nozzle
 
     result = solve_nozzle(area_ratio=3.0, back_pressure_ratio=0.12, order=1)
     print(result.summary())
@@ -25,7 +25,7 @@ way, the quasi-1D initial condition having already removed the transient the
 ``p = 0`` stage exists to remove.  Its value is as a fallback for a high-order
 solve that will not start at all.
 
-When it is on, the returned :class:`~dgnozzle.solver.SolveResult` reports the
+When it is on, the returned :class:`~src.solver.SolveResult` reports the
 **total** cost across all stages -- iterations, wall time and a concatenated
 residual history.  Reporting only the final stage, as an earlier version did,
 makes a continuation run look cheaper than a direct solve, which is exactly
@@ -248,7 +248,7 @@ def solve_nozzle(
         (differentiable).
     U0
         Warm start.  Must match the target order's shape; use
-        :func:`dgnozzle.initialize.change_order` to convert.  Warm-starting from
+        :func:`src.initialize.change_order` to convert.  Warm-starting from
         a neighbouring sweep point typically saves most of the iterations.
     verbose
         Print progress and a summary line.
@@ -257,8 +257,8 @@ def solve_nozzle(
     -------
     SolveResult
         Carries the solution, the operators, and the convergence record.  Check
-        :attr:`~dgnozzle.solver.SolveResult.converged` before trusting the
-        numbers; :attr:`~dgnozzle.solver.SolveResult.message` says what went
+        :attr:`~src.solver.SolveResult.converged` before trusting the
+        numbers; :attr:`~src.solver.SolveResult.message` says what went
         wrong when it is ``False``.
     """
     geo_kw, flow_kw, disc_kw, opt_kw = _split_overrides(overrides)

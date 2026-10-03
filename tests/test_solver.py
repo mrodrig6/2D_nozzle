@@ -9,7 +9,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dgnozzle import (
+from src import (
     FlowConditions,
     NozzleGeometry,
     SolverOptions,
@@ -17,8 +17,8 @@ from dgnozzle import (
     solve_nozzle,
     solve_quasi1d,
 )
-from dgnozzle.api import build_case
-from dgnozzle.initialize import change_order
+from src.api import build_case
+from src.initialize import change_order
 
 pytestmark = pytest.mark.slow
 
@@ -179,7 +179,7 @@ def test_refinement_reduces_the_entropy_error():
 
 
 def test_backends_reach_the_same_steady_state():
-    from dgnozzle.backends import available_backends
+    from src.backends import available_backends
 
     results = {}
     for backend in available_backends():
@@ -199,7 +199,7 @@ def test_divergence_is_reported_not_hidden():
 
 def test_a_mismatched_warm_start_is_rejected():
     case = build_case(NozzleGeometry(contour="smooth"), FlowConditions(), order=1)
-    from dgnozzle.solver import solve_steady
+    from src.solver import solve_steady
 
     bad = np.zeros((case.operators.n_elem, 99, 4))
     with pytest.raises(ValueError, match="expected"):

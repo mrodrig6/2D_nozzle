@@ -43,16 +43,16 @@ die() { printf '%s: %s\n' "$SELF" "$*" >&2; exit 2; }
 # An installed package wins; otherwise the repository root goes on the path, so
 # the code runs straight out of a clone with no install step and from any working
 # directory.  This is deliberately not an error: `install` is a convenience, not
-# a prerequisite.  The package sits at the root, so `python -m dgnozzle` already
+# a prerequisite.  The package sits at the root, so `python -m src` already
 # works when you are standing in the clone -- this is what makes it work when
 # you are not.
 setup_import_path() {
-    if ! "$PY" -c 'import dgnozzle' >/dev/null 2>&1; then
+    if ! "$PY" -c 'import src' >/dev/null 2>&1; then
         export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
     fi
-    if ! "$PY" -c 'import dgnozzle' >/dev/null 2>&1; then
-        printf '%s: cannot import dgnozzle.  ' "$SELF" >&2
-        "$PY" -c 'import dgnozzle' 2>&1 | tail -3 >&2
+    if ! "$PY" -c 'import src' >/dev/null 2>&1; then
+        printf '%s: cannot import the solver package.  ' "$SELF" >&2
+        "$PY" -c 'import src' 2>&1 | tail -3 >&2
         printf '\nTry:  %s/%s install\n' "." "$SELF" >&2
         exit 2
     fi
@@ -187,7 +187,7 @@ translate() {
 dgnozzle() {
     local subcommand=$1; shift
     translate "$@"
-    exec "$PY" -m dgnozzle "$subcommand" ${TRANSLATED[@]+"${TRANSLATED[@]}"}
+    exec "$PY" -m src "$subcommand" ${TRANSLATED[@]+"${TRANSLATED[@]}"}
 }
 
 # --------------------------------------------------------------------------
@@ -285,7 +285,7 @@ take the full set, 'geometry' only the geometry ones.
 
 Aliases: p=order, Q=geometry_order, ref=refine, ar=area_ratio,
 pb=back_pressure_ratio, tvb=tvb_constant.  Ordinary --flags work too, so
-anything 'python -m dgnozzle --help' documents is still available.
+anything 'python -m src --help' documents is still available.
 'M' is deliberately NOT an alias: in this code M always means Mach number.
 
 Cases ('run <name>'):
@@ -297,7 +297,7 @@ $(list_decks)
 Environment
   DG2D_PYTHON        the interpreter to use (default: python3, then python)
 
-No install is required: if dgnozzle is not importable, the repository root is
+No install is required: if the solver package is not importable, the repository root is
 put on PYTHONPATH automatically.  Documentation is in docs/ -- start with
 docs/theory.md for the formulation and docs/lab_guide.md for the exercises.
 EOF
@@ -319,16 +319,16 @@ from pathlib import Path
 
 print(f"python   {sys.version.split()[0]}  ({sys.executable})")
 
-spec = importlib.util.find_spec("dgnozzle")
+spec = importlib.util.find_spec("src")
 if spec is None:
-    print("dgnozzle NOT IMPORTABLE")
+    print("solver package NOT IMPORTABLE")
     raise SystemExit(2)
 
-import dgnozzle
-from dgnozzle.backends import available_backends
+import src
+from src.backends import available_backends
 
-where = Path(dgnozzle.__file__).parent
-print(f"dgnozzle {dgnozzle.__version__}  ({where})")
+where = Path(src.__file__).parent
+print(f"dgnozzle {src.__version__}  ({where})")
 print(f"backends {', '.join(available_backends())}")
 
 for name, what in (("numba", "the fast solver"),

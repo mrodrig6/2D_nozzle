@@ -235,7 +235,7 @@ def solve_steady(
     """Solve for the steady state on a prepared operator set.
 
     Used directly when you already hold the operators (a sweep reusing one mesh,
-    say).  Most callers want :func:`dgnozzle.api.solve_nozzle` instead.
+    say).  Most callers want :func:`src.api.solve_nozzle` instead.
     """
     opts = opts or SolverOptions()
     bk = get_backend(backend, ops, flow, opts)
@@ -247,7 +247,7 @@ def solve_steady(
         if U.shape != (ops.n_elem, ops.ref.n_basis, 4):
             raise ValueError(
                 f"U0 has shape {U.shape}, expected "
-                f"{(ops.n_elem, ops.ref.n_basis, 4)}; use dgnozzle.initialize."
+                f"{(ops.n_elem, ops.ref.n_basis, 4)}; use src.initialize."
                 "change_order or rebuild the mesh to match"
             )
     U = bk.asarray(U)

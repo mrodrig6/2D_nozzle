@@ -33,10 +33,10 @@ dev = ["pytest>=7.4", "pytest-cov", "ruff", "codespell>=2.2"]
 docs = ["pymupdf>=1.23"]
 
 [project.scripts]
-dgnozzle = "dgnozzle.cli:main"
+dgnozzle = "src.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["dgnozzle*"]
+include = ["src*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -6,10 +6,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dgnozzle import NozzleGeometry, build_case
-from dgnozzle import initialize as ini
-from dgnozzle import limiter as lim
-from dgnozzle.config import FlowConditions
+from src import NozzleGeometry, build_case
+from src import initialize as ini
+from src import limiter as lim
+from src.config import FlowConditions
 
 
 @pytest.fixture(scope="module")
@@ -208,8 +208,8 @@ def test_superbee_leaves_a_linear_field_alone(case):
 
 @pytest.mark.numba
 def test_numba_limiter_matches_the_numpy_one(case, smooth_state):
-    from dgnozzle.backends import get_backend
-    from dgnozzle.config import SolverOptions
+    from src.backends import get_backend
+    from src.config import SolverOptions
 
     ops, flow = case.operators, case.flow
     bk = get_backend("numba", ops, flow, SolverOptions(limiter="positivity"))
@@ -230,8 +230,8 @@ def test_the_cheap_screen_never_changes_the_answer(case):
     exercises both branches in the same call: most elements pass the screen, some
     fail it and pass the exact probe, and some are genuinely limited.
     """
-    from dgnozzle.backends import get_backend
-    from dgnozzle.config import SolverOptions
+    from src.backends import get_backend
+    from src.config import SolverOptions
 
     ops, flow = case.operators, case.flow
     bk = get_backend("numba", ops, flow, SolverOptions(limiter="positivity"))
@@ -263,8 +263,8 @@ def test_the_lebesgue_constant_bounds_the_probe_deviation(case):
     would not hold and an inadmissible element could be skipped, so check it
     directly against every probe point the kernel ever evaluates.
     """
-    from dgnozzle.backends import get_backend
-    from dgnozzle.config import SolverOptions
+    from src.backends import get_backend
+    from src.config import SolverOptions
 
     ops = case.operators
     bk = get_backend("numba", ops, case.flow, SolverOptions())

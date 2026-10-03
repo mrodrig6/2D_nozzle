@@ -5,10 +5,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dgnozzle import NozzleGeometry, build_case
-from dgnozzle import assembly as asm
-from dgnozzle.backends import available_backends, get_backend
-from dgnozzle.config import FlowConditions, SolverOptions
+from src import NozzleGeometry, build_case
+from src import assembly as asm
+from src.backends import available_backends, get_backend
+from src.config import FlowConditions, SolverOptions
 
 
 @pytest.fixture(scope="module")
@@ -86,11 +86,11 @@ def test_the_fused_numba_step_matches_the_shared_one(setup, scheme, limiter):
 
     It overrides ``run`` to keep every stage inside preallocated buffers, which
     means the arithmetic of ``rk4_step`` and ``ssprk3_step`` exists twice --
-    once in :class:`~dgnozzle.backends.base.Backend` for NumPy and JAX, once in
+    once in :class:`~src.backends.base.Backend` for NumPy and JAX, once in
     kernels here.  Ten steps is long enough that a wrong coefficient or a stale
     buffer shows up; `fastmath` reassociation keeps it from being exact.
     """
-    from dgnozzle import initialize
+    from src import initialize
 
     case, _ = setup
     ops, flow = case.operators, case.flow
@@ -133,12 +133,12 @@ def test_the_numba_hllc_kernel_matches_the_shared_one():
     """Two copies of a flux is two chances to get it wrong, so pin them.
 
     ``_numba_kernels._hllc`` is a hand transcription of
-    :func:`dgnozzle.physics.hllc_flux`, including the low-Mach branch and every
+    :func:`src.physics.hllc_flux`, including the low-Mach branch and every
     guarded division; nothing but a test keeps them in step.
     """
     import numpy as np
 
-    from dgnozzle.api import solve_nozzle
+    from src.api import solve_nozzle
 
     a = solve_nozzle(order=1, refine=0, flux="hllc", backend="numpy",
                      verbose=False)
@@ -158,12 +158,12 @@ def test_the_folded_rate_kernel_matches_the_unfolded_one():
     """
     import numpy as np
 
-    from dgnozzle import Discretization
-    from dgnozzle.api import build_case
-    from dgnozzle.backends import _numba_kernels as nk
-    from dgnozzle.backends import get_backend
-    from dgnozzle.config import SolverOptions
-    from dgnozzle.initialize import initial_state
+    from src import Discretization
+    from src.api import build_case
+    from src.backends import _numba_kernels as nk
+    from src.backends import get_backend
+    from src.config import SolverOptions
+    from src.initialize import initial_state
 
     for order in (0, 1, 2):
         cs = build_case(discretization=Discretization(order=order, refine=0))

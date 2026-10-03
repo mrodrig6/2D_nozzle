@@ -21,8 +21,8 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 import numpy as np
 
-from dgnozzle import sweep
-from dgnozzle.plotting import plot_sweep
+from src import sweep
+from src.plotting import plot_sweep
 
 
 def main() -> None:

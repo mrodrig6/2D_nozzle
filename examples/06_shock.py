@@ -29,7 +29,7 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 import numpy as np
 
-from dgnozzle import (
+from src import (
     FlowConditions,
     build_case,
     critical_ratios,
@@ -38,7 +38,7 @@ from dgnozzle import (
     solve_quasi1d,
     sweep,
 )
-from dgnozzle.plotting import plot_sweep
+from src.plotting import plot_sweep
 
 
 def main() -> None:
