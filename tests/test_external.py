@@ -304,3 +304,109 @@ def test_a_strong_over_expansion_stops_at_the_mach_reflection(supersonic_result)
             assert all(r.mach > 1.0 for r in jc.regions)
             return
     pytest.skip("no over-expansion in the swept range triggers a Mach disc")
+
+
+# --------------------------------------------------------------------------
+# Colouring the cells by a flow quantity
+# --------------------------------------------------------------------------
+@pytest.mark.slow
+def test_region_polygons_are_closed_triangles_covering_each_state(supersonic_result):
+    """One polygon per wave, each a non-degenerate triangle.
+
+    The fill is only meaningful if the polygons really are the regions.  The
+    open last region must be left out -- its downstream edge is a wave the march
+    has not computed, so drawing it would invent geometry.
+    """
+    from src.external import jet_wave_cells
+
+    jc = jet_wave_cells(supersonic_result, ambient_pressure_ratio=0.030, cells=3)
+    polys = jc.region_polygons()
+    assert len(polys) == len(jc.wave_segments)
+    assert len(polys) == len(jc.regions) - 1  # the open one is dropped
+    for region, poly in polys:
+        assert poly.shape == (3, 2)
+        x, y = poly[:, 0], poly[:, 1]
+        area = 0.5 * abs(x[0] * (y[1] - y[2]) + x[1] * (y[2] - y[0]) + x[2] * (y[0] - y[1]))
+        assert area > 1e-9, f"region {region.index} is degenerate"
+    # the first region is closed by the exit plane, so it owns the lip
+    first = polys[0][1]
+    assert first[:, 0].min() == pytest.approx(jc.lip_x)
+
+
+@pytest.mark.slow
+def test_velocity_ratio_follows_the_mach_number_and_stays_below_vacuum(
+    supersonic_result,
+):
+    """``v/a_t`` is a function of ``M`` alone, and bounded where ``M`` is not.
+
+    This is why it, rather than ``M``, is what the velocity plot colours by: a
+    hard expansion runs ``M`` up without the speed changing much, and the colour
+    should report the speed.
+    """
+    from src.external import jet_wave_cells
+
+    gamma = supersonic_result.flow.gamma
+    vacuum = np.sqrt(2.0 / (gamma - 1.0))
+    jc = jet_wave_cells(supersonic_result, ambient_pressure_ratio=0.030, cells=3)
+    for r in jc.regions:
+        expected = r.mach / np.sqrt(1.0 + 0.5 * (gamma - 1.0) * r.mach**2)
+        assert r.velocity_ratio == pytest.approx(expected, rel=1e-12)
+        assert 0.0 < r.velocity_ratio < vacuum
+
+
+@pytest.mark.slow
+def test_the_pressure_ramp_is_symmetric_about_ambient_in_the_log(supersonic_result):
+    """Equal multiplicative departures from ambient must get equal colour.
+
+    ``p/p_amb`` is a ratio, so a ramp linear in the value would both exaggerate
+    the high side and -- on a strong under-expansion, where the swing is 2.15x up
+    and 0.41x down -- run the scale off the bottom into negative pressure
+    ratios.  Colouring on ``log(p/p_amb)`` fixes both.  Checked here through the
+    public result rather than the plot: the extreme ratios either side of
+    ambient must be reciprocal-ish in log, i.e. map to equal and opposite ends.
+    """
+    pytest.importorskip("matplotlib")
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    from src.external import jet_wave_cells, plot_jet_field
+
+    jc = jet_wave_cells(supersonic_result, ambient_pressure_ratio=0.030, cells=3)
+    amb = jc.exit_waves.ambient_pressure_ratio
+    ratios = [r.pressure_ratio / amb for r, _ in jc.region_polygons()]
+    span = max(abs(np.log(v)) for v in ratios)
+    # the bar must reach at least as far as the furthest region, both ways
+    assert np.exp(span) >= max(ratios) - 1e-12
+    assert np.exp(-span) <= min(ratios) + 1e-12
+
+    fig, ax = plt.subplots()
+    plot_jet_field(supersonic_result, jc, quantity="pressure", ax=ax)
+    plt.close(fig)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("quantity", ["pressure", "velocity", "mach"])
+def test_every_field_quantity_draws(supersonic_result, quantity):
+    pytest.importorskip("matplotlib")
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    from src.external import jet_wave_cells, plot_jet_field
+
+    jc = jet_wave_cells(supersonic_result, ambient_pressure_ratio=0.100, cells=2)
+    fig, ax = plt.subplots()
+    plot_jet_field(supersonic_result, jc, quantity=quantity, ax=ax)
+    plt.close(fig)
+
+
+def test_an_unknown_field_quantity_is_refused():
+    """Silently colouring by the wrong thing is the one failure a reader cannot see."""
+    pytest.importorskip("matplotlib")
+    from src.external import plot_jet_field
+
+    with pytest.raises(ValueError, match="quantity must be one of"):
+        plot_jet_field(None, object(), quantity="entropy")

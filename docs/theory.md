@@ -542,7 +542,8 @@ the way was traceable to $M_{co}$ — read as an epsilon and floored at `1e-8` i
 makes $K_p/f_a$ diverge, turning a 1% pressure difference in still air into a
 mass flux of $-9.8\times10^4$. SLAU2 builds its switches ($g$, $\chi$) from the
 states themselves, so there is no constant to get wrong. `src/physics.py` carries
-the full formulation and a provenance note.
+the full formulation, checked equation by equation against Kitamura & Shima's
+Eqs. (2.3d)–(2.3l) and (3.5).
 
 **The flux evaluation is sound.** It is consistent, conservative under swapping
 the two sides and the normal, preserves a contact discontinuity exactly, upwinds
@@ -595,29 +596,64 @@ component, makes it worse), not the limiter, not a localised feature, and not a
 linear instability. Writing that down is more useful than a sixth hypothesis
 offered without a measurement behind it.
 
+One more variant was tried, and it is the one the source paper itself suggests.
+Kitamura & Shima's whole argument is that the interfacial speed of sound $c_{1/2}$
+matters: their Table 2 scores SLAU at 33 with the arithmetic mean (Eq. 2.3h, the
+default implemented here) and 35 with the critical-speed form (Eq. 2.5g), and the
+SLAU2 section calls the latter "slightly more robust". Swapping it in makes the
+residual **worse** here, 10.0 against 4.8. Six variants, six refutations.
+
 #### Why the published robustness results do not transfer
 
-The AUSM-family literature reports these schemes as *more* robust than Roe, and
-that is not in dispute here — it is a different claim about a different thing.
-Those results measure **shock robustness**: freedom from the carbuncle, reliable
-hypersonic heating, not producing negative states across a strong bow shock,
-usually in a second-order finite-volume code and often for a time-accurate run
-where the residual never has to reach a floor at all. On that axis the AUSM
-family does beat Roe, and Roe's carbuncle is a genuine, well-known defect.
+This is worth stating precisely, because the papers' own numbers make the point
+better than any argument. Kitamura's 2016 assessment scores twelve fluxes on the
+1.5D steady-normal-shock test — the standard carbuncle probe, $M_\infty = 6$, ten
+shock positions, 20 points maximum:
 
-What this solver asks for is a different property: a **damped steady state** of
-an explicit high-order DG discretisation. A flux can be excellent on the first
-axis and unusable on the second, and nothing in a shock-robustness comparison
-measures the second. A table showing van Leer's flux-vector splitting as
-competitive is the same kind of result — it is ranking shock behaviour, not
-steady DG convergence; van Leer FVS would very likely converge here, at a real
-cost in accuracy, since pure FVS smears contacts and shear badly. That is a
-testable claim and it has not been tested.
+| flux | shock-robustness score | captured shock |
+|---|---|---|
+| **Roe (E-fix)** | **0** | thin |
+| Roe | 8 | thin |
+| **HLLC** | **8** | thin |
+| AUSM⁺-up | 16 | thin |
+| HLLE | 16 | broad |
+| AUSMPW+ | 17 | thin |
+| van Leer FVS | 20 | broad |
+| Hänel FVS | 20 | broad |
+| **SLAU2** | **20** | broad |
+| AUSM⁺-up2 | 20 | broad |
+
+Read that against what happens in *this* solver, and the ranking is not merely
+different — it is **inverted**. The three fluxes that converge here are Roe
+(8), Roe with the entropy fix (**0**, the single worst scheme in the table) and
+HLLC (8). The one that fails here, SLAU2, is tied for best (20). The entropy fix
+that makes Roe usable in this DG march is precisely the modification that takes
+Roe from 8 to 0 on their test, and the 2013 paper says so explicitly: "too much
+dissipation addition to the flux yields 1D stability but in expense of Multi-D
+stability, as reported in [4] for Roe flux with entropy-fix".
+
+So the user's reading of the van Leer row was right — van Leer FVS really does
+score 20, beating Roe and HLLC. It is just that the property being scored is
+**robustness against carbuncle at a captured strong shock**, and this solver
+refuses the shocked band outright: there is no strong shock in the domain for
+that property to apply to. Meanwhile the thing the table does *not* score — a
+damped steady state of an explicit high-order DG march — is the only thing that
+matters here, and on the evidence of these ten rows it is anti-correlated with
+what the table does score.
+
+The "captured shock" column suggests why the two might genuinely trade off.
+Every scheme that scores 20 is *broad*: it spreads a discontinuity over more
+cells. Broadening is what kills the carbuncle. In a shock-free nozzle on a
+high-order basis there is nothing to broaden, so the mechanism buys nothing —
+and the schemes that are *thin*, which is what a high-order method wants, are
+exactly the ones that converge. That is a hypothesis, not a demonstration: it is
+consistent with all ten rows and with the six refutations above, but nothing here
+tests it directly.
 
 The practical conclusion is narrow. **Use `roe` or `hllc`.** `slau2` is shipped
 because reproducing the AUSM-family failure with a *parameter-free* member of the
-family is what rules out the tuning constants as the cause — that was worth
-knowing, and it is worth keeping runnable.
+family rules out the tuning constants as the cause, and because having it
+runnable is what made the comparison against the papers' own tables possible.
 
 ---
 
@@ -1273,10 +1309,10 @@ the identical code runs under NumPy, Numba and JAX.
     scheme for all speeds", *AIAA J.* **49**(8), 1693–1709, 2011. (SLAU.)
 13. K. Kitamura and E. Shima, "Towards shock-stable and accurate hypersonic
     heating computations: a new pressure flux for AUSM-family schemes",
-    *J. Comput. Phys.* **245**, 62–83, 2013. (SLAU2.)
-
-> Entries 12 and 13 were cited from the published record, not from a copy of
-> either paper — outbound network access was blocked when `slau2` was written.
-> `src.physics.slau2_flux` states the transcribed formulation in full so it can
-> be checked against them, and `tests/test_physics.py` pins the properties a
-> transcription error would break.
+    *J. Comput. Phys.* **245**, 62–83, 2013. (SLAU2; Eqs. (2.3) and (3.5) are
+    what `src.physics.slau2_flux` implements, and Table 2 is the shock-robustness
+    comparison discussed above.)
+14. K. Kitamura, "Assessment of SLAU2 and other flux functions with slope
+    limiters in hypersonic shock-interaction heating", *Computers and Fluids*
+    **129**, 134–145, 2016. (Table 2 there is the twelve-flux scoring reproduced
+    above; Table 1 is the thin/broad classification.)

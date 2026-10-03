@@ -402,20 +402,22 @@ def slau2_flux(UL, UR, nx, ny, gamma: float, *, xp=np) -> FluxResult:
     flux.
 
     .. note::
-       **Provenance.**  Transcribed from the published formulation, not from a
-       copy of the paper -- outbound access was blocked when this was written,
-       so the equations above are from memory and are stated in full precisely so
-       they can be checked against Shima & Kitamura (AIAA 2011-0059 / AIAA J.
-       49(8), 2011) and Kitamura & Shima (*J. Comput. Phys.* 245, 2013).  What
-       *is* verified here is a set of properties that a transcription error would
-       almost certainly break, in ``tests/test_physics.py``: consistency
+       **Checked against the paper, equation by equation.**  Kitamura & Shima,
+       *J. Comput. Phys.* **245**, 62-83 (2013).  The mass flux above is their
+       Eq. (2.3i); :math:`|\overline{v_n}|_{L,R}` is (2.3j);
+       :math:`|\overline{v_n}|` is (2.3k); :math:`g` is (2.3l);
+       :math:`\hat{M}` is (2.3e); :math:`\chi` is (2.3d);
+       :math:`\bar{a} = \tfrac{1}{2}(a_L + a_R)` is (2.3h), their default;
+       the split polynomials are (2.3f); and the SLAU2 pressure flux is
+       Eq. (3.5), restated as (A.2) in their Appendix.  Every one matches.
+
+       Independently, ``tests/test_physics.py`` pins five properties a
+       transcription error would break: consistency
        (:math:`\hat{\mathbf{F}}(\mathbf{U},\mathbf{U}) = \mathbf{F}\cdot
        \mathbf{n}` exactly), conservation under swapping the two sides and the
        normal, exact preservation of a contact discontinuity, upwinding of every
        convected quantity in the supersonic limit, and the :math:`O(M^2)`
        pressure-dissipation scaling, measured at 4.00 per halving of :math:`M`.
-       Those pin the structure; they do not pin a wrong coefficient that happens
-       to respect all of them.
 
     .. note::
        **Not fully upwind at a supersonic jump**, and that is the design, not a

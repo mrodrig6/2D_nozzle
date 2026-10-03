@@ -80,6 +80,16 @@ class JetRegion:
     """Radians, positive away from the axis."""
     nu: float
     """Prandtl-Meyer angle, radians."""
+    velocity_ratio: float
+    r"""``v / a_t``: speed over the stagnation sound speed.
+
+    The natural non-dimensional speed for this flow, and a function of the Mach
+    number alone, :math:`v/a_t = M\,/\sqrt{1 + \tfrac{\gamma-1}{2}M^2}`.  It is
+    bounded (unlike :math:`M`) by the vacuum value
+    :math:`\sqrt{2/(\gamma-1)}`, which is what makes it the readable thing to
+    colour by: a jet expanding hard runs the Mach number up without the speed
+    changing much, and the colour should say so.
+    """
     on_axis: bool
     """True where this region touches the symmetry axis with ``theta = 0``."""
 
@@ -101,6 +111,29 @@ class JetCells:
     exit_waves: ExitWaves
     stopped_because: str = ""
     """Empty if the requested cells were all marched; otherwise why it stopped."""
+
+    def region_polygons(self) -> list[tuple[JetRegion, np.ndarray]]:
+        r"""Each closed region paired with the region it is.
+
+        The wave nodes alternate between the jet boundary and the axis, so every
+        region after the first is the triangle on three consecutive nodes.  The
+        first is the one exception: it is closed on the left by the exit plane
+        rather than by a wave, so it is the triangle on the lip, the axis point
+        below the lip, and the first axis crossing.
+
+        The final region is left out: it has no downstream wave yet, so it is
+        open, and filling it would draw a boundary the march has not computed.
+        """
+        segs = self.wave_segments
+        if len(segs) == 0:
+            return []
+        nodes = [segs[0][0]] + [seg[1] for seg in segs]
+        out = []
+        first = np.array([[self.lip_x, self.exit_half_height], [self.lip_x, 0.0], nodes[1]])
+        out.append((self.regions[0], first))
+        for k in range(1, len(segs)):
+            out.append((self.regions[k], np.array([nodes[k - 1], nodes[k], nodes[k + 1]])))
+        return out
 
     @property
     def x_extent(self) -> float:
@@ -213,6 +246,7 @@ def jet_wave_cells(
             pressure_ratio=pt_jet * _pressure_from_mach(mach, gamma),
             flow_angle=theta,
             nu=nu,
+            velocity_ratio=float(mach / np.sqrt(1.0 + 0.5 * (gamma - 1.0) * mach * mach)),
             on_axis=on_axis,
         )
 

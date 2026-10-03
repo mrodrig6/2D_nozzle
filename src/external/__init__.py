@@ -11,7 +11,13 @@ through its reflections to the periodic cell pattern.
 from __future__ import annotations
 
 from .jet import JetCells, JetRegion, jet_wave_cells
-from .plotting import REGIME_COLOURS, plot_exit_waves, plot_jet_cells
+from .plotting import (
+    FIELD_RAMPS,
+    REGIME_COLOURS,
+    plot_exit_waves,
+    plot_jet_cells,
+    plot_jet_field,
+)
 from .plume import ExitWaves, exit_wave_structure
 from .waves import (
     deflection_from_wave_angle,
@@ -27,6 +33,7 @@ __all__ = [
     "ExitWaves",
     "JetCells",
     "JetRegion",
+    "FIELD_RAMPS",
     "REGIME_COLOURS",
     "deflection_from_wave_angle",
     "exit_wave_structure",
@@ -36,6 +43,7 @@ __all__ = [
     "oblique_shock_angle",
     "plot_exit_waves",
     "plot_jet_cells",
+    "plot_jet_field",
     "prandtl_meyer",
     "prandtl_meyer_inverse",
     "pressure_ratio_across_oblique_shock",

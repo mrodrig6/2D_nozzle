@@ -28,6 +28,12 @@ What to notice
 * Push the mismatch far enough and the march **stops**, because the regular
   reflection it assumes becomes a Mach disc. It says so rather than drawing a
   pattern that does not exist.
+* The second figure colours the regions instead of drawing the waves.  Pressure
+  gets a *diverging* ramp pinned at ambient, because what matters is which side
+  of ambient a region is on; velocity gets a *sequential* one, because it is a
+  magnitude with no special middle value.  Pressure is coloured on
+  ``log(p/p_amb)`` so that twice ambient and half ambient read as equal and
+  opposite.
 """
 
 from __future__ import annotations
@@ -35,7 +41,12 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 
 from src.api import solve_nozzle
-from src.external import exit_wave_structure, jet_wave_cells, plot_jet_cells
+from src.external import (
+    exit_wave_structure,
+    jet_wave_cells,
+    plot_jet_cells,
+    plot_jet_field,
+)
 from src.postprocess import performance
 
 
@@ -86,6 +97,25 @@ def main() -> None:
     )
     fig.savefig("example_external.png", dpi=150)
     print("wrote example_external.png")
+
+    # the same cells, coloured by what the flow is actually doing in them
+    fig2, axes2 = plt.subplots(4, 1, figsize=(10.5, 11.0), constrained_layout=True)
+    rows = [
+        (0.030, "pressure"),
+        (0.030, "velocity"),
+        (0.100, "pressure"),
+        (0.100, "velocity"),
+    ]
+    for (amb, quantity), ax in zip(rows, axes2, strict=True):
+        cells = jet_wave_cells(result, ambient_pressure_ratio=amb, cells=3)
+        plot_jet_field(result, cells, quantity=quantity, ax=ax)
+    fig2.suptitle(
+        "The same cells, coloured by pressure (diverging about ambient) "
+        "and by velocity (sequential)",
+        fontsize=12,
+    )
+    fig2.savefig("example_external_fields.png", dpi=150)
+    print("wrote example_external_fields.png")
 
 
 if __name__ == "__main__":

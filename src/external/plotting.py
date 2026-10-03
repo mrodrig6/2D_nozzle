@@ -13,7 +13,13 @@ from ..plotting import plot_contour
 from .jet import JetCells, jet_wave_cells
 from .plume import ExitWaves, exit_wave_structure
 
-__all__ = ["REGIME_COLOURS", "plot_exit_waves", "plot_jet_cells"]
+__all__ = [
+    "FIELD_RAMPS",
+    "REGIME_COLOURS",
+    "plot_exit_waves",
+    "plot_jet_cells",
+    "plot_jet_field",
+]
 
 #: One hue per regime, assigned by regime and never by position, so a figure
 #: showing two of the three keeps the same colours as one showing all three.
@@ -282,4 +288,140 @@ def plot_jet_cells(
             fontsize=8,
             color="0.35",
         )
+    return ax
+
+
+#: How each field is encoded.  The jobs differ, so the ramps differ:
+#:
+#: * **pressure** is a *polarity* -- above or below the ambient the jet is trying
+#:   to match -- so it gets a diverging ramp pinned with its neutral midpoint
+#:   exactly at ``p_amb``.  Blue reads as under-ambient (over-expanded locally),
+#:   red as over-ambient.  The midpoint carries meaning, which is the whole
+#:   reason not to use a sequential ramp here.
+#: * **velocity** and **Mach** are *magnitudes* with no special middle value, so
+#:   they get a single-hue sequential ramp, light to dark.
+#:
+#: Neither is a rainbow, and neither hue is reused from REGIME_COLOURS, so a
+#: field plot can never be misread as a regime plot.
+FIELD_RAMPS = {
+    "pressure": ("coolwarm", "diverging", r"$p / p_{amb}$"),
+    "velocity": ("Purples", "sequential", r"$v / a_t$"),
+    "mach": ("Purples", "sequential", r"$M$"),
+}
+
+
+def plot_jet_field(
+    result,
+    cells: JetCells | None = None,
+    *,
+    quantity: str = "pressure",
+    n_cells: int = 3,
+    ax=None,
+    mirror: bool = True,
+    colorbar: bool = True,
+):
+    """Fill the cell pattern, colouring each region by one flow quantity.
+
+    ``plot_jet_cells`` draws the *waves*; this draws the *regions between* them,
+    which is what makes the periodicity read as alternating states rather than
+    as a line drawing.
+
+    Parameters
+    ----------
+    quantity
+        ``'pressure'``, ``'velocity'`` or ``'mach'``.  See :data:`FIELD_RAMPS`
+        for why pressure is encoded differently from the other two.
+    n_cells
+        Shock cells to march, if ``cells`` is not supplied.
+
+    Notes
+    -----
+    Each region is drawn with a thin surface-coloured edge rather than a stroke
+    in the ramp, so neighbouring fills are separated by a gap instead of running
+    together -- the wave *is* the gap, which keeps the structure legible without
+    drawing a second set of lines over the top of the colour.
+
+    The last region is not drawn: it has no downstream wave, so its extent is
+    not something the march computed.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import Normalize
+
+    if quantity not in FIELD_RAMPS:
+        raise ValueError(f"quantity must be one of {sorted(FIELD_RAMPS)}, got {quantity!r}")
+    if cells is None:
+        cells = jet_wave_cells(result, cells=n_cells)
+    if ax is None:
+        _, ax = plt.subplots(figsize=(9.5, 3.4), constrained_layout=True)
+
+    cmap_name, kind, label = FIELD_RAMPS[quantity]
+    amb = cells.exit_waves.ambient_pressure_ratio
+    polys = cells.region_polygons()
+    if not polys:
+        raise ValueError("the march produced no closed region to fill")
+
+    def value(region):
+        if quantity == "pressure":
+            return region.pressure_ratio / amb
+        if quantity == "velocity":
+            return region.velocity_ratio
+        return region.mach
+
+    vals = [value(r) for r, _ in polys]
+    span = 0.0
+    if kind == "diverging":
+        # p/p_amb is a *ratio*, so it is symmetric in the log, not in the value:
+        # twice ambient and half ambient are equal and opposite departures.  A
+        # linear ramp centred on 1 would both exaggerate the high side and run
+        # the scale off the bottom into negative pressure ratios, which mean
+        # nothing.  So colour on log(p/p_amb), symmetric about 0.
+        logs = np.log(np.asarray(vals))
+        span = float(max(np.abs(logs).max(), 1e-9))
+        norm = Normalize(vmin=-span, vmax=span)
+
+        def colour_of(v):
+            return norm(np.log(v))
+    else:
+        norm = Normalize(vmin=min(vals), vmax=max(vals))
+        colour_of = norm
+    cmap = plt.get_cmap(cmap_name)
+
+    signs = (1.0, -1.0) if mirror else (1.0,)
+    for (_region, poly), v in zip(polys, vals, strict=True):
+        for s in signs:
+            xy = np.column_stack([poly[:, 0], s * poly[:, 1]])
+            ax.fill(
+                xy[:, 0],
+                xy[:, 1],
+                facecolor=cmap(colour_of(v)),
+                edgecolor="white",
+                linewidth=1.2,
+                zorder=2,
+            )
+
+    plot_contour(result.geometry, ax=ax, mirror=mirror, color="0.25", lw=1.4)
+    ax.axhline(0.0, color="0.35", lw=0.6, ls=":", zorder=4)
+    ax.set_xlabel("$x$")
+    ax.set_ylabel("$y$")
+    ax.set_aspect("equal", adjustable="box")
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    ew = cells.exit_waves
+    ax.set_title(
+        f"{cells.regime} jet, coloured by {quantity}"
+        f"   $p_e/p_{{amb}}$ = {ew.pressure_mismatch:.3f}   $M_e$ = {ew.exit_mach:.2f}",
+        fontsize=10,
+        loc="left",
+    )
+
+    if colorbar:
+        sm = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
+        cb = ax.figure.colorbar(sm, ax=ax, pad=0.015, fraction=0.045)
+        cb.set_label(label, fontsize=9)
+        if kind == "diverging":
+            # the bar is in log space; label it with the ratios people read
+            ticks = sorted({-span, -span / 2, 0.0, span / 2, span})
+            cb.set_ticks(ticks)
+            cb.set_ticklabels([f"{np.exp(t):.2f}" for t in ticks])
+            cb.ax.axhline(0.0, color="0.2", lw=1.0)  # ambient
     return ax

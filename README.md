@@ -623,6 +623,16 @@ real number you can compare against a photograph.
 
 ![Shock cells](docs/figures/jet_cells.png)
 
+`plot_jet_field` colours the regions instead of drawing the waves, which is what
+makes the ringing read as alternating states rather than as a line drawing. The
+two quantities are encoded differently on purpose: pressure is a *polarity* —
+which side of ambient a region sits on — so it gets a diverging ramp pinned at
+`p_amb`, on `log(p/p_amb)` so that twice ambient and half ambient are equal and
+opposite departures. Velocity is a magnitude with no special middle value, so it
+gets a single-hue sequential ramp.
+
+![Shock-cell fields](docs/figures/jet_fields.png)
+
 Two things to know before reading numbers off it. **Every wave is treated as
 isentropic**, which is what makes the pattern exactly periodic; a real jet's
 compressions steepen into shocks, lose total pressure, and the cells decay
