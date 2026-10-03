@@ -50,9 +50,10 @@ def main() -> None:
     # the full operating map from quasi-1D theory, including the refused band
     print("quasi-1D operating map across the whole range:")
     for pb in np.linspace(0.05, 0.97, 13):
-        q = solve_quasi1d(build_case(contour="smooth",
-                                     area_ratio=area_ratio).geometry,
-                          FlowConditions(back_pressure_ratio=float(pb)))
+        q = solve_quasi1d(
+            build_case(contour="smooth", area_ratio=area_ratio).geometry,
+            FlowConditions(back_pressure_ratio=float(pb)),
+        )
         mark = " " if is_shock_free(area_ratio, float(pb)) else "*"
         print(f"  {mark} p_b/p_t={pb:5.3f}  {q.regime.value}")
     print("  (* = shock inside the diverging section; the DG solver refuses it)")
@@ -64,15 +65,14 @@ def main() -> None:
         back_pressure_ratio=np.linspace(0.02, lo[1] * 0.97, 16),
         area_ratio=area_ratio,
         contour="smooth",
-        order=1,                     # the set is shock free, so p>=1 converges
+        order=1,  # the set is shock free, so p>=1 converges
         refine=1,
-        scheme="ssprk3",             # SSP stages match the positivity limiter
+        scheme="ssprk3",  # SSP stages match the positivity limiter
         max_iterations=200_000,
     )
 
     print()
-    print(table.table(("thrust_coefficient", "mass_flow_in", "exit_mach",
-                       "quasi1d_shock_x")))
+    print(table.table(("thrust_coefficient", "mass_flow_in", "exit_mach", "quasi1d_shock_x")))
     print()
     print("regimes encountered:", sorted(set(r for r in table.regimes if r)))
 
@@ -83,12 +83,21 @@ def main() -> None:
     metrics = ("thrust_coefficient", "mass_flow_in", "quasi1d_shock_x")
     for ax, metric in zip(axs, metrics, strict=True):
         plot_sweep(table, metric, ax=ax)
-        for value, label in ((crit.third, "design"),
-                             (crit.second, "shock at exit"),
-                             (crit.first, "choking")):
+        for value, label in (
+            (crit.third, "design"),
+            (crit.second, "shock at exit"),
+            (crit.first, "choking"),
+        ):
             ax.axvline(value, ls="--", lw=0.8, color="0.55")
-            ax.annotate(label, (value, ax.get_ylim()[1]), rotation=90, fontsize=7,
-                        va="top", ha="right", color="0.4")
+            ax.annotate(
+                label,
+                (value, ax.get_ylim()[1]),
+                rotation=90,
+                fontsize=7,
+                va="top",
+                ha="right",
+                color="0.4",
+            )
     axs[1].set_title("mass flow is frozen once choked", fontsize=9)
     fig.savefig("example_06.png", dpi=130, bbox_inches="tight")
     print("\nwrote example_06.png")

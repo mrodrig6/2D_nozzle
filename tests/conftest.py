@@ -42,9 +42,7 @@ def random_state():
         rng = np.random.default_rng(seed)
         base = np.array([2.0, 0.6, 0.02, 5.0])
         shape = (ops.n_elem, ops.ref.n_basis, 4)
-        return np.ascontiguousarray(
-            base * (1.0 + 0.03 * rng.standard_normal(shape))
-        )
+        return np.ascontiguousarray(base * (1.0 + 0.03 * rng.standard_normal(shape)))
 
     return make
 
@@ -65,11 +63,15 @@ def pytest_addoption(parser):
     """
     group = parser.getgroup("dgnozzle")
     group.addoption(
-        "--fast", action="store_true", default=False,
+        "--fast",
+        action="store_true",
+        default=False,
         help="run only the fast tests (equivalent to -m 'not slow')",
     )
     group.addoption(
-        "--slow", action="store_true", default=False,
+        "--slow",
+        action="store_true",
+        default=False,
         help="run only the slow tests (equivalent to -m slow)",
     )
 
@@ -84,9 +86,7 @@ def pytest_configure(config):
     fast = config.getoption("--fast")
     slow = config.getoption("--slow")
     if fast and slow:
-        raise pytest.UsageError(
-            "--fast and --slow select disjoint sets; pass neither to run both"
-        )
+        raise pytest.UsageError("--fast and --slow select disjoint sets; pass neither to run both")
     if not (fast or slow):
         return
     wanted = "not slow" if fast else "slow"

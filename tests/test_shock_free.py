@@ -44,14 +44,15 @@ MAX_ITERATIONS = 80_000
 
 def _solve(pb, order, refine, flux="roe", **kw):
     with warnings.catch_warnings():
-        warnings.simplefilter("error", RuntimeWarning)   # no shocked-band warning
+        warnings.simplefilter("error", RuntimeWarning)  # no shocked-band warning
         return solve_nozzle(
-            contour="smooth", area_ratio=AREA_RATIO, back_pressure_ratio=pb,
-            discretization=Discretization(order=order, refine=refine,
-                                          geometry_order=2),
-            options=SolverOptions(max_iterations=MAX_ITERATIONS, tolerance=1e-6,
-                                  **kw),
-            flux=flux, verbose=False,
+            contour="smooth",
+            area_ratio=AREA_RATIO,
+            back_pressure_ratio=pb,
+            discretization=Discretization(order=order, refine=refine, geometry_order=2),
+            options=SolverOptions(max_iterations=MAX_ITERATIONS, tolerance=1e-6, **kw),
+            flux=flux,
+            verbose=False,
         )
 
 
@@ -69,14 +70,14 @@ def test_the_shock_free_range_matches_the_critical_ratios():
 @pytest.mark.parametrize(
     ("pb", "free"),
     [
-        (0.03, True),            # under-expanded
-        (CRIT.third, True),      # design
-        (0.15, True),            # over-expanded
-        (CRIT.second, False),    # shock exactly on the exit plane
-        (0.50, False),           # shock in the diverging section
+        (0.03, True),  # under-expanded
+        (CRIT.third, True),  # design
+        (0.15, True),  # over-expanded
+        (CRIT.second, False),  # shock exactly on the exit plane
+        (0.50, False),  # shock in the diverging section
         (0.70, False),
         (0.95, False),
-        (0.99, True),            # unchoked, subsonic throughout
+        (0.99, True),  # unchoked, subsonic throughout
     ],
 )
 def test_is_shock_free_classifies_each_regime(pb, free):
@@ -93,17 +94,23 @@ def test_the_shocked_band_is_refused(pb):
     """
     with pytest.raises(ValueError, match="shock inside the diverging section"):
         solve_nozzle(
-            area_ratio=AREA_RATIO, back_pressure_ratio=pb, order=0,
-            options=SolverOptions(max_iterations=5), verbose=False,
+            area_ratio=AREA_RATIO,
+            back_pressure_ratio=pb,
+            order=0,
+            options=SolverOptions(max_iterations=5),
+            verbose=False,
         )
 
 
 def test_the_shocked_band_can_still_be_opted_into():
     """Refusal must be a default, not a wall: the band is worth exploring."""
     r = solve_nozzle(
-        area_ratio=AREA_RATIO, back_pressure_ratio=0.70, order=0,
+        area_ratio=AREA_RATIO,
+        back_pressure_ratio=0.70,
+        order=0,
         allow_shock_in_nozzle=True,
-        options=SolverOptions(max_iterations=20), verbose=False,
+        options=SolverOptions(max_iterations=20),
+        verbose=False,
     )
     assert not r.converged
 
@@ -112,8 +119,11 @@ def test_shock_free_points_are_accepted():
     with warnings.catch_warnings():
         warnings.simplefilter("error", RuntimeWarning)
         solve_nozzle(
-            area_ratio=AREA_RATIO, back_pressure_ratio=0.15, order=0,
-            options=SolverOptions(max_iterations=5), verbose=False,
+            area_ratio=AREA_RATIO,
+            back_pressure_ratio=0.15,
+            order=0,
+            options=SolverOptions(max_iterations=5),
+            verbose=False,
         )
 
 
@@ -128,7 +138,8 @@ def test_a_sweep_across_the_band_records_it_instead_of_aborting():
 
     table = sweep(
         back_pressure_ratio=[0.15, 0.70, 0.30],
-        area_ratio=AREA_RATIO, order=0,
+        area_ratio=AREA_RATIO,
+        order=0,
         options=SolverOptions(max_iterations=200, tolerance=1e-3),
     )
     failures = table.failures()

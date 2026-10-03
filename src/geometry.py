@@ -304,9 +304,7 @@ def wall_half_height(x, params: Mapping[str, Any], contour: str = "bell", xp=np)
         c1 = y_th + w1 * (y_ex - y_th)
         c2 = y_th + w2 * (y_ex - y_th)
         u = 1.0 - s_div
-        y_div = (
-            u**3 * y_th + 3.0 * u**2 * s_div * c1 + 3.0 * u * s_div**2 * c2 + s_div**3 * y_ex
-        )
+        y_div = u**3 * y_th + 3.0 * u**2 * s_div * c1 + 3.0 * u * s_div**2 * c2 + s_div**3 * y_ex
     else:  # pragma: no cover - guarded above
         raise AssertionError(contour)
 
@@ -352,13 +350,17 @@ def check_contour(geom: NozzleGeometry, n: int = 401) -> dict[str, float]:
 
     eps = 1e-6 * geom.length
     slope_before = float(
-        (geom.wall(np.asarray([x_throat - eps]))[0]
-         - geom.wall(np.asarray([x_throat - 3 * eps]))[0])
+        (
+            geom.wall(np.asarray([x_throat - eps]))[0]
+            - geom.wall(np.asarray([x_throat - 3 * eps]))[0]
+        )
         / (2 * eps)
     )
     slope_after = float(
-        (geom.wall(np.asarray([x_throat + 3 * eps]))[0]
-         - geom.wall(np.asarray([x_throat + eps]))[0])
+        (
+            geom.wall(np.asarray([x_throat + 3 * eps]))[0]
+            - geom.wall(np.asarray([x_throat + eps]))[0]
+        )
         / (2 * eps)
     )
 

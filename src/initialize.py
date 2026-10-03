@@ -142,8 +142,6 @@ def change_order(U, ops_from: Operators, ops_to: Operators, xp=np):
     # orders in either direction.
     from . import elements as el
 
-    phi_src, _, _ = el.shape_functions(
-        ops_from.ref.kind, ops_from.ref.order, ops_to.ref.points_vol
-    )
+    phi_src, _, _ = el.shape_functions(ops_from.ref.kind, ops_from.ref.order, ops_to.ref.points_vol)
     values = xp.einsum("iq,eis->eqs", xp.asarray(phi_src), U)
     return project(values, ops_to, xp=xp)

@@ -123,8 +123,10 @@ def test_shock_obeys_rankine_hugoniot(geom):
 
 def test_choked_mass_flow_is_independent_of_back_pressure(geom):
     """The defining property of choking."""
-    flows = [solve_quasi1d(geom, FlowConditions(back_pressure_ratio=pb)).mass_flow
-             for pb in (0.9, 0.5, 0.15)]
+    flows = [
+        solve_quasi1d(geom, FlowConditions(back_pressure_ratio=pb)).mass_flow
+        for pb in (0.9, 0.5, 0.15)
+    ]
     assert np.allclose(flows, flows[0], rtol=1e-9)
 
 

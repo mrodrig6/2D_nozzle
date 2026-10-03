@@ -38,9 +38,7 @@ def available_backends() -> tuple[str, ...]:
     return tuple(found)
 
 
-def get_backend(
-    name: str, ops: Operators, flow: FlowConditions, opts: SolverOptions
-) -> Backend:
+def get_backend(name: str, ops: Operators, flow: FlowConditions, opts: SolverOptions) -> Backend:
     """Instantiate a backend by name."""
     if name == "numpy":
         return NumpyBackend(ops, flow, opts)

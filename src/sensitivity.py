@@ -197,9 +197,7 @@ class DifferentiableCase:
         """DG operators built from design variables (differentiable)."""
         jnp = self._jnp
         full = self._merged(params)
-        coords = nozzle_node_coords(
-            self.x_frac, self.r_frac, full, self.geometry.contour, xp=jnp
-        )
+        coords = nozzle_node_coords(self.x_frac, self.r_frac, full, self.geometry.contour, xp=jnp)
         return build_operators(
             self.topology,
             coords,
@@ -276,8 +274,9 @@ class DifferentiableCase:
             geom, flow, self.discretization, self.topology, self.x_frac, self.r_frac
         )
 
-    def solve_forward(self, params: Mapping[str, Any] | None = None, *, backend="numba",
-                      U0=None, verbose=False) -> SolveResult:
+    def solve_forward(
+        self, params: Mapping[str, Any] | None = None, *, backend="numba", U0=None, verbose=False
+    ) -> SolveResult:
         """Converge the flow for these design variables, on the frozen logical grid.
 
         The grid is deliberately *not* regenerated: see
@@ -287,8 +286,12 @@ class DifferentiableCase:
 
         cs = self.case_at(params)
         return solve_nozzle(
-            case=cs, flow=cs.flow, options=self.options,
-            backend=backend, U0=U0, verbose=verbose,
+            case=cs,
+            flow=cs.flow,
+            options=self.options,
+            backend=backend,
+            U0=U0,
+            verbose=verbose,
         )
 
     def adjoint_solve(
@@ -323,8 +326,12 @@ class DifferentiableCase:
         # frozen local time step from the converged state
         _, wave = asm.residual(U, ops, flow, xp=jnp)
         dt = asm.local_time_step(
-            wave, ops, self.discretization.order, self.options.cfl,
-            self.options.scheme, xp=jnp,
+            wave,
+            ops,
+            self.discretization.order,
+            self.options.cfl,
+            self.options.scheme,
+            xp=jnp,
         )[:, None, None]
         inv_mass = ops.inv_mass
 
@@ -410,8 +417,7 @@ class DifferentiableCase:
         fwd = self.solve_forward(base, backend=backend, U0=U0, verbose=False)
         if not fwd.converged:
             raise RuntimeError(
-                "the forward solve did not converge, so no gradient can be taken: "
-                f"{fwd.message}"
+                f"the forward solve did not converge, so no gradient can be taken: {fwd.message}"
             )
         U = jnp.asarray(fwd.U)
 
@@ -523,11 +529,7 @@ def finite_difference_gradient(
         ops = res.operators
         import numpy as _np
 
-        return float(
-            objective_value(
-                res.U, ops, res.flow, objective, res.geometry, _np
-            )
-        )
+        return float(objective_value(res.U, ops, res.flow, objective, res.geometry, _np))
 
     grad: dict[str, float] = {}
     for name in names:
@@ -559,9 +561,7 @@ def check_gradient(
     tight enough or the objective is not smooth at this operating point.
     """
     value, adj, _ = dcase.value_and_gradient(objective, names=names, backend=backend)
-    fd = finite_difference_gradient(
-        dcase, objective, names=names, step=step, backend=backend
-    )
+    fd = finite_difference_gradient(dcase, objective, names=names, step=step, backend=backend)
     out: dict[str, dict[str, float]] = {}
     for name in names:
         scale = max(abs(adj[name]), abs(fd[name]), 1e-30)

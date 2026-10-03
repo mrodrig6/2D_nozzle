@@ -41,8 +41,7 @@ def test_a_sweep_with_no_axis_is_rejected():
 
 
 def test_one_dimensional_sweep():
-    table = sweep(area_ratio=np.linspace(2.0, 3.0, 3), order=0,
-                  contour="smooth", progress=False)
+    table = sweep(area_ratio=np.linspace(2.0, 3.0, 3), order=0, contour="smooth", progress=False)
     assert table.n_points == 3
     assert table.shape == (3,)
     assert table.all_converged, table.failures()
@@ -54,8 +53,7 @@ def test_one_dimensional_sweep():
 
 
 def test_warm_starting_changes_cost_but_not_the_answer():
-    kw = dict(area_ratio=np.linspace(2.0, 3.0, 4), order=1,
-              contour="smooth", progress=False)
+    kw = dict(area_ratio=np.linspace(2.0, 3.0, 4), order=1, contour="smooth", progress=False)
     warm = sweep(warm_start=True, **kw)
     cold = sweep(warm_start=False, **kw)
     assert warm.all_converged and cold.all_converged
@@ -70,8 +68,13 @@ def test_warm_starting_changes_cost_but_not_the_answer():
 
 
 def test_two_dimensional_sweep_reshapes():
-    table = sweep(area_ratio=[2.0, 2.5], back_pressure_ratio=[0.12, 0.18],
-                  order=0, contour="smooth", progress=False)
+    table = sweep(
+        area_ratio=[2.0, 2.5],
+        back_pressure_ratio=[0.12, 0.18],
+        order=0,
+        contour="smooth",
+        progress=False,
+    )
     assert table.shape == (2, 2)
     assert table.reshape("thrust").shape == (2, 2)
     assert table.all_converged, table.failures()
@@ -87,8 +90,9 @@ def test_indexing_by_parameter_and_metric():
 
 def test_failures_are_recorded_not_hidden():
     """A point that fails must leave NaN and an explanation, not silence."""
-    table = sweep(area_ratio=[2.5], order=1, contour="smooth",
-                  cfl=80.0, max_iterations=600, progress=False)
+    table = sweep(
+        area_ratio=[2.5], order=1, contour="smooth", cfl=80.0, max_iterations=600, progress=False
+    )
     if not table.all_converged:
         assert np.isnan(table["thrust"][0])
         failures = table.failures()

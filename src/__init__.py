@@ -139,8 +139,13 @@ def __getattr__(name: str):
     ``sensitivity`` needs JAX and ``plotting`` needs matplotlib.  Deferring them
     keeps ``import src`` working -- and fast -- when neither is installed.
     """
-    if name in ("differentiable_case", "check_gradient", "finite_difference_gradient",
-                "DifferentiableCase", "OBJECTIVES"):
+    if name in (
+        "differentiable_case",
+        "check_gradient",
+        "finite_difference_gradient",
+        "DifferentiableCase",
+        "OBJECTIVES",
+    ):
         from . import sensitivity
 
         return getattr(sensitivity, name)

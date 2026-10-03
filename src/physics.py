@@ -128,6 +128,7 @@ def roe_flux(UL, UR, nx, ny, gamma: float, *, entropy_fix: float = 0.05, xp=np) 
     max_speed = xp.maximum(lam1, lam2)
 
     eps = entropy_fix * c
+
     def fix(lam):
         return xp.where(lam < eps, (lam * lam + eps * eps) / (2.0 * eps), lam)
 
@@ -159,8 +160,14 @@ def roe_flux(UL, UR, nx, ny, gamma: float, *, entropy_fix: float = 0.05, xp=np) 
 
 
 def hllc_flux(
-    UL, UR, nx, ny, gamma: float, *,
-    low_mach: float = 0.0, xp=np,
+    UL,
+    UR,
+    nx,
+    ny,
+    gamma: float,
+    *,
+    low_mach: float = 0.0,
+    xp=np,
 ) -> FluxResult:
     r"""HLLC with Batten's wave speeds, optionally with a low-Mach correction.
 
@@ -250,9 +257,7 @@ def hllc_flux(
     vy = (sL_ * vyL + sR_ * vyR) / den
     H = (sL_ * HL + sR_ * HR) / den
     vn_t = vx * nx + vy * ny
-    a_t = xp.sqrt(
-        xp.maximum((gamma - 1.0) * (H - 0.5 * (vx * vx + vy * vy)), FLOOR)
-    )
+    a_t = xp.sqrt(xp.maximum((gamma - 1.0) * (H - 0.5 * (vx * vx + vy * vy)), FLOOR))
 
     SL = xp.minimum(vnL - aL, vn_t - a_t)
     SR = xp.maximum(vnR + aR, vn_t + a_t)
@@ -403,8 +408,16 @@ def inflow_flux(
 
 
 def outflow_flux(
-    U, nx, ny, gamma: float, *, p_back: float,
-    rho_t: float = 0.0, p_t: float = 1.0, backflow_band: float = 0.05, xp=np,
+    U,
+    nx,
+    ny,
+    gamma: float,
+    *,
+    p_back: float,
+    rho_t: float = 0.0,
+    p_t: float = 1.0,
+    backflow_band: float = 0.05,
+    xp=np,
 ) -> FluxResult:
     r"""Pressure outflow that switches automatically to supersonic extrapolation.
 
@@ -483,9 +496,7 @@ def outflow_flux(
         vx_bf = vn_bf * nx
         vy_bf = vn_bf * ny
         E_bf = pb / ((gamma - 1.0) * rho_bf) + 0.5 * (vx_bf * vx_bf + vy_bf * vy_bf)
-        U_bf = xp.stack(
-            [rho_bf, rho_bf * vx_bf, rho_bf * vy_bf, rho_bf * E_bf], axis=-1
-        )
+        U_bf = xp.stack([rho_bf, rho_bf * vx_bf, rho_bf * vy_bf, rho_bf * E_bf], axis=-1)
         # smooth blend over 0 <= vn/a <= band, so nothing switches discontinuously
         t = xp.clip((vn / a) / max(backflow_band, 1e-12), 0.0, 1.0)[..., None]
         U_sub = t * U_sub + (1.0 - t) * U_bf

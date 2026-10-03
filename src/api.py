@@ -51,23 +51,53 @@ from .solver import SolveHistory, SolveResult, solve_steady
 
 #: Keyword shortcuts accepted by :func:`solve_nozzle`, grouped by target object.
 _GEOMETRY_KEYS = (
-    "area_ratio", "throat_x", "throat_half_height", "inlet_half_height",
-    "length", "contour", "theta_initial_deg", "theta_exit_deg",
-    "bezier_w1", "bezier_w2",
+    "area_ratio",
+    "throat_x",
+    "throat_half_height",
+    "inlet_half_height",
+    "length",
+    "contour",
+    "theta_initial_deg",
+    "theta_exit_deg",
+    "bezier_w1",
+    "bezier_w2",
 )
 _FLOW_KEYS = (
-    "gamma", "Rgas", "total_temperature", "total_pressure",
-    "back_pressure_ratio", "inflow_angle", "entropy_fix",
-    "flux", "hllc_low_mach", "backflow", "allow_shock_in_nozzle",
+    "gamma",
+    "Rgas",
+    "total_temperature",
+    "total_pressure",
+    "back_pressure_ratio",
+    "inflow_angle",
+    "entropy_fix",
+    "flux",
+    "hllc_low_mach",
+    "backflow",
+    "allow_shock_in_nozzle",
 )
 _DISC_KEYS = (
-    "element", "order", "geometry_order", "refine", "nx", "nr",
-    "x_spacing", "cluster_strength", "cluster_width",
+    "element",
+    "order",
+    "geometry_order",
+    "refine",
+    "nx",
+    "nr",
+    "x_spacing",
+    "cluster_strength",
+    "cluster_width",
 )
 _OPTS_KEYS = (
-    "cfl", "tolerance", "max_iterations", "scheme", "limiter",
-    "initial_condition", "p_continuation", "print_interval", "divergence_factor",
-    "tvb_constant", "positivity_cfl",
+    "cfl",
+    "tolerance",
+    "max_iterations",
+    "scheme",
+    "limiter",
+    "initial_condition",
+    "p_continuation",
+    "print_interval",
+    "divergence_factor",
+    "tvb_constant",
+    "positivity_cfl",
 )
 
 
@@ -94,9 +124,7 @@ class Case:
         if order == self.discretization.order:
             return self.operators
         if order not in self._order_cache:
-            self._order_cache[order] = build_operators(
-                self.topology, self.node_coords, order
-            )
+            self._order_cache[order] = build_operators(self.topology, self.node_coords, order)
         return self._order_cache[order]
 
     def quasi1d(self, n_points: int = 601) -> Quasi1DSolution:
@@ -124,9 +152,7 @@ def _split_overrides(overrides: dict[str, Any]) -> tuple[dict, dict, dict, dict]
             opt[key] = value
         else:
             known = sorted(_GEOMETRY_KEYS + _FLOW_KEYS + _DISC_KEYS + _OPTS_KEYS)
-            raise TypeError(
-                f"unknown keyword {key!r}. Accepted shortcuts: {', '.join(known)}"
-            )
+            raise TypeError(f"unknown keyword {key!r}. Accepted shortcuts: {', '.join(known)}")
     return geo, flo, dis, opt
 
 
@@ -147,13 +173,13 @@ def build_case(
     if extra:
         raise TypeError(f"build_case got solver options {sorted(extra)}; pass them to solve_nozzle")
 
-    geom = (geometry or NozzleGeometry())
+    geom = geometry or NozzleGeometry()
     if geo_kw:
         geom = NozzleGeometry(**{**geom.as_dict(), **geo_kw})
-    flw = (flow or FlowConditions())
+    flw = flow or FlowConditions()
     if flow_kw:
         flw = flw.replace(**flow_kw)
-    dsc = (discretization or Discretization())
+    dsc = discretization or Discretization()
     if disc_kw:
         dsc = dsc.replace(**disc_kw)
 
@@ -291,8 +317,7 @@ def solve_nozzle(
     # difference between a student mis-reading the result and knowing the
     # operating point is outside what the solver can do.
     if not (
-        q1d_mod.is_shock_free(cs.geometry.area_ratio, flw.back_pressure_ratio,
-                              flw.gamma)
+        q1d_mod.is_shock_free(cs.geometry.area_ratio, flw.back_pressure_ratio, flw.gamma)
         or flw.allow_shock_in_nozzle
     ):
         lo, hi = q1d_mod.shock_free_range(cs.geometry.area_ratio, flw.gamma)
@@ -312,8 +337,9 @@ def solve_nozzle(
         print("=== dgnozzle ===")
         print(f"  {cs.geometry.describe()}")
         print(f"  {cs.topology.summary()}")
-        print(f"  p={target}, Q={disc.geometry_order}, {disc.n_dof} DOF/variable, "
-              f"backend={backend}")
+        print(
+            f"  p={target}, Q={disc.geometry_order}, {disc.n_dof} DOF/variable, backend={backend}"
+        )
         print(f"  {q1d.summary()}")
         print(f"  critical ratios: {q1d.critical.describe()}")
         print(f"  {'iter':>9s}   {'residual':>12s}")
@@ -339,8 +365,14 @@ def solve_nozzle(
         if verbose and len(orders) > 1:
             print(f"  -- stage p={order} --")
         result = solve_steady(
-            ops, flw, cs.geometry, disc.replace(order=order), stage_opts,
-            backend=backend, U0=U, progress=progress,
+            ops,
+            flw,
+            cs.geometry,
+            disc.replace(order=order),
+            stage_opts,
+            backend=backend,
+            U0=U,
+            progress=progress,
         )
         U = result.U
         prev_ops = ops  # noqa: F841

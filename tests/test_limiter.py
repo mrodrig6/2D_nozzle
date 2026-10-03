@@ -38,8 +38,8 @@ def test_limiter_is_inactive_on_a_smooth_state(case, smooth_state, kind):
 def test_limiter_restores_positivity(case, smooth_state, kind):
     ops, flow = case.operators, case.flow
     U = smooth_state.copy()
-    U[3, 0, 0] = -0.5   # density overshoot
-    U[7, 1, 3] = -1.0   # energy overshoot -> negative pressure
+    U[3, 0, 0] = -0.5  # density overshoot
+    U[7, 1, 3] = -1.0  # energy overshoot -> negative pressure
     assert lim.diagnose(U, ops, flow).min_pressure < 0.0
 
     out = lim.apply_limiter(U, ops, flow, kind)
@@ -104,9 +104,7 @@ def test_superbee_bounds_the_slope_by_the_neighbour_jump(case, smooth_state):
     allowed = lim.superbee(jump, dev)
     # on an interior face the surviving increment may not exceed what Superbee
     # admits for that jump; a slack of 1e-9 covers the single scaling factor
-    assert np.all(
-        np.abs(dev[interior]) <= np.abs(allowed[interior]) + 1e-9
-    )
+    assert np.all(np.abs(dev[interior]) <= np.abs(allowed[interior]) + 1e-9)
 
 
 def test_superbee_scales_every_component_by_the_same_factor(case, smooth_state):

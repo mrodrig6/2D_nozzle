@@ -37,9 +37,12 @@ def _flow_args(p: argparse.ArgumentParser) -> None:
 def _disc_args(p: argparse.ArgumentParser) -> None:
     g = p.add_argument_group("discretisation")
     g.add_argument("--element", default="tri", choices=("tri", "quad"))
-    g.add_argument("--flux", default="roe", choices=("roe", "hllc"),
-                   help="interface flux: Roe (most accurate) or "
-                        "HLLC (positivity-preserving)")
+    g.add_argument(
+        "--flux",
+        default="roe",
+        choices=("roe", "hllc"),
+        help="interface flux: Roe (most accurate) or HLLC (positivity-preserving)",
+    )
     g.add_argument("-p", "--order", type=int, default=1, help="polynomial order p")
     g.add_argument("-Q", "--geometry-order", type=int, default=1, help="geometry order Q")
     g.add_argument("-r", "--refine", type=int, default=0, help="refinement level")
@@ -50,30 +53,42 @@ def _solver_args(p: argparse.ArgumentParser) -> None:
     g = p.add_argument_group("solver")
     g.add_argument("--backend", default="numba", choices=("numba", "numpy", "jax"))
     g.add_argument(
-        "--cfl", type=float, default=None,
+        "--cfl",
+        type=float,
+        default=None,
         help="Courant number: cfl/(2p+1) times the geometric step. The default "
-             "is 70%% of the largest value measured to converge at this order",
+        "is 70%% of the largest value measured to converge at this order",
     )
     g.add_argument("--tolerance", type=float, default=1e-6)
     g.add_argument("--max-iterations", type=int, default=200_000)
     g.add_argument("--scheme", default="rk4", choices=("rk4", "ssprk3"))
-    g.add_argument("--limiter", default="positivity",
-                   choices=("none", "positivity", "superbee"))
-    g.add_argument("--positivity-cfl", type=float, default=0.0,
-                   help="extra time-step cap while a limiter is active "
-                        "(0 disables)")
-    g.add_argument("--allow-shock-in-nozzle", action="store_true",
-                   help="run an operating point whose shock sits inside the "
-                        "diverging section (it will not converge)")
-    g.add_argument("--backflow", action="store_true",
-                   help="treat reverse flow at the exit with its own branch")
-    g.add_argument("--tvb-constant", type=float, default=50.0,
-                   help="Cockburn-Shu TVB threshold M for limiter=superbee")
+    g.add_argument("--limiter", default="positivity", choices=("none", "positivity", "superbee"))
+    g.add_argument(
+        "--positivity-cfl",
+        type=float,
+        default=0.0,
+        help="extra time-step cap while a limiter is active (0 disables)",
+    )
+    g.add_argument(
+        "--allow-shock-in-nozzle",
+        action="store_true",
+        help="run an operating point whose shock sits inside the "
+        "diverging section (it will not converge)",
+    )
+    g.add_argument(
+        "--backflow", action="store_true", help="treat reverse flow at the exit with its own branch"
+    )
+    g.add_argument(
+        "--tvb-constant",
+        type=float,
+        default=50.0,
+        help="Cockburn-Shu TVB threshold M for limiter=superbee",
+    )
     g.add_argument(
         "--p-continuation",
         action="store_true",
         help="solve at p=0 and re-project upward; a fallback for a high-order "
-             "solve that will not start, not a speed-up",
+        "solve that will not start, not a speed-up",
     )
     g.add_argument("-q", "--quiet", action="store_true")
 
@@ -90,12 +105,30 @@ def _collect(args) -> dict:
     """
     defined = vars(args)
     names = (
-        "contour", "area_ratio", "throat_x", "theta_exit_deg",
-        "bezier_w1", "bezier_w2", "back_pressure_ratio", "gamma",
-        "element", "order", "geometry_order", "refine", "x_spacing",
+        "contour",
+        "area_ratio",
+        "throat_x",
+        "theta_exit_deg",
+        "bezier_w1",
+        "bezier_w2",
+        "back_pressure_ratio",
+        "gamma",
+        "element",
+        "order",
+        "geometry_order",
+        "refine",
+        "x_spacing",
         "flux",
-        "cfl", "tolerance", "max_iterations", "scheme", "limiter",
-        "p_continuation", "tvb_constant", "positivity_cfl", "backflow", "allow_shock_in_nozzle",
+        "cfl",
+        "tolerance",
+        "max_iterations",
+        "scheme",
+        "limiter",
+        "p_continuation",
+        "tvb_constant",
+        "positivity_cfl",
+        "backflow",
+        "allow_shock_in_nozzle",
     )
     out = {name: defined[name] for name in names if name in defined}
     if defined.get("theta_initial_deg") is not None:
@@ -125,8 +158,7 @@ def _cmd_solve(args) -> int:
             U=result.U,
             converged=result.converged,
             residual=result.residual,
-            **{f"geom_{k}": v for k, v in result.geometry.as_dict().items()
-               if v is not None},
+            **{f"geom_{k}": v for k, v in result.geometry.as_dict().items() if v is not None},
         )
         print(f"solution written to {args.save}")
     return 0 if result.converged else 1
@@ -138,8 +170,9 @@ def _cmd_sweep(args) -> int:
     values = np.linspace(args.start, args.stop, args.count)
     fixed = _collect(args)
     fixed.pop(args.parameter, None)
-    result = sweep(progress=not args.quiet, backend=args.backend,
-                   **{args.parameter: values}, **fixed)
+    result = sweep(
+        progress=not args.quiet, backend=args.backend, **{args.parameter: values}, **fixed
+    )
     print()
     print(result.table(tuple(args.metrics)))
     if args.csv:
@@ -162,9 +195,20 @@ def _cmd_geometry(args) -> int:
 
     kw = _collect(args)
     geom = NozzleGeometry(
-        **{k: v for k, v in kw.items()
-           if k in ("contour", "area_ratio", "throat_x", "theta_initial_deg",
-                    "theta_exit_deg", "bezier_w1", "bezier_w2")}
+        **{
+            k: v
+            for k, v in kw.items()
+            if k
+            in (
+                "contour",
+                "area_ratio",
+                "throat_x",
+                "theta_initial_deg",
+                "theta_exit_deg",
+                "bezier_w1",
+                "bezier_w2",
+            )
+        }
     )
     print(geom.describe())
     diag = check_contour(geom)
@@ -190,9 +234,14 @@ def _cmd_bench(args) -> int:
     from .initialize import initial_state
 
     kw = _collect(args)
-    case = build_case(**{k: v for k, v in kw.items()
-                         if k not in ("cfl", "tolerance", "max_iterations", "scheme",
-                                      "limiter", "p_continuation")})
+    case = build_case(
+        **{
+            k: v
+            for k, v in kw.items()
+            if k
+            not in ("cfl", "tolerance", "max_iterations", "scheme", "limiter", "p_continuation")
+        }
+    )
     opts = SolverOptions(cfl=args.cfl, limiter=args.limiter, scheme=args.scheme)
     ops = case.operators
     U0 = initial_state(ops, case.flow, case.geometry, "quasi1d")
@@ -240,8 +289,9 @@ def build_parser() -> argparse.ArgumentParser:
     _flow_args(w)
     _disc_args(w)
     _solver_args(w)
-    w.add_argument("--metrics", nargs="+",
-                   default=["thrust_coefficient", "exit_mach", "entropy_error"])
+    w.add_argument(
+        "--metrics", nargs="+", default=["thrust_coefficient", "exit_mach", "entropy_error"]
+    )
     w.add_argument("--csv", help="write the full table here")
     w.add_argument("--figure", help="write a plot here")
     w.set_defaults(func=_cmd_sweep)

@@ -43,9 +43,7 @@ def test_prandtl_meyer_matches_the_tables(mach, nu_deg):
 
 @pytest.mark.parametrize("mach", [1.2, 2.0, 3.5, 6.0])
 def test_prandtl_meyer_inverse_round_trips(mach):
-    assert prandtl_meyer_inverse(prandtl_meyer(mach, GAMMA), GAMMA) == pytest.approx(
-        mach, rel=1e-9
-    )
+    assert prandtl_meyer_inverse(prandtl_meyer(mach, GAMMA), GAMMA) == pytest.approx(mach, rel=1e-9)
 
 
 def test_prandtl_meyer_refuses_subsonic_flow():
@@ -79,9 +77,7 @@ def test_oblique_shock_angle_inverts_its_own_pressure_relation(mach):
 def test_the_normal_shock_is_the_strongest_attached_shock(mach):
     """One step past it must be refused, and at it beta must be 90 degrees."""
     strongest = 1.0 + 2.0 * GAMMA / (GAMMA + 1.0) * (mach**2 - 1.0)
-    assert oblique_shock_angle(mach, strongest, GAMMA) == pytest.approx(
-        np.pi / 2, rel=1e-6
-    )
+    assert oblique_shock_angle(mach, strongest, GAMMA) == pytest.approx(np.pi / 2, rel=1e-6)
     with pytest.raises(ValueError, match="detach"):
         oblique_shock_angle(mach, strongest * 1.01, GAMMA)
 
@@ -117,8 +113,13 @@ def test_max_deflection_is_between_the_mach_angle_and_normal():
 
 def _solved(pb, order=1, refine=0):
     return solve_nozzle(
-        contour="smooth", area_ratio=2.5, back_pressure_ratio=pb,
-        order=order, refine=refine, geometry_order=2, verbose=False,
+        contour="smooth",
+        area_ratio=2.5,
+        back_pressure_ratio=pb,
+        order=order,
+        refine=refine,
+        geometry_order=2,
+        verbose=False,
     )
 
 
@@ -157,8 +158,13 @@ def test_a_non_converged_solve_is_refused_rather_than_read():
     from src.config import SolverOptions
 
     r = solve_nozzle(
-        contour="smooth", area_ratio=2.5, back_pressure_ratio=0.15,
-        order=1, refine=0, options=SolverOptions(max_iterations=5), verbose=False,
+        contour="smooth",
+        area_ratio=2.5,
+        back_pressure_ratio=0.15,
+        order=1,
+        refine=0,
+        options=SolverOptions(max_iterations=5),
+        verbose=False,
     )
     assert not r.converged
     with pytest.raises(ValueError, match="converged"):

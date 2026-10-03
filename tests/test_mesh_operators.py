@@ -150,8 +150,9 @@ def test_freestream_preservation(geom, kind, order, q):
 @pytest.mark.parametrize("q", GEOM_ORDERS)
 def test_curved_elements_improve_the_geometry(geom, q):
     """Q=2 must represent the curved wall far better than Q=1 at equal element count."""
-    exact = float(np.trapezoid(np.asarray(geom.wall(np.linspace(0, 1, 400_001))),
-                               np.linspace(0, 1, 400_001)))
+    exact = float(
+        np.trapezoid(np.asarray(geom.wall(np.linspace(0, 1, 400_001))), np.linspace(0, 1, 400_001))
+    )
     errors = {}
     for qq in (1, 2):
         topo, coords, _ = build_nozzle_mesh(geom, geometry_order=qq)

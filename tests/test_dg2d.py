@@ -37,7 +37,11 @@ def run(*args, cwd=None, timeout=300):
     env.pop("PYTHONPATH", None)
     return subprocess.run(
         ["bash", str(SCRIPT), *args],
-        cwd=str(cwd or ROOT), env=env, capture_output=True, text=True, timeout=timeout,
+        cwd=str(cwd or ROOT),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
     )
 
 
@@ -54,8 +58,18 @@ def test_bash_parses_it():
 def test_help_lists_every_command(flag):
     out = run(flag)
     assert out.returncode == 0
-    for command in ("install", "check", "list", "run", "solve", "sweep",
-                    "geometry", "bench", "test", "docs"):
+    for command in (
+        "install",
+        "check",
+        "list",
+        "run",
+        "solve",
+        "sweep",
+        "geometry",
+        "bench",
+        "test",
+        "docs",
+    ):
         assert command in out.stdout
 
 
@@ -115,7 +129,11 @@ def test_a_bad_interpreter_is_reported_not_ignored():
     env["DG2D_PYTHON"] = "definitely-not-an-interpreter"
     out = subprocess.run(
         ["bash", str(SCRIPT), "check"],
-        cwd=str(ROOT), env=env, capture_output=True, text=True, timeout=60,
+        cwd=str(ROOT),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
     assert out.returncode != 0
     assert "DG2D_PYTHON" in out.stderr
@@ -224,8 +242,7 @@ def test_every_shipped_deck_has_a_summary_line(tmp_path):
 def test_a_deck_expands_to_the_values_it_holds(tmp_path):
     """``geometry @contour`` must behave as if the lines had been typed."""
     deck = run("geometry", "@contour", cwd=tmp_path)
-    typed = run("geometry", "contour=bell", "ar=2.5", "theta_initial_deg=30",
-                cwd=tmp_path)
+    typed = run("geometry", "contour=bell", "ar=2.5", "theta_initial_deg=30", cwd=tmp_path)
     assert deck.returncode == 0, deck.stderr
     assert deck.stdout == typed.stdout
 
@@ -233,8 +250,7 @@ def test_a_deck_expands_to_the_values_it_holds(tmp_path):
 def test_a_later_argument_overrides_the_deck(tmp_path):
     """The whole point of a deck is that it is a starting point, not a cage."""
     deck = run("geometry", "@contour", "ar=4.0", cwd=tmp_path)
-    typed = run("geometry", "contour=bell", "ar=4.0", "theta_initial_deg=30",
-                cwd=tmp_path)
+    typed = run("geometry", "contour=bell", "ar=4.0", "theta_initial_deg=30", cwd=tmp_path)
     assert deck.returncode == 0, deck.stderr
     assert deck.stdout == typed.stdout
     assert "AR=4.0" in deck.stdout
@@ -291,6 +307,11 @@ def test_a_self_including_deck_fails_instead_of_hanging(tmp_path):
 
 def test_a_pytest_node_id_is_not_mistaken_for_a_deck(tmp_path):
     """``test tests/x.py::name`` must not try to expand anything."""
-    out = run("test", "tests/test_dg2d.py::test_the_shipped_decks_are_listed",
-              "--collect-only", "-q", cwd=tmp_path)
+    out = run(
+        "test",
+        "tests/test_dg2d.py::test_the_shipped_decks_are_listed",
+        "--collect-only",
+        "-q",
+        cwd=tmp_path,
+    )
     assert "no deck named" not in out.stderr

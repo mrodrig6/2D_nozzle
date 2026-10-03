@@ -110,8 +110,7 @@ def test_inflow_picks_a_non_negative_mach_number():
         vx = rng.uniform(-0.9, 0.9)
         p = rng.uniform(0.05, 1.5)
         U = np.array([[rho, rho * vx, 0.0, p / (GAMMA - 1) + 0.5 * rho * vx * vx]])
-        out = ph.inflow_flux(U, np.array([-1.0]), np.array([0.0]), GAMMA,
-                             Tt=1.0, pt=1.0, Rgas=0.4)
+        out = ph.inflow_flux(U, np.array([-1.0]), np.array([0.0]), GAMMA, Tt=1.0, pt=1.0, Rgas=0.4)
         assert np.all(np.isfinite(out.flux))
         # a physical inflow carries mass INTO the domain, i.e. flux[0] <= 0
         assert out.flux[0, 0] <= 1e-12
@@ -174,8 +173,7 @@ def test_hllc_is_fully_upwind_when_supersonic(mach):
     """Supersonic means one wave family, so the branch must be the exact flux."""
     rho, a = 1.0, 1.0
     p = rho * a * a / GAMMA
-    UL = np.array([[rho, rho * mach * a, 0.0,
-                    p / (GAMMA - 1) + 0.5 * rho * (mach * a) ** 2]])
+    UL = np.array([[rho, rho * mach * a, 0.0, p / (GAMMA - 1) + 0.5 * rho * (mach * a) ** 2]])
     UR = np.array([[0.6, 0.48 * mach * a, 0.1, 0.7 * p / (GAMMA - 1) + 0.2]])
     nx, ny = np.array([1.0]), np.array([0.0])
     got = ph.hllc_flux(UL, UR, nx, ny, GAMMA).flux
@@ -196,10 +194,8 @@ def test_hllc_keeps_the_star_density_positive():
         rho_l, rho_r = rng.uniform(1e-3, 2.0, 2)
         p_l, p_r = rng.uniform(1e-4, 2.0, 2)
         u_l, u_r = rng.uniform(-6.0, 6.0), rng.uniform(-6.0, 6.0)
-        UL = np.array([[rho_l, rho_l * u_l, 0.0,
-                        p_l / (GAMMA - 1) + 0.5 * rho_l * u_l ** 2]])
-        UR = np.array([[rho_r, rho_r * u_r, 0.0,
-                        p_r / (GAMMA - 1) + 0.5 * rho_r * u_r ** 2]])
+        UL = np.array([[rho_l, rho_l * u_l, 0.0, p_l / (GAMMA - 1) + 0.5 * rho_l * u_l**2]])
+        UR = np.array([[rho_r, rho_r * u_r, 0.0, p_r / (GAMMA - 1) + 0.5 * rho_r * u_r**2]])
         nx, ny = np.array([1.0]), np.array([0.0])
         out = ph.hllc_flux(UL, UR, nx, ny, GAMMA)
         assert np.all(np.isfinite(out.flux)), (rho_l, rho_r, p_l, p_r, u_l, u_r)
@@ -231,8 +227,9 @@ def test_hllc_needs_no_entropy_fix():
     def flux_at(mach):
         u = mach * a
         U = np.array([[rho, rho * u, 0.0, p / (GAMMA - 1) + 0.5 * rho * u * u]])
-        nudge = np.array([[rho * 1.01, rho * 1.01 * u, 0.0,
-                           p * 1.01 / (GAMMA - 1) + 0.5 * rho * 1.01 * u * u]])
+        nudge = np.array(
+            [[rho * 1.01, rho * 1.01 * u, 0.0, p * 1.01 / (GAMMA - 1) + 0.5 * rho * 1.01 * u * u]]
+        )
         return ph.hllc_flux(U, nudge, nx, ny, GAMMA).flux[0, 0]
 
     # sweep through M = 1 and check the mass flux has no kink
@@ -256,8 +253,7 @@ def test_backflow_is_inert_where_the_flow_leaves():
         U = np.array([[rho, rho * u, 0.0, p / (GAMMA - 1) + 0.5 * rho * u * u]])
         nx, ny = np.array([1.0]), np.array([0.0])
         off = ph.outflow_flux(U, nx, ny, GAMMA, p_back=0.6 * p)
-        on = ph.outflow_flux(U, nx, ny, GAMMA, p_back=0.6 * p,
-                             rho_t=1.0, p_t=1.0)
+        on = ph.outflow_flux(U, nx, ny, GAMMA, p_back=0.6 * p, rho_t=1.0, p_t=1.0)
         assert np.allclose(off.flux, on.flux), f"branch leaked at M={mach}"
 
 
@@ -265,7 +261,7 @@ def test_backflow_changes_the_flux_when_the_flow_enters():
     """And it must actually do something when ``v_n < 0``, or it is dead code."""
     rho, p = 1.0, 1.0 / GAMMA
     a = np.sqrt(GAMMA * p / rho)
-    u = -0.25 * a                      # reverse flow through the exit plane
+    u = -0.25 * a  # reverse flow through the exit plane
     U = np.array([[rho, rho * u, 0.0, p / (GAMMA - 1) + 0.5 * rho * u * u]])
     nx, ny = np.array([1.0]), np.array([0.0])
     off = ph.outflow_flux(U, nx, ny, GAMMA, p_back=0.6 * p)
@@ -288,10 +284,10 @@ def test_backflow_blends_continuously_through_zero_normal_velocity():
 
     def flux_at(mach):
         u = mach * a
-        U = np.array([[rho, rho * u, 0.3 * rho * a,
-                       p / (GAMMA - 1) + 0.5 * rho * (u * u + (0.3 * a) ** 2)]])
-        return ph.outflow_flux(U, nx, ny, GAMMA, p_back=0.6 * p,
-                               rho_t=1.0, p_t=1.0).flux[0]
+        U = np.array(
+            [[rho, rho * u, 0.3 * rho * a, p / (GAMMA - 1) + 0.5 * rho * (u * u + (0.3 * a) ** 2)]]
+        )
+        return ph.outflow_flux(U, nx, ny, GAMMA, p_back=0.6 * p, rho_t=1.0, p_t=1.0).flux[0]
 
     # continuity is tested by refinement, not by a threshold: halving the
     # sample spacing must halve the largest step.  A real switch would leave it

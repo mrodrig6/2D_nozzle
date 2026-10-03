@@ -55,6 +55,12 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         run: ruff check src tests examples docs
 
+      # --check only reports; it never rewrites a file in CI.  Formatting is
+      # settled once here so it stops coming up in review.
+      - name: Format
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        run: ruff format --check src tests examples docs
+
       # The ignore list in pyproject.toml is every false positive this raises in
       # aerodynamics and LaTeX, checked individually -- Ue, nd, \oint, pres,
       # "Numer. Anal.".  Without it the check is noise; with it, it is a real

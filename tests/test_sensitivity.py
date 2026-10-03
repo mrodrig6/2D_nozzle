@@ -27,8 +27,12 @@ def dcase():
     # 'smooth' and a shock-free operating point: the limiter stays inactive, so
     # the discrete objective is smooth in the design variables
     return differentiable_case(
-        contour="smooth", order=1, refine=0,
-        back_pressure_ratio=0.15, tolerance=1e-11, max_iterations=200_000,
+        contour="smooth",
+        order=1,
+        refine=0,
+        back_pressure_ratio=0.15,
+        tolerance=1e-11,
+        max_iterations=200_000,
     )
 
 
@@ -93,8 +97,12 @@ def test_forward_solve_uses_the_frozen_logical_grid(dcase):
 
 def test_a_failed_forward_solve_refuses_to_produce_a_gradient():
     bad = differentiable_case(
-        contour="smooth", order=1, refine=0, back_pressure_ratio=0.15,
-        cfl=90.0, max_iterations=500,
+        contour="smooth",
+        order=1,
+        refine=0,
+        back_pressure_ratio=0.15,
+        cfl=90.0,
+        max_iterations=500,
     )
     with pytest.raises(RuntimeError, match="did not converge"):
         bad.value_and_gradient("thrust", names=("area_ratio",))

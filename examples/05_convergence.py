@@ -31,10 +31,14 @@ def study(contour: str, order: int, refines=(0, 1, 2)):
     dofs, errors = [], []
     for refine in refines:
         result = solve_nozzle(
-            contour=contour, order=order, refine=refine,
-            geometry_order=2,            # curved: otherwise geometry error dominates
+            contour=contour,
+            order=order,
+            refine=refine,
+            geometry_order=2,  # curved: otherwise geometry error dominates
             back_pressure_ratio=0.15,
-            tolerance=1e-9, verbose=False, max_iterations=300_000,
+            tolerance=1e-9,
+            verbose=False,
+            max_iterations=300_000,
         )
         if not result.converged:
             print(f"  skipped refine={refine}: {result.message}")
@@ -44,8 +48,10 @@ def study(contour: str, order: int, refines=(0, 1, 2)):
         rate = ""
         if len(errors) > 1:
             rate = f"   rate {np.log(errors[-2] / errors[-1]) / np.log(2.0):5.2f}"
-        print(f"  {contour:9s} p={order} refine={refine}  "
-              f"DOF={dofs[-1]:6d}  entropy error {errors[-1]:.4e}{rate}")
+        print(
+            f"  {contour:9s} p={order} refine={refine}  "
+            f"DOF={dofs[-1]:6d}  entropy error {errors[-1]:.4e}{rate}"
+        )
     return np.array(dofs), np.array(errors)
 
 
@@ -59,9 +65,13 @@ def main() -> None:
         refines = (0, 1) if order == 2 else (0, 1, 2)
         dofs, errors = study(contour, order, refines)
         if len(dofs) > 1:
-            plot_convergence_study(dofs, errors, ax=ax,
-                                   label=f"{contour}, p={order}",
-                                   expected_rate=expected if contour == "smooth" else None)
+            plot_convergence_study(
+                dofs,
+                errors,
+                ax=ax,
+                label=f"{contour}, p={order}",
+                expected_rate=expected if contour == "smooth" else None,
+            )
         print()
 
     ax.set_title("entropy error, curved elements (Q=2)", fontsize=10)

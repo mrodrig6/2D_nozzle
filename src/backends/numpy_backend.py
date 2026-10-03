@@ -28,8 +28,12 @@ class NumpyBackend(Backend):
         if self.opts.limiter == "none" or self.ops.ref.order == 0:
             return U
         out = lim.apply_limiter(
-            U, self.ops, self.flow, self.opts.limiter,
-            tvb_constant=self.opts.tvb_constant, xp=np,
+            U,
+            self.ops,
+            self.flow,
+            self.opts.limiter,
+            tvb_constant=self.opts.tvb_constant,
+            xp=np,
         )
         self.n_limit_calls += 1
         changed = np.abs(out - U).max(axis=(1, 2)) > 0.0
@@ -38,8 +42,12 @@ class NumpyBackend(Backend):
 
     def time_step(self, wave_sum):
         dt = asm.local_time_step(
-            wave_sum, self.ops, self.ops.ref.order, self.opts.cfl,
-            self.opts.scheme, xp=np,
+            wave_sum,
+            self.ops,
+            self.ops.ref.order,
+            self.opts.cfl,
+            self.opts.scheme,
+            xp=np,
         )
         return self.positivity_scale() * dt[:, None, None]
 

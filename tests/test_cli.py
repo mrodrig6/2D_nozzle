@@ -85,9 +85,7 @@ def _choices_for(option: str, subcommand: str = "solve") -> tuple[str, ...]:
     subparsers = next(
         a for a in parser._actions if isinstance(a.choices, dict) and subcommand in a.choices
     )
-    action = next(
-        a for a in subparsers.choices[subcommand]._actions if a.dest == option
-    )
+    action = next(a for a in subparsers.choices[subcommand]._actions if a.dest == option)
     return tuple(action.choices or ())
 
 
@@ -127,19 +125,44 @@ def test_solve_subcommand_end_to_end(capsys):
 @pytest.mark.slow
 def test_solve_subcommand_reports_failure_in_its_exit_code():
     """A run that does not converge must not exit 0."""
-    assert main([
-        "solve", "--order", "1", "--contour", "smooth",
-        "--cfl", "80", "--max-iterations", "600", "--quiet",
-    ]) == 1
+    assert (
+        main(
+            [
+                "solve",
+                "--order",
+                "1",
+                "--contour",
+                "smooth",
+                "--cfl",
+                "80",
+                "--max-iterations",
+                "600",
+                "--quiet",
+            ]
+        )
+        == 1
+    )
 
 
 @pytest.mark.slow
 def test_sweep_subcommand_writes_a_csv(tmp_path):
     csv = tmp_path / "sweep.csv"
-    code = main([
-        "sweep", "area_ratio", "2.0", "2.5", "2",
-        "--order", "0", "--contour", "smooth", "--quiet", "--csv", str(csv),
-    ])
+    code = main(
+        [
+            "sweep",
+            "area_ratio",
+            "2.0",
+            "2.5",
+            "2",
+            "--order",
+            "0",
+            "--contour",
+            "smooth",
+            "--quiet",
+            "--csv",
+            str(csv),
+        ]
+    )
     assert code == 0
     lines = csv.read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 3

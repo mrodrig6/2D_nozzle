@@ -33,9 +33,7 @@ def _require_matplotlib():
     try:
         import matplotlib.pyplot as plt
     except ImportError as exc:  # pragma: no cover
-        raise ImportError(
-            "plotting needs matplotlib: pip install 'dgnozzle[plot]'"
-        ) from exc
+        raise ImportError("plotting needs matplotlib: pip install 'dgnozzle[plot]'") from exc
     return plt
 
 
@@ -63,8 +61,12 @@ def plot_contour(
     xt = geom.throat_location()
     ax.axvline(xt, color="0.6", lw=0.7, ls="--")
     ax.annotate(
-        "throat", (xt, 0.0), textcoords="offset points", xytext=(4, 6),
-        fontsize=8, color="0.4",
+        "throat",
+        (xt, 0.0),
+        textcoords="offset points",
+        xytext=(4, 6),
+        fontsize=8,
+        color="0.4",
     )
     ax.set_xlabel("$x$ [m]")
     ax.set_ylabel("$y$ [m]")
@@ -103,9 +105,7 @@ def plot_mesh(
         segs.append(xy)
     from matplotlib.collections import LineCollection
 
-    ax.add_collection(
-        LineCollection(np.concatenate(segs, axis=0), colors="0.45", linewidths=lw)
-    )
+    ax.add_collection(LineCollection(np.concatenate(segs, axis=0), colors="0.45", linewidths=lw))
 
     if color_boundaries:
         palette = {
@@ -198,17 +198,22 @@ def plot_centreline(
 
     if compare_quasi1d:
         q = solve_quasi1d(result.geometry, result.flow)
-        ref = {"mach": q.mach, "pressure": q.pressure,
-               "density": q.density, "vx": q.velocity}
+        ref = {"mach": q.mach, "pressure": q.pressure, "density": q.density, "vx": q.velocity}
         ax.plot(q.x, ref[quantity], "--", color="0.4", lw=1.2, label="quasi-1D theory")
         if q.shock_x is not None:
-            ax.axvline(q.shock_x, color="tab:red", lw=0.8, ls=":",
-                       label=f"quasi-1D shock ($M_1$={q.shock_mach:.2f})")
+            ax.axvline(
+                q.shock_x,
+                color="tab:red",
+                lw=0.8,
+                ls=":",
+                label=f"quasi-1D shock ($M_1$={q.shock_mach:.2f})",
+            )
 
     ax.axvline(result.geometry.throat_location(), color="0.7", lw=0.7, ls="--")
     ax.set_xlabel("$x$ [m]")
-    ax.set_ylabel({"mach": "Mach number", "pressure": "$p$", "density": r"$\rho$",
-                   "vx": "$v_x$"}[quantity])
+    ax.set_ylabel(
+        {"mach": "Mach number", "pressure": "$p$", "density": r"$\rho$", "vx": "$v_x$"}[quantity]
+    )
     ax.legend(fontsize=8, frameon=False)
     ax.grid(alpha=0.25)
     return ax
@@ -257,8 +262,11 @@ def plot_convergence(results, ax=None, labels: Sequence[str] | None = None):
         results = [results]
     for k, res in enumerate(results):
         it, r = res.history.as_arrays()
-        lab = (labels[k] if labels else
-               f"p={res.discretization.order}, ref={res.discretization.refine}")
+        lab = (
+            labels[k]
+            if labels
+            else f"p={res.discretization.order}, ref={res.discretization.refine}"
+        )
         ax.semilogy(it, r / r[0], lw=1.4, label=lab)
     ax.set_xlabel("iteration")
     ax.set_ylabel(r"$\|\dot{U}\|_{\rm rms}$ / initial")
@@ -286,8 +294,7 @@ def plot_sweep(
             ax.legend(fontsize=8, frameon=False)
         bad = ~result.converged
         if bad.any():
-            ax.plot(x[bad], result[metric][bad], "x", color="tab:red", ms=9,
-                    label="not converged")
+            ax.plot(x[bad], result[metric][bad], "x", color="tab:red", ms=9, label="not converged")
             ax.legend(fontsize=8, frameon=False)
         ax.set_xlabel(name.replace("_", " "))
         ax.set_ylabel(metric.replace("_", " "))
@@ -310,7 +317,11 @@ def plot_sweep(
 
 
 def plot_convergence_study(
-    dofs: Sequence[float], errors: Sequence[float], ax=None, *, label: str = "",
+    dofs: Sequence[float],
+    errors: Sequence[float],
+    ax=None,
+    *,
+    label: str = "",
     expected_rate: float | None = None,
 ):
     """Log-log error against ``1/sqrt(DOF)`` with a fitted slope.

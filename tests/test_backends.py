@@ -98,9 +98,7 @@ def test_the_fused_numba_step_matches_the_shared_one(setup, scheme, limiter):
     # the perturbed state of `setup` oscillates within elements, and ten
     # unlimited steps of it diverge in both backends -- which agrees, but
     # compares NaN to NaN.  Start from the real initial condition instead.
-    U = np.ascontiguousarray(
-        initialize.initial_state(ops, flow, case.geometry, "quasi1d")
-    )
+    U = np.ascontiguousarray(initialize.initial_state(ops, flow, case.geometry, "quasi1d"))
 
     ref, res_ref = get_backend("numpy", ops, flow, opts).run(U.copy(), 10, scheme)
     out, res = get_backend("numba", ops, flow, opts).run(U.copy(), 10, scheme)
@@ -140,10 +138,8 @@ def test_the_numba_hllc_kernel_matches_the_shared_one():
 
     from src.api import solve_nozzle
 
-    a = solve_nozzle(order=1, refine=0, flux="hllc", backend="numpy",
-                     verbose=False)
-    b = solve_nozzle(order=1, refine=0, flux="hllc", backend="numba",
-                     verbose=False)
+    a = solve_nozzle(order=1, refine=0, flux="hllc", backend="numpy", verbose=False)
+    b = solve_nozzle(order=1, refine=0, flux="hllc", backend="numba", verbose=False)
     assert a.iterations == b.iterations
     assert np.abs(a.U - b.U).max() / np.abs(a.U).max() < 1e-12
 
@@ -177,9 +173,22 @@ def test_the_folded_rate_kernel_matches_the_unfolded_one():
         unfolded = np.empty_like(U)
         bk._edges(U)
         nk.element_pass(
-            U, bk._fw, bk._smax, bk._phi_vol, bk._grad_x, bk._grad_y,
-            bk._phi_face, bk._face_edge, bk._face_side, bk._face_sign,
-            bk._edge_length, bk._gamma, bk._inv_mass, True, unfolded, bk._wave,
+            U,
+            bk._fw,
+            bk._smax,
+            bk._phi_vol,
+            bk._grad_x,
+            bk._grad_y,
+            bk._phi_face,
+            bk._face_edge,
+            bk._face_side,
+            bk._face_sign,
+            bk._edge_length,
+            bk._gamma,
+            bk._inv_mass,
+            True,
+            unfolded,
+            bk._wave,
         )
         scale = max(np.abs(unfolded).max(), 1e-30)
         assert np.abs(folded - unfolded).max() / scale < 1e-12, f"order {order}"

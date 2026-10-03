@@ -139,9 +139,7 @@ def mach_from_area(area_ratio, gamma: float, supersonic: bool = False, tol: floa
 def normal_shock_mach(M1, gamma: float):
     """Downstream Mach number across a normal shock."""
     M1 = np.asarray(M1, dtype=float)
-    return np.sqrt(
-        (1.0 + 0.5 * (gamma - 1.0) * M1 * M1) / (gamma * M1 * M1 - 0.5 * (gamma - 1.0))
-    )
+    return np.sqrt((1.0 + 0.5 * (gamma - 1.0) * M1 * M1) / (gamma * M1 * M1 - 0.5 * (gamma - 1.0)))
 
 
 def normal_shock_static_pressure_ratio(M1, gamma: float):
@@ -224,8 +222,7 @@ def shock_free_range(area_ratio: float, gamma: float = 1.4):
     return (0.0, crit.second), (crit.first, 1.0)
 
 
-def is_shock_free(area_ratio: float, back_pressure_ratio: float,
-                  gamma: float = 1.4) -> bool:
+def is_shock_free(area_ratio: float, back_pressure_ratio: float, gamma: float = 1.4) -> bool:
     """True when no normal shock stands inside the diverging section.
 
     The boundary ``p_b/p_t == second`` counts as *not* shock free: that is a
@@ -344,6 +341,7 @@ def solve_quasi1d(
         pt_local = np.full_like(x, pt)
 
         if regime is Regime.SHOCK_IN_NOZZLE:
+
             def exit_pressure_for_shock(xs: float) -> float:
                 a1 = 2.0 * float(geom.wall(np.asarray([xs]))[0])
                 m1 = float(mach_from_area(a1 / a_star, gamma, supersonic=True))

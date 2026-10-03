@@ -65,9 +65,7 @@ class NumbaBackend(Backend):
             )
         self._flux_id = _KERNEL_FLUXES[_flux]
         self._low_mach = float(getattr(flow, "hllc_low_mach", 0.0))
-        self._rho_t_bf = (
-            float(flow.stagnation_density) if getattr(flow, "backflow", False) else 0.0
-        )
+        self._rho_t_bf = float(flow.stagnation_density) if getattr(flow, "backflow", False) else 0.0
         self._p_t_bf = float(flow.total_pressure)
         self._band_bf = 0.05
         ed = ops.topology.edges
@@ -137,9 +135,22 @@ class NumbaBackend(Backend):
     def residual(self, U):
         self._edges(_c(U))
         nk.element_pass(
-            _c(U), self._fw, self._smax, self._phi_vol, self._grad_x, self._grad_y,
-            self._phi_face, self._face_edge, self._face_side, self._face_sign,
-            self._edge_length, self._gamma, self._inv_mass, False, self._R, self._wave,
+            _c(U),
+            self._fw,
+            self._smax,
+            self._phi_vol,
+            self._grad_x,
+            self._grad_y,
+            self._phi_face,
+            self._face_edge,
+            self._face_side,
+            self._face_sign,
+            self._edge_length,
+            self._gamma,
+            self._inv_mass,
+            False,
+            self._R,
+            self._wave,
         )
         return self._R.copy(), self._wave.copy()
 
@@ -168,13 +179,31 @@ class NumbaBackend(Backend):
     # -- fused internals ---------------------------------------------------
     def _edges(self, U) -> None:
         nk.edge_pass(
-            U, self._phi_face, self._iedge_elem, self._iedge_face,
-            self._bedge_elem, self._bedge_face, self._bedge_tag,
-            self._edge_normal, self._edge_jac, self._w_face,
-            self._gamma, self._efix, self._flux_id, self._low_mach,
-            self._rho_t_bf, self._p_t_bf, self._band_bf,
-            self._at2, self._at, self._rho_t,
-            self._ca, self._sa, self._p_back, self._fw, self._smax,
+            U,
+            self._phi_face,
+            self._iedge_elem,
+            self._iedge_face,
+            self._bedge_elem,
+            self._bedge_face,
+            self._bedge_tag,
+            self._edge_normal,
+            self._edge_jac,
+            self._w_face,
+            self._gamma,
+            self._efix,
+            self._flux_id,
+            self._low_mach,
+            self._rho_t_bf,
+            self._p_t_bf,
+            self._band_bf,
+            self._at2,
+            self._at,
+            self._rho_t,
+            self._ca,
+            self._sa,
+            self._p_back,
+            self._fw,
+            self._smax,
         )
 
     def _rate_into(self, U, out) -> None:
@@ -185,15 +214,25 @@ class NumbaBackend(Backend):
         """
         self._edges(U)
         nk.element_rate(
-            U, self._fw, self._smax, self._phi_vol,
-            self._grad_x_m, self._grad_y_m, self._face_basis_m,
-            self._face_edge, self._face_sign, self._edge_length,
-            self._gamma, out, self._wave,
+            U,
+            self._fw,
+            self._smax,
+            self._phi_vol,
+            self._grad_x_m,
+            self._grad_y_m,
+            self._face_basis_m,
+            self._face_edge,
+            self._face_sign,
+            self._edge_length,
+            self._gamma,
+            out,
+            self._wave,
         )
 
     def _dt_into(self) -> np.ndarray:
         nk.local_dt(
-            self._wave, self._elem_area,
+            self._wave,
+            self._elem_area,
             self.positivity_scale()
             * asm.step_coefficient(self.ops.ref.order, self.opts.cfl, self.opts.scheme),
             self._dt,
@@ -220,8 +259,17 @@ class NumbaBackend(Backend):
             U[...] = limited
 
         n_scaled, n_repair = nk.positivity_limit(
-            U, self._phi_vol, self._phi_face, self._face_side, self._mean_weights,
-            self._gamma, 1e-8, self._rho_floor, self._p_floor, 12, self._lebesgue,
+            U,
+            self._phi_vol,
+            self._phi_face,
+            self._face_side,
+            self._mean_weights,
+            self._gamma,
+            1e-8,
+            self._rho_floor,
+            self._p_floor,
+            12,
+            self._lebesgue,
         )
         self.n_limited += max(int(n_scaled), n_slope)
         self.n_mean_repaired += int(n_repair)

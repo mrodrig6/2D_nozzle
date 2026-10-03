@@ -27,11 +27,11 @@ from src import check_gradient, differentiable_case
 
 def main() -> None:
     dcase = differentiable_case(
-        contour="smooth",           # shock-free and C1: the right setting for AD
+        contour="smooth",  # shock-free and C1: the right setting for AD
         order=1,
         refine=0,
         back_pressure_ratio=0.15,
-        tolerance=1e-11,            # the adjoint needs a tightly converged state
+        tolerance=1e-11,  # the adjoint needs a tightly converged state
     )
 
     names = ("area_ratio", "throat_x", "theta_exit", "inlet_half_height", "back_pressure")
@@ -40,14 +40,15 @@ def main() -> None:
 
     t0 = time.perf_counter()
     check_gradient(dcase, "thrust", names=names, step=1e-4)
-    print(f"\n(verification took {time.perf_counter() - t0:.1f} s, "
-          f"most of it in the {2 * len(names)} finite-difference solves)")
+    print(
+        f"\n(verification took {time.perf_counter() - t0:.1f} s, "
+        f"most of it in the {2 * len(names)} finite-difference solves)"
+    )
 
     # The adjoint alone, which is what you would use in an optimiser
     t0 = time.perf_counter()
     value, grad, _ = dcase.value_and_gradient("thrust", names=names)
-    print(f"\nadjoint only: {time.perf_counter() - t0:.1f} s for all "
-          f"{len(names)} derivatives")
+    print(f"\nadjoint only: {time.perf_counter() - t0:.1f} s for all {len(names)} derivatives")
     print(f"  thrust = {value:.8f}")
     for name in names:
         print(f"    d(thrust)/d({name:20s}) = {grad[name]:+.6e}")

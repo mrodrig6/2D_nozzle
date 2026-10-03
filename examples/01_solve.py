@@ -32,9 +32,9 @@ def main() -> None:
     result = solve_nozzle(
         contour="smooth",
         area_ratio=area_ratio,
-        back_pressure_ratio=0.15,   # over-expanded: shock-free inside the nozzle
+        back_pressure_ratio=0.15,  # over-expanded: shock-free inside the nozzle
         order=1,
-        geometry_order=2,           # curved elements: far better wall geometry
+        geometry_order=2,  # curved elements: far better wall geometry
         refine=0,
     )
 

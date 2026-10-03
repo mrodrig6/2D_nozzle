@@ -362,7 +362,10 @@ def _outflow(Ub, nx, ny, gamma, p_back, rho_t, p_t, band, out):
             t * mx_out + (1.0 - t) * mx_in,
             t * my_out + (1.0 - t) * my_in,
             t * en_out + (1.0 - t) * en_in,
-            nx, ny, gamma, out,
+            nx,
+            ny,
+            gamma,
+            out,
         )
         return abs(vnb) + ab
 
@@ -469,8 +472,7 @@ def edge_pass(
                 if tag == _INFLOW:
                     sp = _inflow(UL, nx, ny, gamma, at2, at, rho_t, ca, sa, flux)
                 elif tag == _OUTFLOW:
-                    sp = _outflow(UL, nx, ny, gamma, p_back,
-                                  rho_t_bf, p_t_bf, band_bf, flux)
+                    sp = _outflow(UL, nx, ny, gamma, p_back, rho_t_bf, p_t_bf, band_bf, flux)
                 else:  # _WALL or _AXIS
                     sp = _wall(UL, nx, ny, gamma, flux)
                 if sp > best:
@@ -824,8 +826,17 @@ def _probe_minima(Ue, Ubar0, Ubar1, Ubar2, Ubar3, theta, phi_vol, phi_face, fsid
 
 @njit(parallel=True, **_JIT)
 def positivity_limit(
-    U, phi_vol, phi_face, face_side, mean_weights, gamma, fraction, rho_floor, p_floor,
-    steps, lebesgue,
+    U,
+    phi_vol,
+    phi_face,
+    face_side,
+    mean_weights,
+    gamma,
+    fraction,
+    rho_floor,
+    p_floor,
+    steps,
+    lebesgue,
 ):
     r"""Zhang-Shu positivity limiter, **in place**.  Returns ``(n_scaled, n_repaired)``.
 

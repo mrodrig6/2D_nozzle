@@ -242,8 +242,15 @@ def _solve_point(
 ):
     try:
         res = solve_nozzle(
-            geometry, flow, discretization, options,
-            backend=backend, U0=U0, verbose=False, **dict(fixed), **dict(point),
+            geometry,
+            flow,
+            discretization,
+            options,
+            backend=backend,
+            U0=U0,
+            verbose=False,
+            **dict(fixed),
+            **dict(point),
         )
     except ValueError as exc:
         if "shock inside the diverging section" not in str(exc):
@@ -283,9 +290,7 @@ def _pin_worker_to_one_thread() -> None:  # pragma: no cover - runs in a subproc
 
 def _worker(args):  # pragma: no cover - runs in a subprocess
     point, fixed, geometry, flow, discretization, options, backend = args
-    res, perf = _solve_point(
-        point, fixed, geometry, flow, discretization, options, backend, None
-    )
+    res, perf = _solve_point(point, fixed, geometry, flow, discretization, options, backend, None)
     if perf is None:
         return point, None, res.converged, res.message, res.geometry, res.flow, res
     metrics = _extract(res, perf, res.geometry, res.flow)
@@ -378,7 +383,13 @@ def sweep(
             fi = flat_index(idx)
             flat_points[fi] = point
             res, perf = _solve_point(
-                point, fixed, geometry, flow, discretization, options, backend,
+                point,
+                fixed,
+                geometry,
+                flow,
+                discretization,
+                options,
+                backend,
                 U_prev if warm_start else None,
             )
             converged[fi] = res.converged

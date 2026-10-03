@@ -156,24 +156,23 @@ def exit_wave_structure(
                 "the shock detaches and this relation does not apply"
             )
         mn1 = m_e * np.sin(beta)
-        mn2 = np.sqrt(
-            (1.0 + 0.5 * (gamma - 1.0) * mn1**2)
-            / (gamma * mn1**2 - 0.5 * (gamma - 1.0))
-        )
+        mn2 = np.sqrt((1.0 + 0.5 * (gamma - 1.0) * mn1**2) / (gamma * mn1**2 - 0.5 * (gamma - 1.0)))
         m_down = float(mn2 / np.sin(beta - theta))
         return ExitWaves(
-            "over-expanded", m_e, pe, amb, mismatch, theta,
-            wave_angle=beta, downstream_mach=m_down,
+            "over-expanded",
+            m_e,
+            pe,
+            amb,
+            mismatch,
+            theta,
+            wave_angle=beta,
+            downstream_mach=m_down,
         )
 
     # under-expanded: the jet expands to ambient through a Prandtl-Meyer fan
     m_down = float(
         np.sqrt(
-            (
-                (1.0 + 0.5 * (gamma - 1.0) * m_e**2)
-                * (amb / pe) ** (-(gamma - 1.0) / gamma)
-                - 1.0
-            )
+            ((1.0 + 0.5 * (gamma - 1.0) * m_e**2) * (amb / pe) ** (-(gamma - 1.0) / gamma) - 1.0)
             / (0.5 * (gamma - 1.0))
         )
     )
@@ -181,6 +180,12 @@ def exit_wave_structure(
     lead = waves.mach_angle(m_e)
     trail = waves.mach_angle(m_down) - theta
     return ExitWaves(
-        "under-expanded", m_e, pe, amb, mismatch, theta,
-        fan_angles=(lead, trail), downstream_mach=m_down,
+        "under-expanded",
+        m_e,
+        pe,
+        amb,
+        mismatch,
+        theta,
+        fan_angles=(lead, trail),
+        downstream_mach=m_down,
     )

@@ -159,8 +159,7 @@ def march(
         if progress is not None:
             progress(done, float(res))
         elif opts.print_interval > 0 and done >= next_print:
-            print(f"  {label}{done:>7d}   {res / scale:.6e}   "
-                  f"({res / res0:.3e} of initial)")
+            print(f"  {label}{done:>7d}   {res / scale:.6e}   ({res / res0:.3e} of initial)")
             next_print = done + opts.print_interval
 
         if not np.isfinite(res):
@@ -205,9 +204,7 @@ def march(
                         "reduce the polynomial order, or move the operating point"
                     )
                 else:
-                    message += (
-                        ". Try a smaller cfl, scheme='ssprk3', or a finer mesh"
-                    )
+                    message += ". Try a smaller cfl, scheme='ssprk3', or a finer mesh"
                 break
 
     if not converged and not message:

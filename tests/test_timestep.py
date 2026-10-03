@@ -61,9 +61,7 @@ def test_cfl_keeps_its_traditional_meaning():
 
     for order in range(5):
         for cfl in (0.25, 1.0, 2.0):
-            assert asm.step_coefficient(order, cfl) == pytest.approx(
-                cfl / (2 * order + 1)
-            )
+            assert asm.step_coefficient(order, cfl) == pytest.approx(cfl / (2 * order + 1))
 
 
 def test_the_default_holds_the_margin_constant_instead_of_the_number():
@@ -74,9 +72,7 @@ def test_the_default_holds_the_margin_constant_instead_of_the_number():
     """
     from src import assembly as asm
 
-    margins = [
-        asm.recommended_cfl(p, "rk4") / asm.stability_limit(p, "rk4") for p in range(4)
-    ]
+    margins = [asm.recommended_cfl(p, "rk4") / asm.stability_limit(p, "rk4") for p in range(4)]
     assert all(abs(m - asm.CFL_MARGIN) < 1e-12 for m in margins)
     # and it is genuinely order-dependent, not a constant in disguise
     assert asm.recommended_cfl(1, "rk4") > 1.5 * asm.recommended_cfl(0, "rk4")

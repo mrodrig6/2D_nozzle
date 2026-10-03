@@ -172,8 +172,7 @@ def build_edges(
         uniq, starts = np.unique(bedge_tag, return_index=True)
         stops = np.append(starts[1:], bedge_tag.size)
         tag_slices = {
-            int(t): slice(int(a), int(b))
-            for t, a, b in zip(uniq, starts, stops, strict=True)
+            int(t): slice(int(a), int(b)) for t, a, b in zip(uniq, starts, stops, strict=True)
         }
 
     # -- gather map: every (element, local face) points at one global edge
@@ -405,8 +404,10 @@ def structured_nozzle_topology(
     base_j = (cj * q).ravel()
 
     elem_nodes = np.concatenate(
-        [node_id(base_i[:, None] + off[None, :, 0], base_j[:, None] + off[None, :, 1])
-         for off in offsets],
+        [
+            node_id(base_i[:, None] + off[None, :, 0], base_j[:, None] + off[None, :, 1])
+            for off in offsets
+        ],
         axis=0,
     )
 
@@ -425,8 +426,15 @@ def structured_nozzle_topology(
         elem_nodes=elem_nodes,
         n_nodes=n_ix * n_iy,
         edges=conn,
-        logical={"nx_cells": ncx, "nr_cells": ncy, "nx_nodes": n_ix, "nr_nodes": n_iy,
-                 "refine": refine, "nx_base": nx, "nr_base": nr},
+        logical={
+            "nx_cells": ncx,
+            "nr_cells": ncy,
+            "nx_nodes": n_ix,
+            "nr_nodes": n_iy,
+            "refine": refine,
+            "nx_base": nx,
+            "nr_base": nr,
+        },
     )
     return topo, x_frac, r_frac
 
@@ -449,9 +457,7 @@ def nozzle_x_distribution(
     elif spacing == "throat":
         base = _clustered_x_distribution(nx_base, x_throat, cluster_strength, cluster_width)
     else:
-        raise ValueError(
-            f"unknown x_spacing {spacing!r}; use 'throat', 'inlet' or 'uniform'"
-        )
+        raise ValueError(f"unknown x_spacing {spacing!r}; use 'throat', 'inlet' or 'uniform'")
     x = _subdivide(base, n_sub)
     if x.size != n_nodes_x:  # pragma: no cover - guarded by construction
         raise AssertionError(f"expected {n_nodes_x} axial nodes, built {x.size}")

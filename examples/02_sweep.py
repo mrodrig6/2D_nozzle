@@ -29,16 +29,17 @@ def main() -> None:
     area_ratios = np.linspace(2.0, 4.5, 11)
 
     table = sweep(
-        area_ratio=area_ratios,   # iterable -> a sweep axis
-        contour="smooth",         # scalars  -> fixed settings
+        area_ratio=area_ratios,  # iterable -> a sweep axis
+        contour="smooth",  # scalars  -> fixed settings
         order=1,
-        refine=1,                 # ref=0 under-resolves the largest area ratios
+        refine=1,  # ref=0 under-resolves the largest area ratios
         back_pressure_ratio=0.15,
     )
 
     print()
-    print(table.table(("thrust_coefficient", "exit_mach", "quasi1d_exit_mach",
-                       "thrust_efficiency")))
+    print(
+        table.table(("thrust_coefficient", "exit_mach", "quasi1d_exit_mach", "thrust_efficiency"))
+    )
 
     for point, why in table.failures():
         print(f"\nFAILED at {point}: {why}")
@@ -46,9 +47,11 @@ def main() -> None:
     ok = table.converged
     if ok.any():
         best = int(np.argmax(np.where(ok, table["thrust_coefficient"], -np.inf)))
-        print(f"\nbest thrust coefficient at area_ratio = "
-              f"{table['area_ratio'][best]:.3f}: "
-              f"c_F = {table['thrust_coefficient'][best]:.5f}")
+        print(
+            f"\nbest thrust coefficient at area_ratio = "
+            f"{table['area_ratio'][best]:.3f}: "
+            f"c_F = {table['thrust_coefficient'][best]:.5f}"
+        )
 
     table.to_csv("sweep_area_ratio.csv")
     print("wrote sweep_area_ratio.csv")

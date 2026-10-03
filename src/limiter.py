@@ -215,9 +215,7 @@ def positivity_limiter(
     probes = probe_values(U, ops, xp=xp)
 
     rho_bar = ubar[..., 0]
-    p_bar = (gamma - 1.0) * (
-        ubar[..., 3] - 0.5 * (ubar[..., 1] ** 2 + ubar[..., 2] ** 2) / rho_bar
-    )
+    p_bar = (gamma - 1.0) * (ubar[..., 3] - 0.5 * (ubar[..., 1] ** 2 + ubar[..., 2] ** 2) / rho_bar)
     eps_rho = xp.maximum(fraction * rho_bar, 0.5 * rho_floor)
     eps_p = xp.maximum(fraction * p_bar, 0.5 * p_floor)
 
@@ -286,8 +284,13 @@ def face_trace_means(U, ops: Operators, xp=np):
 
 
 def superbee_limiter(
-    U, ops: Operators, flow: FlowConditions, *, tvb_constant: float = 50.0,
-    xp=np, tol: float = 1e-12,
+    U,
+    ops: Operators,
+    flow: FlowConditions,
+    *,
+    tvb_constant: float = 50.0,
+    xp=np,
+    tol: float = 1e-12,
 ):
     r"""Superbee TVD slope limiter on the cell-average neighbourhood.
 
@@ -389,8 +392,8 @@ def superbee_limiter(
     # a face that is not limiting: no increment to limit, a domain boundary, or
     # an increment below the TVB threshold
     area = xp.asarray(ops.elem_area)
-    share = (area / area.sum())[:, None, None]          # stands in for (h/L)^2
-    scale = xp.abs(ubar).max(axis=0)[None, None, :]     # global, per component
+    share = (area / area.sum())[:, None, None]  # stands in for (h/L)^2
+    scale = xp.abs(ubar).max(axis=0)[None, None, :]  # global, per component
     threshold = tvb_constant * share * scale
     quiet = (xp.abs(dev) <= tol) | ~interior | (xp.abs(dev) <= threshold)
     theta_face = xp.where(quiet, 1.0, theta_face)
@@ -403,8 +406,13 @@ def superbee_limiter(
 
 
 def apply_limiter(
-    U, ops: Operators, flow: FlowConditions, kind: str, *,
-    tvb_constant: float = 50.0, xp=np,
+    U,
+    ops: Operators,
+    flow: FlowConditions,
+    kind: str,
+    *,
+    tvb_constant: float = 50.0,
+    xp=np,
 ):
     """Dispatch to the requested limiter.  ``'none'`` returns ``U`` unchanged."""
     if kind == "none" or ops.ref.order == 0:
@@ -426,8 +434,8 @@ def diagnose(U, ops: Operators, flow: FlowConditions, xp=np) -> LimiterDiagnosti
     probes = probe_values(U, ops, xp=xp)
     rho = probes[..., 0]
     p = (flow.gamma - 1.0) * (
-        probes[..., 3] - 0.5 * (probes[..., 1] ** 2 + probes[..., 2] ** 2)
-        / xp.where(rho != 0.0, rho, 1.0)
+        probes[..., 3]
+        - 0.5 * (probes[..., 1] ** 2 + probes[..., 2] ** 2) / xp.where(rho != 0.0, rho, 1.0)
     )
     return LimiterDiagnostics(
         n_limited=0,

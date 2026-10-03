@@ -77,14 +77,22 @@ class JaxBackend(Backend):
 
     def limit(self, U):
         return lim.apply_limiter(
-            U, self.ops, self.flow, self.opts.limiter,
-            tvb_constant=self.opts.tvb_constant, xp=self.jnp,
+            U,
+            self.ops,
+            self.flow,
+            self.opts.limiter,
+            tvb_constant=self.opts.tvb_constant,
+            xp=self.jnp,
         )
 
     def time_step(self, wave_sum):
         dt = asm.local_time_step(
-            wave_sum, self.ops, self.ops.ref.order, self.opts.cfl,
-            self.opts.scheme, xp=self.jnp,
+            wave_sum,
+            self.ops,
+            self.ops.ref.order,
+            self.opts.cfl,
+            self.opts.scheme,
+            xp=self.jnp,
         )
         return self.positivity_scale() * dt[:, None, None]
 

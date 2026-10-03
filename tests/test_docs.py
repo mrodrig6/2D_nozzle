@@ -24,9 +24,7 @@ from pathlib import Path
 
 import pytest
 
-DOCS = sorted(
-    [Path("README.md"), *Path("docs").glob("*.md"), Path("examples/README.md")]
-)
+DOCS = sorted([Path("README.md"), *Path("docs").glob("*.md"), Path("examples/README.md")])
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -134,5 +132,5 @@ def test_every_text_file_is_read_as_utf_8():
                 offenders.append(f"{path.relative_to(ROOT)}:{i}: {line.strip()}")
     assert not offenders, (
         "these calls use the locale's default encoding, which breaks on "
-        "Windows; pass encoding=\"utf-8\":\n  " + "\n  ".join(offenders)
+        'Windows; pass encoding="utf-8":\n  ' + "\n  ".join(offenders)
     )

@@ -358,9 +358,7 @@ class SolverOptions:
         if self.scheme not in ("rk4", "ssprk3"):
             raise ValueError(f"scheme must be 'rk4' or 'ssprk3', got {self.scheme!r}")
         if not 0.0 <= self.positivity_cfl <= 1.0:
-            raise ValueError(
-                f"positivity_cfl must lie in [0, 1], got {self.positivity_cfl}"
-            )
+            raise ValueError(f"positivity_cfl must lie in [0, 1], got {self.positivity_cfl}")
         if self.tvb_constant < 0.0:
             raise ValueError(f"tvb_constant must be non-negative, got {self.tvb_constant}")
         if self.limiter not in ("none", "positivity", "superbee"):

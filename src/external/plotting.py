@@ -26,8 +26,13 @@ REGIME_COLOURS = {
 
 
 def plot_exit_waves(
-    result, waves: ExitWaves | None = None, *, ax=None, mirror: bool = True,
-    extent: float = 0.45, label: bool = True,
+    result,
+    waves: ExitWaves | None = None,
+    *,
+    ax=None,
+    mirror: bool = True,
+    extent: float = 0.45,
+    label: bool = True,
 ):
     """Plot the nozzle wall and the first wave leaving the lip.
 
@@ -55,10 +60,17 @@ def plot_exit_waves(
         """A line from the lip at ``angle`` below the axis direction."""
         dx = reach
         dy = -reach * np.tan(angle)
-        for s in ((1.0,) if not mirror else (1.0, -1.0)):
-            ax.plot([length, length + dx], [s * y_lip, s * (y_lip + dy)],
-                    style, color=colour, lw=width, alpha=alpha,
-                    solid_capstyle="round", zorder=3)
+        for s in (1.0,) if not mirror else (1.0, -1.0):
+            ax.plot(
+                [length, length + dx],
+                [s * y_lip, s * (y_lip + dy)],
+                style,
+                color=colour,
+                lw=width,
+                alpha=alpha,
+                solid_capstyle="round",
+                zorder=3,
+            )
 
     if waves.regime == "over-expanded":
         # a single oblique shock, drawn solid: it is a discontinuity
@@ -84,21 +96,29 @@ def plot_exit_waves(
         ax.set_title(
             f"{waves.regime}   $p_e/p_{{amb}}$ = {waves.pressure_mismatch:.3f}"
             f"   $M_e$ = {waves.exit_mach:.2f}",
-            fontsize=10, loc="left", color="0.2",
+            fontsize=10,
+            loc="left",
+            color="0.2",
         )
         if waves.regime != "design":
             # The waves run downstream and *toward* the axis in both regimes,
             # even though the under-expanded jet turns outward.  These are Mach
             # waves and a shock, not streamlines, and conflating the two is the
             # standard way to misread this picture.
-            kind = ("expansion fan (Mach waves)" if waves.regime == "under-expanded"
-                    else "oblique shock")
+            kind = (
+                "expansion fan (Mach waves)"
+                if waves.regime == "under-expanded"
+                else "oblique shock"
+            )
             way = "outward" if waves.regime == "under-expanded" else "inward"
             ax.text(
-                0.99, 0.06,
-                f"{kind} \u2014 flow turns "
-                f"{abs(np.degrees(waves.turn_angle)):.1f}\u00b0 {way}",
-                transform=ax.transAxes, fontsize=8, color=colour,
-                ha="right", va="bottom",
+                0.99,
+                0.06,
+                f"{kind} \u2014 flow turns {abs(np.degrees(waves.turn_angle)):.1f}\u00b0 {way}",
+                transform=ax.transAxes,
+                fontsize=8,
+                color=colour,
+                ha="right",
+                va="bottom",
             )
     return ax

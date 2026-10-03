@@ -321,9 +321,7 @@ def scalar_field(state: np.ndarray, flow: FlowConditions, name: str) -> np.ndarr
     if name == "velocity":
         return np.asarray(np.sqrt(vx * vx + vy * vy))
     if name == "entropy":
-        s_t = flow.total_pressure ** (1.0 - gamma) * (
-            flow.Rgas * flow.total_temperature
-        ) ** gamma
+        s_t = flow.total_pressure ** (1.0 - gamma) * (flow.Rgas * flow.total_temperature) ** gamma
         return np.asarray((p / rho**gamma) / s_t)
     raise ValueError(f"unknown scalar {name!r}; choose from {SCALARS}")
 
@@ -356,9 +354,7 @@ def sample_field(
             for i in range(n - j):
                 tris.append([index[(i, j)], index[(i + 1, j)], index[(i, j + 1)]])
                 if i + j < n - 1:
-                    tris.append(
-                        [index[(i + 1, j)], index[(i + 1, j + 1)], index[(i, j + 1)]]
-                    )
+                    tris.append([index[(i + 1, j)], index[(i + 1, j + 1)], index[(i, j + 1)]])
     else:
         ij = [(i, j) for j in range(n + 1) for i in range(n + 1)]
         index = {p: k for k, p in enumerate(ij)}

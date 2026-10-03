@@ -53,9 +53,7 @@ def volume_term(U, ops: Operators, flow: FlowConditions, xp=np):
     r"""The element integral :math:`-\int \nabla\phi_i \cdot \vec{F}\,d\Omega`."""
     u_q = xp.einsum("iq,eis->eqs", xp.asarray(ops.ref.phi_vol), U)
     F, G = ph.euler_flux(u_q, flow.gamma, xp=xp)
-    return -(
-        xp.einsum("eiq,eqs->eis", ops.grad_x, F) + xp.einsum("eiq,eqs->eis", ops.grad_y, G)
-    )
+    return -(xp.einsum("eiq,eqs->eis", ops.grad_x, F) + xp.einsum("eiq,eqs->eis", ops.grad_y, G))
 
 
 def edge_fluxes(U, ops: Operators, flow: FlowConditions, xp=np):
@@ -79,13 +77,16 @@ def edge_fluxes(U, ops: Operators, flow: FlowConditions, xp=np):
     nx_i, ny_i = nrm[:ni, :, 0], nrm[:ni, :, 1]
     if flow.flux == "hllc":
         interior = ph.hllc_flux(
-            UL, UR, nx_i, ny_i, flow.gamma,
-            low_mach=flow.hllc_low_mach, xp=xp,
+            UL,
+            UR,
+            nx_i,
+            ny_i,
+            flow.gamma,
+            low_mach=flow.hllc_low_mach,
+            xp=xp,
         )
     else:
-        interior = ph.roe_flux(
-            UL, UR, nx_i, ny_i, flow.gamma, entropy_fix=flow.entropy_fix, xp=xp
-        )
+        interior = ph.roe_flux(UL, UR, nx_i, ny_i, flow.gamma, entropy_fix=flow.entropy_fix, xp=xp)
 
     # ---- boundary edges: one call per tag, on a contiguous slice
     belem, bface = edges.bedge_elem, edges.bedge_face
@@ -101,15 +102,26 @@ def edge_fluxes(U, ops: Operators, flow: FlowConditions, xp=np):
         U_s, nxs, nys = Ub[sl], nx_b[sl], ny_b[sl]
         if tag is BoundaryTag.INFLOW:
             res = ph.inflow_flux(
-                U_s, nxs, nys, flow.gamma,
-                Tt=flow.total_temperature, pt=flow.total_pressure,
-                Rgas=flow.Rgas, alpha=flow.inflow_angle, xp=xp,
+                U_s,
+                nxs,
+                nys,
+                flow.gamma,
+                Tt=flow.total_temperature,
+                pt=flow.total_pressure,
+                Rgas=flow.Rgas,
+                alpha=flow.inflow_angle,
+                xp=xp,
             )
         elif tag is BoundaryTag.OUTFLOW:
             res = ph.outflow_flux(
-                U_s, nxs, nys, flow.gamma, p_back=flow.back_pressure,
+                U_s,
+                nxs,
+                nys,
+                flow.gamma,
+                p_back=flow.back_pressure,
                 rho_t=(flow.stagnation_density if flow.backflow else 0.0),
-                p_t=flow.total_pressure, xp=xp,
+                p_t=flow.total_pressure,
+                xp=xp,
             )
         else:  # WALL and AXIS share the inviscid slip flux
             res = ph.wall_flux(U_s, nxs, nys, flow.gamma, xp=xp)
@@ -236,9 +248,7 @@ def step_coefficient(order: int, cfl: float | None, scheme: str = "rk4") -> floa
     return cfl / (2 * order + 1)
 
 
-def local_time_step(
-    wave_sum, ops: Operators, order: int, cfl: float, scheme: str = "rk4", xp=np
-):
+def local_time_step(wave_sum, ops: Operators, order: int, cfl: float, scheme: str = "rk4", xp=np):
     r"""Element-local pseudo-time step.
 
     .. math::

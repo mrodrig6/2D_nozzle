@@ -65,9 +65,7 @@ def prandtl_meyer_inverse(nu: float, gamma: float = 1.4) -> float:
     return float(brentq(lambda m: prandtl_meyer(m, gamma) - nu, 1.0 + 1e-12, 1e6))
 
 
-def pressure_ratio_across_oblique_shock(
-    mach: float, beta: float, gamma: float = 1.4
-) -> float:
+def pressure_ratio_across_oblique_shock(mach: float, beta: float, gamma: float = 1.4) -> float:
     r"""Static pressure ratio across an oblique shock at wave angle ``beta``.
 
     Only the normal component matters, so this is the normal-shock relation at
@@ -75,9 +73,7 @@ def pressure_ratio_across_oblique_shock(
     """
     mn2 = (mach * np.sin(beta)) ** 2
     if mn2 < 1.0:
-        raise ValueError(
-            f"M_n = {np.sqrt(mn2):.4f} is subsonic; beta must exceed the Mach angle"
-        )
+        raise ValueError(f"M_n = {np.sqrt(mn2):.4f} is subsonic; beta must exceed the Mach angle")
     return float(1.0 + 2.0 * gamma / (gamma + 1.0) * (mn2 - 1.0))
 
 
@@ -129,8 +125,7 @@ def oblique_shock_angle(
         raise ValueError(f"an oblique shock needs supersonic flow, got M={mach}")
     if pressure_ratio < 1.0:
         raise ValueError(
-            f"an oblique shock raises pressure, so the ratio must be >= 1, "
-            f"got {pressure_ratio:.4f}"
+            f"an oblique shock raises pressure, so the ratio must be >= 1, got {pressure_ratio:.4f}"
         )
     mn2 = 1.0 + (gamma + 1.0) / (2.0 * gamma) * (pressure_ratio - 1.0)
     sin_beta = np.sqrt(mn2) / mach
