@@ -243,8 +243,9 @@ seconds, cached afterwards).
 Run the tests:
 
 ```bash
-./dg2d.sh test -m "not slow"   # 359 unit tests, about two minutes
-./dg2d.sh test                 # plus the end-to-end solves and adjoint checks
+./dg2d.sh test --fast          # the unit tests, about two minutes
+./dg2d.sh test --slow          # only the end-to-end solves and adjoint checks
+./dg2d.sh test                 # everything
 ```
 
 The `slow` marker covers the tests that run a real flow solve — including the

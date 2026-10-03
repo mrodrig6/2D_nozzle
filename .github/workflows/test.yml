@@ -41,7 +41,7 @@ jobs:
         run: python -c "from dgnozzle.backends import available_backends; print(available_backends())"
 
       - name: Fast tests
-        run: pytest -q -m "not slow"
+        run: pytest -q --fast
 
       # The slow tests are 42 end-to-end solves, including finite-difference
       # gradient checks that cost two extra flow solves per design variable.
@@ -49,7 +49,7 @@ jobs:
       # running them six times over buys no extra signal and a lot of minutes.
       - name: Full solves and adjoint checks
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        run: pytest -q -m slow --durations=10
+        run: pytest -q --slow --durations=10
 
       - name: Lint
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'

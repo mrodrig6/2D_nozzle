@@ -42,7 +42,7 @@ include = ["dgnozzle*"]
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
 markers = [
-    "slow: tests that run a full solve (deselect with -m 'not slow')",
+    "slow: tests that run a full solve (use --fast to skip them, --slow for only them)",
     "jax: tests that need JAX",
     "numba: tests that need Numba",
 ]
