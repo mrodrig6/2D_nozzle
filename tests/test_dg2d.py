@@ -26,7 +26,7 @@ pytestmark = pytest.mark.skipif(
     reason="dg2d.sh needs bash",
 )
 
-CASES = ("solve", "sweep", "sensitivity", "optimise", "convergence", "shock")
+CASES = ("solve", "sweep", "sensitivity", "optimise", "convergence", "shock", "external")
 
 
 def run(*args, cwd=None, timeout=300):
