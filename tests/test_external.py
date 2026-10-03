@@ -169,3 +169,138 @@ def test_a_non_converged_solve_is_refused_rather_than_read():
     assert not r.converged
     with pytest.raises(ValueError, match="converged"):
         exit_wave_structure(r)
+
+
+# --------------------------------------------------------------------------
+# The extended downstream domain: the shock-cell march
+# --------------------------------------------------------------------------
+@pytest.fixture(scope="module")
+def supersonic_result():
+    from src.api import solve_nozzle
+
+    return solve_nozzle(order=2, refine=0, back_pressure_ratio=0.0640, verbose=False)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("amb", [0.030, 0.100])
+def test_jet_cells_put_the_boundary_regions_exactly_at_ambient(supersonic_result, amb):
+    """The free-boundary condition, which is the whole closure of the march.
+
+    Every region that touches the jet boundary must sit at ``p_amb`` exactly --
+    that is what defines the reflection there.  If this drifts, the wave the
+    march computes is not the wave the boundary condition asks for.
+    """
+    from src.external import jet_wave_cells
+
+    jc = jet_wave_cells(supersonic_result, ambient_pressure_ratio=amb, cells=3)
+    edge = [r for r in jc.regions if not r.on_axis]
+    assert len(edge) >= 2
+    for r in edge:
+        assert r.pressure_ratio == pytest.approx(amb, rel=1e-10)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("amb", [0.030, 0.100])
+def test_jet_cells_are_periodic_with_period_four(supersonic_result, amb):
+    """The cycle must close: state 4 is state 0 again.
+
+    Everything downstream -- that the cells repeat, that ``cell_length`` means
+    anything -- rests on this, and it is the first thing a sign error breaks.
+    """
+    from src.external import jet_wave_cells
+
+    jc = jet_wave_cells(supersonic_result, ambient_pressure_ratio=amb, cells=3)
+    assert len(jc.regions) >= 5
+    for k in range(len(jc.regions) - 4):
+        a, b = jc.regions[k], jc.regions[k + 4]
+        assert b.nu == pytest.approx(a.nu, rel=1e-10)
+        assert b.flow_angle == pytest.approx(a.flow_angle, abs=1e-12)
+        assert b.on_axis == a.on_axis
+
+
+@pytest.mark.slow
+def test_jet_cells_alternate_about_ambient_on_the_axis(supersonic_result):
+    """Under-expanded: the axis over-shoots *below* ambient, then back above.
+
+    The jet never simply relaxes to ambient; it rings about it.  That ringing is
+    what makes the cells visible, so it is worth pinning that the sign alternates
+    rather than decaying -- this model has no mechanism to decay.
+    """
+    from src.external import jet_wave_cells
+
+    jc = jet_wave_cells(supersonic_result, ambient_pressure_ratio=0.030, cells=3)
+    amb = jc.exit_waves.ambient_pressure_ratio
+    axis = [r.pressure_ratio / amb for r in jc.regions if r.on_axis]
+    assert len(axis) >= 3
+    assert axis[0] > 1.0  # under-expanded, so the exit is above ambient
+    assert axis[1] < 1.0  # the double expansion overshoots below it
+    assert axis[2] == pytest.approx(axis[0], rel=1e-10)
+
+
+@pytest.mark.slow
+def test_jet_cells_have_equal_length_and_scale_linearly(supersonic_result):
+    """``cells=n`` must reach n times as far, with every cell the same length."""
+    from src.external import jet_wave_cells
+
+    one = jet_wave_cells(supersonic_result, ambient_pressure_ratio=0.030, cells=1)
+    three = jet_wave_cells(supersonic_result, ambient_pressure_ratio=0.030, cells=3)
+    assert len(three.wave_segments) == 3 * len(one.wave_segments)
+    assert three.cell_length == pytest.approx(one.cell_length, rel=1e-10)
+    assert three.x_extent == pytest.approx(3.0 * one.x_extent, rel=1e-10)
+
+
+@pytest.mark.slow
+def test_an_under_expanded_jet_bulges_and_an_over_expanded_one_pinches(supersonic_result):
+    """The jet boundary is a streamline, so it goes where the first wave turns it.
+
+    Outward for an under-expanded jet, inward for an over-expanded one.  Getting
+    this backwards is the most visible way to have the sign of ``theta`` wrong,
+    and no pressure check would catch it.
+    """
+    from src.external import jet_wave_cells
+
+    under = jet_wave_cells(supersonic_result, ambient_pressure_ratio=0.030, cells=2)
+    over = jet_wave_cells(supersonic_result, ambient_pressure_ratio=0.100, cells=2)
+    assert under.boundary[1, 1] > under.boundary[0, 1]
+    assert over.boundary[1, 1] < over.boundary[0, 1]
+
+
+@pytest.mark.slow
+def test_the_design_point_has_no_cells_to_march(supersonic_result):
+    """No lip wave means no pattern; say so rather than drawing nothing."""
+    from src.external import jet_wave_cells
+    from src.postprocess import performance
+
+    # the design point is this nozzle's own computed exit pressure, not the
+    # quasi-1D one -- they differ by 4.5%, as src.external.plume records
+    design = float(performance(supersonic_result).exit_pressure_ratio)
+    with pytest.raises(ValueError, match="design point"):
+        jet_wave_cells(supersonic_result, ambient_pressure_ratio=design, cells=2)
+
+
+@pytest.mark.slow
+def test_a_strong_over_expansion_stops_at_the_mach_reflection(supersonic_result):
+    """The model's own limit, reported rather than drawn through.
+
+    A compression reflecting off the axis has to turn the flow by twice the lip
+    angle.  Past maximum deflection that regular reflection does not exist -- it
+    is a Mach reflection, a Mach disc -- and the periodic pattern below it is
+    fiction.  The march must stop and say which wave it stopped on.
+    """
+    from src.external import exit_wave_structure, jet_wave_cells
+
+    # walk up the over-expansion: the lip shock is still attached well past the
+    # point where the doubled turn at the axis is not
+    for amb in (0.16, 0.18, 0.20, 0.22, 0.24):
+        try:
+            exit_wave_structure(supersonic_result, ambient_pressure_ratio=amb)
+        except ValueError:
+            continue  # the lip shock already detaches; not the case under test
+        jc = jet_wave_cells(supersonic_result, ambient_pressure_ratio=amb, cells=3)
+        if jc.stopped_because:
+            assert "Mach disc" in jc.stopped_because
+            assert len(jc.wave_segments) < 6
+            # and it must stop *before* drawing the impossible wave
+            assert all(r.mach > 1.0 for r in jc.regions)
+            return
+    pytest.skip("no over-expansion in the swept range triggers a Mach disc")

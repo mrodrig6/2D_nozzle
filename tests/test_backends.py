@@ -144,6 +144,23 @@ def test_the_numba_hllc_kernel_matches_the_shared_one():
     assert np.abs(a.U - b.U).max() / np.abs(a.U).max() < 1e-12
 
 
+def test_the_numba_slau2_kernel_matches_the_shared_one():
+    """``_numba_kernels._slau2`` is a hand transcription of the shared flux.
+
+    It matters more here than for the other two: the shared SLAU2 was itself
+    transcribed from the literature rather than from the paper, so a divergence
+    between the two copies would be a second error on top of a first.
+    """
+    import numpy as np
+
+    from src.api import solve_nozzle
+
+    a = solve_nozzle(order=1, refine=0, flux="slau2", backend="numpy", verbose=False)
+    b = solve_nozzle(order=1, refine=0, flux="slau2", backend="numba", verbose=False)
+    assert a.iterations == b.iterations
+    assert np.abs(a.U - b.U).max() / np.abs(a.U).max() < 1e-12
+
+
 def test_the_folded_rate_kernel_matches_the_unfolded_one():
     """``element_rate`` must be the exact same rate, not merely a close one.
 

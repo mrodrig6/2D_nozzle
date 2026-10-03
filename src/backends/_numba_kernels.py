@@ -247,6 +247,74 @@ def _hllc(UL, UR, nx, ny, gamma, low_mach, out):
 
 
 @njit(inline="always", **_JIT)
+def _slau2(UL, UR, nx, ny, gamma, out):
+    """SLAU2, the parameter-free low-dissipation AUSM-family flux.
+
+    Mirrors :func:`src.physics.slau2_flux`, which carries the derivation and
+    the provenance note; ``tests/test_backends.py`` pins the two against each
+    other.  Returns the max signal speed.
+    """
+    rL = max(UL[0], FLOOR)
+    vxL = UL[1] / rL
+    vyL = UL[2] / rL
+    pL = _pressure(UL[0], UL[1], UL[2], UL[3], gamma)
+    HL = (UL[3] + pL) / rL
+
+    rR = max(UR[0], FLOOR)
+    vxR = UR[1] / rR
+    vyR = UR[2] / rR
+    pR = _pressure(UR[0], UR[1], UR[2], UR[3], gamma)
+    HR = (UR[3] + pR) / rR
+
+    vnL = vxL * nx + vyL * ny
+    vnR = vxR * nx + vyR * ny
+    aL = np.sqrt(max(gamma * pL / rL, FLOOR))
+    aR = np.sqrt(max(gamma * pR / rR, FLOOR))
+
+    a_bar = 0.5 * (aL + aR)
+    rho_bar = 0.5 * (rL + rR)
+    ML = vnL / a_bar
+    MR = vnR / a_bar
+
+    v_bar = np.sqrt(0.5 * (vxL * vxL + vyL * vyL + vxR * vxR + vyR * vyR))
+    m_hat = min(1.0, v_bar / a_bar)
+    chi = (1.0 - m_hat) * (1.0 - m_hat)
+
+    # g is nonzero only at an expansion (M_L < 0 < M_R)
+    g = -max(min(ML, 0.0), -1.0) * min(max(MR, 0.0), 1.0)
+    vn_mean = (rL * abs(vnL) + rR * abs(vnR)) / (rL + rR)
+    vn_l = (1.0 - g) * vn_mean + g * abs(vnL)
+    vn_r = (1.0 - g) * vn_mean + g * abs(vnR)
+
+    mdot = 0.5 * (rL * (vnL + vn_l) + rR * (vnR - vn_r) - (chi / a_bar) * (pR - pL))
+
+    if abs(ML) < 1.0:
+        betaL = 0.25 * (2.0 - ML) * (ML + 1.0) * (ML + 1.0)
+    else:
+        betaL = 0.5 * (1.0 + np.sign(ML))
+    if abs(MR) < 1.0:
+        betaR = 0.25 * (2.0 + MR) * (MR - 1.0) * (MR - 1.0)
+    else:
+        betaR = 0.5 * (1.0 - np.sign(MR))
+
+    p_tilde = (
+        0.5 * (pL + pR)
+        + 0.5 * (betaL - betaR) * (pL - pR)
+        + v_bar * (betaL + betaR - 1.0) * rho_bar * a_bar
+    )
+
+    mp = 0.5 * (mdot + abs(mdot))
+    mm = 0.5 * (mdot - abs(mdot))
+
+    out[0] = mp + mm
+    out[1] = mp * vxL + mm * vxR + p_tilde * nx
+    out[2] = mp * vyL + mm * vyR + p_tilde * ny
+    out[3] = mp * HL + mm * HR
+
+    return max(abs(vnL) + aL, abs(vnR) + aR)
+
+
+@njit(inline="always", **_JIT)
 def _wall(Ub, nx, ny, gamma, out):
     rho = max(Ub[0], FLOOR)
     vx = Ub[1] / rho
@@ -448,6 +516,8 @@ def edge_pass(
                 ny = edge_normal[k, q, 1]
                 if flux_id == 1:
                     sp = _hllc(UL, UR, nx, ny, gamma, low_mach, flux)
+                elif flux_id == 2:
+                    sp = _slau2(UL, UR, nx, ny, gamma, flux)
                 else:
                     sp = _roe(UL, UR, nx, ny, gamma, efix, flux)
                 if sp > best:

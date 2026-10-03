@@ -29,4 +29,6 @@ docs/tikz/*.pdf
 !docs/figures/*.csv
 example_*.png
 sweep*.csv
-external_waves.png
+# anchored to the repo root: the same names live, tracked, under docs/figures/
+/external_waves.png
+/jet_cells.png

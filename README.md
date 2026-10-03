@@ -140,19 +140,32 @@ always means Mach number, and the TVB constant is not a Mach number.
 `geometry` runs no flow solve — use it to check a contour before committing to
 a simulation.
 
-**Interface flux.** Two are available, and the choice is a real one:
+**Interface flux.** Three are available, and the choice is a real one:
 
 | `flux=` | What it is | Use it when |
 |---|---|---|
 | `roe` (default) | Roe's approximate Riemann solver with the Harten–Hyman entropy fix | **Accuracy.** Consistently the lowest entropy error, and what every number in this README was produced with |
 | `hllc` | HLLC with Batten's wave speeds | **Robustness.** Provably positivity-preserving, needs no entropy fix and so has no constant to tune, and is cheaper |
+| `slau2` | SLAU2, the parameter-free low-dissipation AUSM-family flux | **Study, not production.** See the warning below |
 
 Measured at the design point: HLLC converges in 451 iterations against Roe's 751
 at `p=0` and agrees to ~1% in thrust, while Roe is the more accurate of the two
 (entropy error 3.8e-3 against 6.2e-3 at `p=1`). Neither fixes the `p>=1` shocked
-divergence. See [`docs/theory.md`](docs/theory.md#hllc-and-why-it-is-the-robust-choice).
+divergence. See [`docs/theory.md`](docs/theory.md#hllc-and-why-it-is-the-robust-choice),
+and [the AUSM-family section](docs/theory.md#the-ausm-family-why-slau2-ships-and-why-it-is-not-recommended)
+for what `slau2` was built to find out.
 
-Both run on the Numba fast path.
+> **`slau2` does not converge in this solver, and that is the point of shipping
+> it.** It reaches the right answer — thrust and exit Mach within 0.7% of Roe —
+> and then sits in a bounded limit cycle with a residual four orders of magnitude
+> above Roe's, which never decays. The flux itself checks out: it is consistent,
+> conservative, preserves a contact discontinuity exactly, and its low-Mach
+> dissipation scales as `O(M^2)` (measured 4.00 per halving of `M`), all pinned by
+> tests. The failure is in the *steady march*, not the flux evaluation, and it is
+> the same failure AUSM⁺-up showed before it was removed. Use it to study that;
+> do not use it for an answer you intend to trust.
+
+All three run on the Numba fast path.
 
 ### The cases
 
@@ -569,6 +582,53 @@ best = minimize(negative_thrust, x0, jac=True, method="L-BFGS-B",
 
 All three live in [`examples/`](examples/), alongside a first solve, a
 convergence study and a back-pressure sweep. `./dg2d.sh list` names them.
+
+### 4. What happens outside the nozzle
+
+The mesh stops at the lip, but the interesting waves do not. A nozzle designed to
+be shock free inside puts its whole wave system *outside*, and
+[`src/external/`](src/external/) evaluates that in closed form from the converged
+exit state. It is deliberately separate from the solver: nothing in a flow solve
+calls it, so post-processing that can legitimately have no answer fails where you
+asked for it rather than inside a march.
+
+```bash
+./dg2d.sh run external       # examples/07_external.py
+```
+
+```python
+from src.api import solve_nozzle
+from src.external import exit_wave_structure, jet_wave_cells, plot_jet_cells
+
+r = solve_nozzle(order=2, refine=0, back_pressure_ratio=0.0640)
+
+print(exit_wave_structure(r, ambient_pressure_ratio=0.03).describe())
+# under-expanded: p_e/p_amb = 2.1517, M_e = 2.458 -> 2.957,
+# Prandtl-Meyer fan from 24.01 to 8.98 deg, turning the flow 10.79 deg outward
+
+cells = jet_wave_cells(r, ambient_pressure_ratio=0.03, cells=3)
+print(cells.describe())
+# under-expanded jet: 6 waves, cell length 3.5574 (10.16 exit half-heights),
+# reaching x = 11.6723 ...
+
+plot_jet_cells(r, cells)
+```
+
+`exit_wave_structure` gives the first wave at the lip. `jet_wave_cells` extends
+the domain downstream, marching that wave through its reflections off the
+symmetry axis and the constant-pressure jet boundary to give the repeating
+shock-cell pattern — the "shock diamonds" of a rocket plume. The domain reaches
+roughly ten nozzle lengths at a strong under-expansion, and the cell length is a
+real number you can compare against a photograph.
+
+![Shock cells](docs/figures/jet_cells.png)
+
+Two things to know before reading numbers off it. **Every wave is treated as
+isentropic**, which is what makes the pattern exactly periodic; a real jet's
+compressions steepen into shocks, lose total pressure, and the cells decay
+downstream. And a strongly mismatched jet forms a **Mach disc** rather than the
+regular reflection assumed here — the march detects that and stops rather than
+drawing a pattern that does not exist.
 
 ---
 

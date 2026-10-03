@@ -40,7 +40,7 @@ def _disc_args(p: argparse.ArgumentParser) -> None:
     g.add_argument(
         "--flux",
         default="roe",
-        choices=("roe", "hllc"),
+        choices=("roe", "hllc", "slau2"),
         help="interface flux: Roe (most accurate) or HLLC (positivity-preserving)",
     )
     g.add_argument("-p", "--order", type=int, default=1, help="polynomial order p")

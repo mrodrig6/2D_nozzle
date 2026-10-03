@@ -304,3 +304,135 @@ def test_backflow_blends_continuously_through_zero_normal_velocity():
             f"step ratio {coarse / fine:.2f} is not first order; "
             "the branch is switching rather than blending"
         )
+
+
+# --------------------------------------------------------------------------
+# SLAU2
+#
+# The formulation was transcribed from the literature rather than from a copy
+# of the paper (see the provenance note on ph.slau2_flux), so these tests carry
+# more weight than usual: they are what stands between a transcription slip and
+# a wrong answer.  Each one is a property the published scheme is claimed to
+# have, chosen so that a mistyped coefficient would break at least one.
+# --------------------------------------------------------------------------
+def test_slau2_flux_is_consistent(states, normals):
+    nx, ny = normals
+    out = ph.slau2_flux(states, states, nx, ny, GAMMA)
+    assert np.allclose(out.flux, ph.normal_flux(states, nx, ny, GAMMA))
+
+
+def test_slau2_flux_is_conservative(states, normals):
+    nx, ny = normals
+    L, R = states[:2], states[1:]
+    a = ph.slau2_flux(L, R, nx[:2], ny[:2], GAMMA).flux
+    b = ph.slau2_flux(R, L, -nx[:2], -ny[:2], GAMMA).flux
+    assert np.allclose(a, -b)
+
+
+@pytest.mark.parametrize("vn", [0.0, 0.3, -0.3, 2.0])
+def test_slau2_preserves_a_contact_discontinuity_exactly(vn):
+    """Uniform pressure and velocity, jumping density: the upwind flux, exactly.
+
+    This is the AUSM family's signature property and the reason the mass flux
+    is weighted by density rather than averaged.  A sign error in the ``g``
+    switch or in ``vn_mean`` shows up here and almost nowhere else.
+    """
+    p = 1.0
+
+    def cons(rho):
+        return np.array([[rho, rho * vn, 0.0, p / (GAMMA - 1) + 0.5 * rho * vn * vn]])
+
+    UL, UR = cons(1.0), cons(5.0)
+    nx, ny = np.array([1.0]), np.array([0.0])
+    got = ph.slau2_flux(UL, UR, nx, ny, GAMMA).flux
+    upwind = UL if vn > 0.0 else UR
+    assert np.allclose(got, ph.normal_flux(upwind, nx, ny, GAMMA), rtol=0, atol=1e-14)
+
+
+@pytest.mark.parametrize("mach", [1.2, 3.0])
+def test_slau2_convects_from_the_upwind_side_when_supersonic(mach):
+    """Supersonic: ``Psi`` and ``p_tilde`` come wholly from upwind.
+
+    Note what is *not* asserted: that the flux equals the upwind flux.  SLAU2's
+    mass flux dissipates on ``rho_R - rho_L`` at the mean fluid speed rather
+    than upwinding each side separately, so at a supersonic *jump* ``mdot``
+    differs from ``rho_L v_nL`` by a few percent -- by design, as the docstring
+    derives.  Asserting the stronger property would be asserting a bug.
+    """
+    rho, a = 1.0, 1.0
+    p = rho * a * a / GAMMA
+    vL = mach * a
+    vR = 0.95 * vL
+    UL = np.array([[rho, rho * vL, 0.0, p / (GAMMA - 1) + 0.5 * rho * vL * vL]])
+    UR = np.array([[0.6, 0.6 * vR, 0.06, 0.7 * p / (GAMMA - 1) + 0.5 * 0.6 * (vR * vR + 0.01)]])
+    nx, ny = np.array([1.0]), np.array([0.0])
+
+    # the premise, asserted rather than assumed: BOTH normal Mach numbers must
+    # exceed 1 against the interface sound speed, or beta_L/beta_R do not
+    # saturate and the flux is legitimately two-sided
+    aL = ph.sound_speed(UL, GAMMA)
+    aR = ph.sound_speed(UR, GAMMA)
+    a_bar = 0.5 * (aL + aR)
+    assert (vL / a_bar > 1.0).all() and (vR / a_bar > 1.0).all()
+
+    got = ph.slau2_flux(UL, UR, nx, ny, GAMMA).flux
+
+    _, vxL, vyL, pL, HL = ph.primitives(UL, GAMMA)
+    mdot = got[:, 0]
+    psi = np.stack([np.ones_like(vxL), vxL, vyL, HL], axis=-1)
+    N = np.array([[0.0, 1.0, 0.0, 0.0]])
+    assert np.allclose(got, mdot[:, None] * psi + pL[:, None] * N, rtol=0, atol=1e-13)
+
+
+def test_slau2_pressure_dissipation_scales_as_mach_squared():
+    """The low-Mach property, and the reason SLAU2 needs no cutoff Mach number.
+
+    AUSM+-up buys this with ``K_p``, ``K_u`` and ``M_co``; SLAU2's ``chi`` and
+    its ``|v|``-weighted pressure term deliver it from the states alone.  The
+    measured ratio per halving of ``M`` is 4.00 by ``M = 0.025``.
+    """
+    nx, ny = np.array([1.0]), np.array([0.0])
+    a = np.sqrt(GAMMA)
+    ratios = []
+    prev = None
+    for mach in (0.2, 0.1, 0.05, 0.025):
+        v = mach * a
+
+        def cons(vel):
+            return np.array([[1.0, vel, 0.0, 1.0 / (GAMMA - 1) + 0.5 * vel * vel]])
+
+        UL, UR = cons(v), cons(v * 1.02)
+        got = ph.slau2_flux(UL, UR, nx, ny, GAMMA).flux
+        central = 0.5 * (ph.normal_flux(UL, nx, ny, GAMMA) + ph.normal_flux(UR, nx, ny, GAMMA))
+        diss = abs(float(got[0, 1] - central[0, 1]))
+        if prev is not None:
+            ratios.append(prev / diss)
+        prev = diss
+    # O(M^2) means 4x per halving; the first interval is still feeling the
+    # higher-order terms, the last is asymptotic
+    assert ratios[-1] == pytest.approx(4.0, abs=0.05)
+    assert all(r > 3.5 for r in ratios)
+
+
+def test_slau2_is_sane_in_still_air_with_a_pressure_jump():
+    """The configuration that exposed AUSM+-up, kept as a regression.
+
+    A 1% pressure difference across a motionless interface gave AUSM+-up a mass
+    flux of -9.8e4, because ``M_co`` had been read as an epsilon and floored at
+    1e-8, making ``K_p / f_a`` diverge.  SLAU2 has no such constant.  The bar
+    here is simply that it agrees with the two solvers that were never in doubt.
+    """
+    nx, ny = np.array([1.0]), np.array([0.0])
+
+    def cons(p):
+        return np.array([[1.0, 0.0, 0.0, p / (GAMMA - 1)]])
+
+    for dp in (0.01, 0.1, 1.0):
+        UL, UR = cons(1.0), cons(1.0 + dp)
+        m_slau = float(ph.slau2_flux(UL, UR, nx, ny, GAMMA).flux[0, 0])
+        m_roe = float(ph.roe_flux(UL, UR, nx, ny, GAMMA).flux[0, 0])
+        m_hllc = float(ph.hllc_flux(UL, UR, nx, ny, GAMMA).flux[0, 0])
+        # driven from high to low pressure, so the mass flux is negative
+        assert m_slau < 0.0
+        assert m_slau == pytest.approx(m_roe, rel=0.1)
+        assert m_slau == pytest.approx(m_hllc, rel=0.35)

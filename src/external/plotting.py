@@ -10,9 +10,10 @@ from __future__ import annotations
 import numpy as np
 
 from ..plotting import plot_contour
+from .jet import JetCells, jet_wave_cells
 from .plume import ExitWaves, exit_wave_structure
 
-__all__ = ["REGIME_COLOURS", "plot_exit_waves"]
+__all__ = ["REGIME_COLOURS", "plot_exit_waves", "plot_jet_cells"]
 
 #: One hue per regime, assigned by regime and never by position, so a figure
 #: showing two of the three keeps the same colours as one showing all three.
@@ -121,4 +122,164 @@ def plot_exit_waves(
                 ha="right",
                 va="bottom",
             )
+    return ax
+
+
+def plot_jet_cells(
+    result,
+    cells: JetCells | None = None,
+    *,
+    n_cells: int = 3,
+    ax=None,
+    ax_pressure=None,
+    mirror: bool = True,
+):
+    """Draw the extended downstream domain: the wave cells and the axis pressure.
+
+    Two panels sharing ``x``, because the periodicity is the point and it reads
+    far better as a trace than as a pattern:
+
+    * **top** -- the nozzle, the jet boundary, and each wave as a straight
+      characteristic.  Compressions are solid and expansions dashed, so wave
+      *type* survives a greyscale print and does not rely on colour.
+    * **bottom** -- :math:`p/p_{\\rm amb}` along the symmetry axis, a staircase
+      that crosses 1 once per half cell.  The horizontal line at 1 is the
+      ambient the jet is trying to match and keeps overshooting.
+
+    ``n_cells`` is how many shock cells to march, and therefore how far
+    downstream the domain extends.
+
+    Pass ``ax`` alone for the wave pattern by itself, or ``ax`` and
+    ``ax_pressure`` to place both panels into axes you already own; pass neither
+    and a two-panel figure is made here.
+    """
+    import matplotlib.pyplot as plt
+
+    if cells is None:
+        cells = jet_wave_cells(result, cells=n_cells)
+
+    if ax is None:
+        _, axes = plt.subplots(
+            2,
+            1,
+            figsize=(9.0, 5.0),
+            height_ratios=(2.0, 1.0),
+            sharex=True,
+            constrained_layout=True,
+        )
+        ax, ax_p = axes
+    else:
+        ax_p = ax_pressure
+
+    geom = result.geometry
+    plot_contour(geom, ax=ax, mirror=mirror, color="0.25", lw=1.4)
+    colour = REGIME_COLOURS[cells.regime]
+    signs = (1.0, -1.0) if mirror else (1.0,)
+
+    # the jet boundary: a streamline, so it is the thing that visibly bulges
+    bnd = cells.boundary
+    for s in signs:
+        ax.plot(
+            bnd[:, 0],
+            s * bnd[:, 1],
+            color=colour,
+            lw=1.8,
+            alpha=0.9,
+            zorder=3,
+            label="jet boundary" if s > 0 else None,
+        )
+
+    # waves, labelled once each so the legend has one entry per type
+    seen = set()
+    for k, seg in enumerate(cells.wave_segments):
+        # the region reached by wave k is regions[k + 1]
+        compressive = cells.regions[k + 1].nu < cells.regions[k].nu
+        style = "-" if compressive else "--"
+        name = "compression" if compressive else "expansion"
+        for s in signs:
+            lab = None
+            if s > 0 and name not in seen:
+                lab = name
+                seen.add(name)
+            ax.plot(
+                seg[:, 0],
+                s * seg[:, 1],
+                style,
+                color=colour,
+                lw=1.3 if compressive else 1.0,
+                alpha=0.85,
+                zorder=2,
+                label=lab,
+            )
+
+    ax.axhline(0.0, color="0.75", lw=0.6, ls=":", zorder=1)
+    ax.axvline(cells.lip_x, color="0.75", lw=0.7, ls="--", zorder=1)
+    ax.set_ylabel("$y$")
+    ax.set_aspect("equal", adjustable="box")
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    ax.legend(loc="upper left", fontsize=8, frameon=False, ncol=3)
+    ew = cells.exit_waves
+    ax.set_title(
+        f"{cells.regime} jet   $p_e/p_{{amb}}$ = {ew.pressure_mismatch:.3f}"
+        f"   $M_e$ = {ew.exit_mach:.2f}"
+        f"   cell length {cells.cell_length:.3f}",
+        fontsize=10,
+        loc="left",
+    )
+
+    if ax_p is not None:
+        amb = ew.ambient_pressure_ratio
+        # the axis crossings bound each on-axis region
+        xs = [cells.lip_x]
+        for seg in cells.wave_segments:
+            if abs(seg[1, 1]) < 1e-12:
+                xs.append(float(seg[1, 0]))
+        axis_regions = [r for r in cells.regions if r.on_axis]
+        n = min(len(xs) - 1, len(axis_regions))
+        for i in range(n):
+            ax_p.plot(
+                [xs[i], xs[i + 1]],
+                [axis_regions[i].pressure_ratio / amb] * 2,
+                color=colour,
+                lw=2.0,
+                solid_capstyle="butt",
+            )
+            if i + 1 < n:
+                ax_p.plot(
+                    [xs[i + 1]] * 2,
+                    [
+                        axis_regions[i].pressure_ratio / amb,
+                        axis_regions[i + 1].pressure_ratio / amb,
+                    ],
+                    color=colour,
+                    lw=0.8,
+                    alpha=0.5,
+                )
+        ax_p.axhline(1.0, color="0.45", lw=0.8, ls="--")
+        ax_p.annotate(
+            "ambient",
+            xy=(0.995, 1.0),
+            xycoords=("axes fraction", "data"),
+            ha="right",
+            va="bottom",
+            fontsize=8,
+            color="0.35",
+        )
+        ax_p.set_xlabel("$x$")
+        ax_p.set_ylabel("$p / p_{amb}$ on the axis")
+        for side in ("top", "right"):
+            ax_p.spines[side].set_visible(False)
+    else:
+        ax.set_xlabel("$x$")
+
+    if cells.stopped_because:
+        ax.annotate(
+            "march stopped: " + cells.stopped_because.split(":")[0],
+            xy=(0.99, 0.04),
+            xycoords="axes fraction",
+            ha="right",
+            fontsize=8,
+            color="0.35",
+        )
     return ax

@@ -520,6 +520,105 @@ untouched. `0` disables it and gives standard HLLC, which is the verified path;
 the form follows the paper, so check the cutoff constant against it before
 relying on that branch quantitatively.
 
+### The AUSM family: why SLAU2 ships, and why it is not recommended
+
+`flux='slau2'` selects SLAU2, the parameter-free low-dissipation AUSM-family
+flux. An AUSM-family scheme does not solve a Riemann problem; it splits the
+interface into a *mass* flux carrying the convective field and a *pressure* flux
+carrying the acoustic one,
+
+```math
+\hat{\mathbf{F}} = \frac{\dot{m} + |\dot{m}|}{2}\,\boldsymbol{\Psi}_L
+                 + \frac{\dot{m} - |\dot{m}|}{2}\,\boldsymbol{\Psi}_R
+                 + \tilde{p}\,\mathbf{N},
+\qquad
+\boldsymbol{\Psi} = (1,\ v_x,\ v_y,\ H)^T .
+```
+
+SLAU2 was chosen over AUSM⁺-up2 for one reason: **it has no tunable constants.**
+AUSM⁺-up carries $K_p$, $K_u$ and a cutoff Mach number $M_{co}$, and this package
+carried that scheme briefly and removed it. One of the two failures found along
+the way was traceable to $M_{co}$ — read as an epsilon and floored at `1e-8` it
+makes $K_p/f_a$ diverge, turning a 1% pressure difference in still air into a
+mass flux of $-9.8\times10^4$. SLAU2 builds its switches ($g$, $\chi$) from the
+states themselves, so there is no constant to get wrong. `src/physics.py` carries
+the full formulation and a provenance note.
+
+**The flux evaluation is sound.** It is consistent, conservative under swapping
+the two sides and the normal, preserves a contact discontinuity exactly, upwinds
+every convected quantity in the supersonic limit, and its low-Mach dissipation
+scales as $O(M^2)$ — measured at 4.00 per halving of $M$. In the still-air
+configuration that broke AUSM⁺-up it agrees with Roe to 3%. All of that is
+pinned by tests in `tests/test_physics.py`.
+
+**And it still does not converge.** At the design point it reaches the right
+answer — thrust and area-averaged exit Mach within 0.7% of Roe — and then sits
+there with a scaled residual of 4.8 against Roe's 9.6e-7, which never decays.
+That is the same failure AUSM⁺-up showed. Five hypotheses were tested and four
+were refuted outright:
+
+| Hypothesis | Measurement | Verdict |
+|---|---|---|
+| Starved dissipation on flow-aligned faces | binned by $\lvert v_n\rvert/a$ on a converged Roe field: 1.01× on tangential faces, 0.49× only in the transonic band | refuted |
+| An un-smoothed kink at $v_n = 0$ (Roe's entropy fix smooths its own) | smoothed each of the three kinks ($g$, $\lvert\overline{v_n}\rvert$, the $\dot m$ split) Harten–Hyman style | no change to 4 digits |
+| No dissipation on the shear mode | at $v_n = 0$: SLAU2, HLLC and un-fixed Roe all give **exactly zero**; only fixed Roe gives 2.96e-4 | refuted — HLLC has zero too and converges |
+| Under-dissipation generally | added Rusanov dissipation at 0.02/0.05/0.20, and separately on each of the four components | none converges; **more dissipation makes the residual worse** |
+| A limiter artifact, or a frozen state | the limiter changes the state by exactly 0; the state keeps moving, amplitude saturating at 1.7e-3 (8e-4 relative) | not a limiter artifact — it is a bounded limit cycle |
+| A linear instability: undamped modes in the semi-discrete operator | full 1680×1680 Jacobian of $-M^{-1}R$ by central differences at a common base state converged to $\lVert R\rVert_\infty = 2.1\times10^{-17}$ | **refuted** — see below |
+
+The residual is also *distributed*, not localised: total $\lVert R\rVert$ is 1.13
+against Roe's 6.9e-5, and the ten worst elements carry only 8.3% of it, spread
+through the supersonic section rather than piled at one feature.
+
+The spectrum is worth stating in full, because it rules out the explanation one
+would reach for first:
+
+| flux | span (most negative $\mathrm{Re}\,\lambda$) | $\max \mathrm{Re}\,\lambda$ | modes with $\mathrm{Re} \ge 0$ |
+|---|---|---|---|
+| `roe`   | −2.62e+02 | −2.18 | 0 of 1680 |
+| `hllc`  | −2.61e+02 | −2.54 | 0 of 1680 |
+| `slau2` | −3.56e+02 | −2.57 | 0 of 1680 |
+
+**All three operators are strictly damped, and SLAU2's is indistinguishable from
+HLLC's.** There is no linear instability to find. Whatever drives the limit
+cycle is therefore not visible to a linearisation — which points at the scheme's
+*switches*, the places where the flux is continuous but its derivative is not and
+a finite-difference Jacobian quietly averages across the corner. That is a
+coherent reading, but it is not a demonstration: the three switches that can be
+smoothed ($g$, $\lvert\overline{v_n}\rvert$, the $\dot m$ split) were smoothed,
+and the residual did not move.
+
+**So the mechanism is not identified.** What is established is where it is *not*:
+not the tuning constants (SLAU2 has none), not the flux evaluation (verified
+against five properties), not under-dissipation (adding any amount, on any
+component, makes it worse), not the limiter, not a localised feature, and not a
+linear instability. Writing that down is more useful than a sixth hypothesis
+offered without a measurement behind it.
+
+#### Why the published robustness results do not transfer
+
+The AUSM-family literature reports these schemes as *more* robust than Roe, and
+that is not in dispute here — it is a different claim about a different thing.
+Those results measure **shock robustness**: freedom from the carbuncle, reliable
+hypersonic heating, not producing negative states across a strong bow shock,
+usually in a second-order finite-volume code and often for a time-accurate run
+where the residual never has to reach a floor at all. On that axis the AUSM
+family does beat Roe, and Roe's carbuncle is a genuine, well-known defect.
+
+What this solver asks for is a different property: a **damped steady state** of
+an explicit high-order DG discretisation. A flux can be excellent on the first
+axis and unusable on the second, and nothing in a shock-robustness comparison
+measures the second. A table showing van Leer's flux-vector splitting as
+competitive is the same kind of result — it is ranking shock behaviour, not
+steady DG convergence; van Leer FVS would very likely converge here, at a real
+cost in accuracy, since pure FVS smears contacts and shear badly. That is a
+testable claim and it has not been tested.
+
+The practical conclusion is narrow. **Use `roe` or `hllc`.** `slau2` is shipped
+because reproducing the AUSM-family failure with a *parameter-free* member of the
+family is what rules out the tuning constants as the cause — that was worth
+knowing, and it is worth keeping runnable.
+
 ---
 
 ## Boundary conditions
@@ -1170,3 +1269,14 @@ the identical code runs under NumPy, Numba and JAX.
     design", *Flow, Turbulence and Combustion* **65**, 393–415, 2000.
 11. A. H. Shapiro, *The Dynamics and Thermodynamics of Compressible Fluid Flow*,
     Ronald Press, 1953.
+12. E. Shima and K. Kitamura, "Parameter-free simple low-dissipation AUSM-family
+    scheme for all speeds", *AIAA J.* **49**(8), 1693–1709, 2011. (SLAU.)
+13. K. Kitamura and E. Shima, "Towards shock-stable and accurate hypersonic
+    heating computations: a new pressure flux for AUSM-family schemes",
+    *J. Comput. Phys.* **245**, 62–83, 2013. (SLAU2.)
+
+> Entries 12 and 13 were cited from the published record, not from a copy of
+> either paper — outbound network access was blocked when `slau2` was written.
+> `src.physics.slau2_flux` states the transcribed formulation in full so it can
+> be checked against them, and `tests/test_physics.py` pins the properties a
+> transcription error would break.
