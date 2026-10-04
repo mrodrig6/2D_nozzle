@@ -183,6 +183,21 @@ def plot_field(
     return ax
 
 
+#: Axial quantities ``plot_centreline`` can draw, with the quasi-1D field each is
+#: compared against and its axis label.  Every one of these is a *static*
+#: quantity in the solver's own units, and the quasi-1D column is the same
+#: quantity from the same reservoir, so the two curves are directly comparable
+#: rather than merely similarly shaped.
+CENTRELINE_QUANTITIES = {
+    "mach": ("mach", "Mach number"),
+    "pressure": ("pressure", "$p$"),
+    "density": ("density", r"$\rho$"),
+    "temperature": ("temperature", "$T$"),
+    "vx": ("velocity", "$v_x$"),
+    "velocity": ("velocity", r"$|\mathbf{v}|$"),
+}
+
+
 def plot_centreline(
     result: SolveResult, ax=None, *, quantity: str = "mach", compare_quasi1d: bool = True
 ):
@@ -191,15 +206,22 @@ def plot_centreline(
     The gap between the two curves *is* the two-dimensionality of the flow: it is
     small in the converging section and grows through the expansion, where the
     streamlines are no longer parallel.
+
+    ``quantity`` is one of :data:`CENTRELINE_QUANTITIES`.
     """
+    if quantity not in CENTRELINE_QUANTITIES:
+        raise ValueError(
+            f"quantity must be one of {sorted(CENTRELINE_QUANTITIES)}, got {quantity!r}"
+        )
+    q1d_name, ylabel = CENTRELINE_QUANTITIES[quantity]
+
     ax = _axes(ax, figsize=(7.5, 3.4))
     cl = centreline_profile(result)
     ax.plot(cl["x"], cl[quantity], "-", color="tab:blue", lw=1.6, label="DG (axis)")
 
     if compare_quasi1d:
         q = solve_quasi1d(result.geometry, result.flow)
-        ref = {"mach": q.mach, "pressure": q.pressure, "density": q.density, "vx": q.velocity}
-        ax.plot(q.x, ref[quantity], "--", color="0.4", lw=1.2, label="quasi-1D theory")
+        ax.plot(q.x, getattr(q, q1d_name), "--", color="0.4", lw=1.2, label="quasi-1D theory")
         if q.shock_x is not None:
             ax.axvline(
                 q.shock_x,
@@ -211,9 +233,7 @@ def plot_centreline(
 
     ax.axvline(result.geometry.throat_location(), color="0.7", lw=0.7, ls="--")
     ax.set_xlabel("$x$ [m]")
-    ax.set_ylabel(
-        {"mach": "Mach number", "pressure": "$p$", "density": r"$\rho$", "vx": "$v_x$"}[quantity]
-    )
+    ax.set_ylabel(ylabel)
     ax.legend(fontsize=8, frameon=False)
     ax.grid(alpha=0.25)
     return ax

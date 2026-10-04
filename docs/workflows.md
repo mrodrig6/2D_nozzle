@@ -104,8 +104,27 @@ area_ratio               9.772082e-03   9.772082e-03   2.12e-08
 throat_x                -1.490300e-02  -1.490297e-02   2.01e-06
 ```
 
-Objectives: `thrust`, `thrust_coefficient`, `exit_mach`, `mass_flow`,
-`exit_pressure`. Design variables: every geometric one, plus `back_pressure`.
+**Thrust is the default objective, and it is differentiable end to end.** The
+same number `performance(result).thrust` reports is what the adjoint
+differentiates, so there is no separate "optimisation thrust" that could drift
+from the reported one:
+
+| `objective=` | What it maximises |
+|---|---|
+| `thrust` *(default)* | axial thrust, momentum form, per unit depth |
+| `thrust_coefficient` | `thrust / (p_t A_throat)` |
+| `exit_mach` | area-averaged exit Mach number |
+| `mass_flow` | inlet mass flow |
+| `exit_pressure` | area-averaged exit static pressure |
+
+```python
+value, grad, _ = dc.value_and_gradient("thrust", names=("area_ratio", "throat_x"))
+# thrust = 0.050239
+#   d(thrust)/d(area_ratio) = +1.568055e-02
+#   d(thrust)/d(throat_x)   = -6.185422e-03
+```
+
+Design variables: every geometric one, plus `back_pressure`.
 
 > The gradient is of the **discrete** problem, which is what optimisation needs.
 > Use a shock-free operating point: a limiter switching on and off introduces

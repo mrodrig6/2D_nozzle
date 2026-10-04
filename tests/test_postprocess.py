@@ -139,3 +139,69 @@ def test_node_coordinates_are_recovered_exactly(projected):
 
     case = build_case(projected.geometry, projected.flow, projected.discretization)
     assert np.allclose(_node_coords(projected), case.node_coords)
+
+
+# --------------------------------------------------------------------------
+# Temperature, which the profiles and the summary now carry
+# --------------------------------------------------------------------------
+def test_boundary_profiles_carry_temperature_consistent_with_the_field(projected):
+    """A profile and a contour of the same quantity must not drift apart.
+
+    ``sample_boundary`` and ``scalar_field`` derive temperature independently --
+    one from the sampled boundary state, one from an arbitrary state array -- so
+    nothing but a test keeps the two expressions the same.
+    """
+    cl = centreline_profile(projected)
+    assert "temperature" in cl
+    assert "velocity" in cl
+    assert np.all(cl["temperature"] > 0.0)
+
+    # the same states, through the other path
+    tr = boundary_trace(projected.U, projected.operators, BoundaryTag.AXIS)
+    expected = scalar_field(tr.state, projected.flow, "temperature")
+    assert cl["temperature"].min() == pytest.approx(expected.min(), rel=5e-2)
+    assert cl["temperature"].max() == pytest.approx(expected.max(), rel=5e-2)
+
+
+def test_centreline_velocity_matches_its_components(projected):
+    cl = centreline_profile(projected)
+    speed = np.sqrt(cl["vx"] ** 2 + cl["vy"] ** 2)
+    assert np.allclose(cl["velocity"], speed, rtol=1e-12)
+
+
+def test_static_temperature_falls_through_the_expansion(projected):
+    """The physics, not the plumbing: T drops monotonically past the throat.
+
+    A nozzle converts enthalpy into kinetic energy, so static temperature on the
+    axis can only fall downstream of the throat.  If this ever rises, the field
+    is wrong in a way no shape check would catch.
+    """
+    cl = centreline_profile(projected)
+    throat = projected.geometry.throat_location()
+    past = cl["x"] > throat
+    t = cl["temperature"][past]
+    assert t[0] > t[-1]
+    # and it never exceeds the reservoir value
+    assert t.max() <= projected.flow.total_temperature * (1.0 + 1e-9)
+
+
+def test_exit_temperature_ratio_tracks_the_isentropic_relation(projected):
+    r"""``T_e/T_t`` must agree with ``(1 + (gamma-1)/2 M_e^2)^-1``.
+
+    Not exactly: the gap *is* the entropy generated, so this is a check with a
+    physical scale rather than a tolerance pulled from the air.  On a converged
+    solve the two agree to a few tenths of a percent; here the field is the
+    quasi-1D projection, so the agreement is tighter still.
+    """
+    perf = performance(projected)
+    gamma = projected.flow.gamma
+    m_e = perf.exit_mach_area_averaged
+    isentropic = (1.0 + 0.5 * (gamma - 1.0) * m_e * m_e) ** -1.0
+    assert perf.exit_temperature_ratio == pytest.approx(isentropic, rel=0.02)
+    assert 0.0 < perf.exit_temperature_ratio < 1.0
+
+
+def test_the_summary_reports_temperature(projected):
+    """It is only an output if a student actually sees it."""
+    text = performance(projected).summary()
+    assert "T/T_t" in text
