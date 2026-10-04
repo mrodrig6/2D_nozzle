@@ -209,7 +209,7 @@ The point of the file is that you now edit it. Raise `area_ratio` to 3.5 and
 rerun; the exit Mach number climbs and the thrust coefficient does not, because
 past the matched condition the nozzle over-expands. That trade is Exercise 1 of
 [the lab guide](lab_guide.md), and [the three
-workflows](#what-students-do-with-it) below are the same file grown into a
+workflows](workflows.md#what-students-do-with-it) below are the same file grown into a
 sweep, a gradient and an optimisation.
 
 ### Plotting
@@ -265,7 +265,7 @@ isentropic tables apply directly.
 > idealisation, not a mistake — but it puts a Prandtl–Meyer singularity in the
 > exact solution, which **caps the achievable order of accuracy**. A convergence
 > study must use `'smooth'` or `'analytic'`. See
-> [Verification](#verification).
+> [Verification](verification.md#verification).
 
 ### Operating point
 
@@ -287,7 +287,7 @@ print(critical_ratios(2.5019).describe())
 | at `third` | design point, perfectly expanded |
 | below `third` | under-expanded |
 
-**Shocked cases (between the second and first critical ratios) mostly do not converge** — `p=0` sometimes does, `p>=1` diverges; see [Known limitation](#known-limitation-shocked-operating-points).
+**Shocked cases (between the second and first critical ratios) mostly do not converge** — `p=0` sometimes does, `p>=1` diverges; see [Known limitation](performance.md#known-limitation-shocked-operating-points).
 
 ---
 
@@ -302,7 +302,7 @@ print(critical_ratios(2.5019).describe())
 | `geometry_order` (`Q`) | `1` straight-sided, `2` curved. `Q=2` represents the curved wall ~125× more accurately at the same element count. |
 | `refine` | uniform refinement; each level multiplies elements by 4. |
 | `element` | `'tri'` (default) or `'quad'`. |
-| `cfl` | Courant number, `cfl/(2p+1)` times the geometric step. The default is order-dependent — see [the time step](#the-time-step). |
+| `cfl` | Courant number, `cfl/(2p+1)` times the geometric step. The default is order-dependent — see [the time step](performance.md#the-time-step). |
 
 Solve times on 4 cores of a 2.1 GHz Xeon, default `bell` contour, converged to
 `1e-6` on the scaled residual, with the Numba kernels already compiled:
@@ -317,7 +317,7 @@ Solve times on 4 cores of a 2.1 GHz Xeon, default `bell` contour, converged to
 | 1 | 2 | 2240 | 6720 | 3301 | **2.9 s** | 0.86 |
 
 That is 2.5–3.8× faster than this table read a release ago; [what changed and
-what each part was worth](#what-made-it-faster) is below.
+what each part was worth](performance.md#what-made-it-faster) is below.
 
 The *first* solve in a session pays a few seconds of Numba compilation on top,
 once, and then caches it.
