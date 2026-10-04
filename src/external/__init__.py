@@ -14,6 +14,7 @@ from .jet import JetCells, JetRegion, jet_wave_cells
 from .plotting import (
     FIELD_RAMPS,
     REGIME_COLOURS,
+    latex_rc,
     plot_exit_waves,
     plot_jet_cells,
     plot_jet_field,
@@ -38,6 +39,7 @@ __all__ = [
     "deflection_from_wave_angle",
     "exit_wave_structure",
     "jet_wave_cells",
+    "latex_rc",
     "mach_angle",
     "max_deflection_angle",
     "oblique_shock_angle",

@@ -50,6 +50,7 @@ Before running anything, ask the solver what regimes exist for your geometry:
 
 ```python
 from src import critical_ratios
+
 print(critical_ratios(2.5).describe())
 # first=0.9609 (choking), second=0.4345 (shock at exit), third=0.0639 (design)
 ```
@@ -76,9 +77,13 @@ thrust? Why is it not simply the largest one?
 import numpy as np
 from src import sweep
 
-table = sweep(area_ratio=np.linspace(2.0, 4.5, 11),
-              contour="smooth", order=1, refine=1,
-              back_pressure_ratio=0.15)
+table = sweep(
+    area_ratio=np.linspace(2.0, 4.5, 11),
+    contour="smooth",
+    order=1,
+    refine=1,
+    back_pressure_ratio=0.15,
+)
 print(table.table())
 ```
 
@@ -101,9 +106,14 @@ shocked points do not converge (see *Limitations* at the end of this guide):
 
 ```python
 from src import critical_ratios
+
 crit = critical_ratios(2.5)
-table = sweep(back_pressure_ratio=np.linspace(0.05, crit.second * 0.95, 12),
-              area_ratio=2.5, contour="smooth", order=1)
+table = sweep(
+    back_pressure_ratio=np.linspace(0.05, crit.second * 0.95, 12),
+    area_ratio=2.5,
+    contour="smooth",
+    order=1,
+)
 print(table.table(("mass_flow_in", "exit_mach", "thrust_coefficient")))
 ```
 
@@ -117,9 +127,11 @@ to respond:
 
 ```python
 from src import solve_quasi1d, NozzleGeometry, FlowConditions
+
 for pb in (0.999, 0.99, 0.97, 0.9, 0.5, 0.15):
-    s = solve_quasi1d(NozzleGeometry(contour="smooth", area_ratio=2.5),
-                      FlowConditions(back_pressure_ratio=pb))
+    s = solve_quasi1d(
+        NozzleGeometry(contour="smooth", area_ratio=2.5), FlowConditions(back_pressure_ratio=pb)
+    )
     print(f"{pb:.3f}  mdot={s.mass_flow:.6f}  {s.regime.value}")
 ```
 
@@ -136,11 +148,13 @@ Quasi-1D theory answers this exactly:
 
 ```python
 from src import solve_quasi1d, NozzleGeometry, FlowConditions
+
 geom = NozzleGeometry(contour="smooth", area_ratio=2.5)
 for pb in (0.9, 0.7, 0.5):
     s = solve_quasi1d(geom, FlowConditions(back_pressure_ratio=pb))
-    print(f"pb/pt={pb}: shock at x={s.shock_x:.4f}, M1={s.shock_mach:.3f}, "
-          f"M_exit={s.exit_mach:.3f}")
+    print(
+        f"pb/pt={pb}: shock at x={s.shock_x:.4f}, M1={s.shock_mach:.3f}, M_exit={s.exit_mach:.3f}"
+    )
 ```
 
 **What to report.** Shock position and upstream Mach number against back
@@ -150,12 +164,14 @@ never *designed* to run in this regime.
 **Now try the DG solver on the same point** and watch it fail:
 
 ```python
-r = solve_nozzle(back_pressure_ratio=0.70, order=0, refine=1,
-                 contour="smooth", max_iterations=40000)
+r = solve_nozzle(
+    back_pressure_ratio=0.70, order=0, refine=1, contour="smooth", max_iterations=40000
+)
 print(r.converged, r.message)
 import matplotlib.pyplot as plt
 from src.plotting import plot_convergence
-plot_convergence(r)     # the residual falls, then parks
+
+plot_convergence(r)  # the residual falls, then parks
 plt.show()
 ```
 
@@ -179,8 +195,9 @@ shapes give different thrust?
 
 ```python
 for contour in ("conical", "smooth", "bell", "moc", "bezier"):
-    r = solve_nozzle(contour=contour, area_ratio=2.5, order=1,
-                     refine=1, geometry_order=2, verbose=False)
+    r = solve_nozzle(
+        contour=contour, area_ratio=2.5, order=1, refine=1, geometry_order=2, verbose=False
+    )
     print(f"{contour:9s} c_F = {performance(r).thrust_coefficient:.5f}")
 ```
 
@@ -223,12 +240,12 @@ Two consequences you should internalise:
 ```python
 from src import differentiable_case, check_gradient
 
-dc = differentiable_case(contour="bezier", order=1,
-                         back_pressure_ratio=0.15, tolerance=1e-11)
-check_gradient(dc, "thrust", names=("area_ratio", "throat_x"))   # do this first
+dc = differentiable_case(contour="bezier", order=1, back_pressure_ratio=0.15, tolerance=1e-11)
+check_gradient(dc, "thrust", names=("area_ratio", "throat_x"))  # do this first
 
 value, grad, _ = dc.value_and_gradient(
-    "thrust", names=("area_ratio", "throat_x", "bezier_w1", "bezier_w2"))
+    "thrust", names=("area_ratio", "throat_x", "bezier_w1", "bezier_w2")
+)
 ```
 
 **Verify before you trust.** Run `check_gradient` once and confirm the adjoint

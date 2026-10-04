@@ -55,7 +55,7 @@ class NumbaBackend(Backend):
         # if one is added without one.  It raises rather than falling back,
         # because silently returning a Roe answer under another label is the one
         # failure mode a student could not detect.
-        _KERNEL_FLUXES = {"roe": 0, "hllc": 1, "slau2": 2}
+        _KERNEL_FLUXES = {"roe": 0, "hllc": 1}
         _flux = getattr(flow, "flux", "roe")
         if _flux not in _KERNEL_FLUXES:
             raise NotImplementedError(

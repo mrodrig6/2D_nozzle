@@ -53,13 +53,13 @@ jobs:
 
       - name: Lint
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        run: ruff check src tests examples docs
+        run: ruff check src tests examples docs legacy
 
       # --check only reports; it never rewrites a file in CI.  Formatting is
       # settled once here so it stops coming up in review.
       - name: Format
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        run: ruff format --check src tests examples docs
+        run: ruff format --check src tests examples docs legacy
 
       # The ignore list in pyproject.toml is every false positive this raises in
       # aerodynamics and LaTeX, checked individually -- Ue, nd, \oint, pres,
@@ -67,7 +67,7 @@ jobs:
       # check on the prose, which in this repository is most of the content.
       - name: Spell check
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        run: codespell src tests examples docs README.md
+        run: codespell src tests examples docs legacy README.md
 
   docs:
     runs-on: ubuntu-latest

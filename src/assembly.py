@@ -85,8 +85,6 @@ def edge_fluxes(U, ops: Operators, flow: FlowConditions, xp=np):
             low_mach=flow.hllc_low_mach,
             xp=xp,
         )
-    elif flow.flux == "slau2":
-        interior = ph.slau2_flux(UL, UR, nx_i, ny_i, flow.gamma, xp=xp)
     else:
         interior = ph.roe_flux(UL, UR, nx_i, ny_i, flow.gamma, entropy_fix=flow.entropy_fix, xp=xp)
 

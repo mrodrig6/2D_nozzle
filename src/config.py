@@ -92,19 +92,9 @@ class FlowConditions:
             not, and which is the assumption the Zhang-Shu positivity limiter's
             theorem needs.  It also needs no entropy fix, because the HLL family
             cannot produce an expansion shock, so there is no constant to tune.
-        ``'slau2'``
-            SLAU2, the parameter-free low-dissipation AUSM-family flux of Shima
-            and Kitamura.  Splits the interface into a mass flux and a pressure
-            flux rather than solving a Riemann problem, and -- unlike
-            AUSM\ :sup:`+`-up, which this package carried briefly and removed --
-            has no cutoff Mach number and no :math:`K_p`/:math:`K_u` to set.  Its
-            low-Mach dissipation scales as :math:`O(M^2)` on its own.  It carries
-            no positivity proof, so prefer ``'hllc'`` when that guarantee is what
-            you are after.
-
-        All three agree to discretisation error on a smooth solution, so
-        switching is a way to ask how much of an answer is the flux rather than
-        the mesh.  None of them makes a shocked operating point converge.
+        The two agree to discretisation error on a smooth solution, so switching
+        is a way to ask how much of an answer is the flux rather than the mesh.
+        Neither makes a shocked operating point converge.
     """
 
     gamma: float = 1.4
@@ -130,8 +120,8 @@ class FlowConditions:
             )
         if self.entropy_fix < 0.0:
             raise ValueError("entropy_fix must be non-negative")
-        if self.flux not in ("roe", "hllc", "slau2"):
-            raise ValueError(f"flux must be 'roe', 'hllc' or 'slau2', got {self.flux!r}")
+        if self.flux not in ("roe", "hllc"):
+            raise ValueError(f"flux must be 'roe' or 'hllc', got {self.flux!r}")
         if self.hllc_low_mach < 0.0:
             raise ValueError("hllc_low_mach must be non-negative")
 

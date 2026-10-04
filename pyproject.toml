@@ -28,7 +28,13 @@ jax = ["jax>=0.4.20"]
 plot = ["matplotlib>=3.7"]
 # everything a student needs for the lab
 all = ["numba>=0.58", "jax>=0.4.20", "matplotlib>=3.7"]
-dev = ["pytest>=7.4", "pytest-cov", "ruff", "codespell>=2.2"]
+# ruff is pinned, not floated.  An unpinned formatter means CI can turn red
+# with no change to the repository: 0.16 began formatting Python code blocks
+# inside Markdown, which added three files to `ruff format` overnight and broke
+# a green build.  For a teaching code that is the worst kind of failure -- the
+# student changed nothing and the build is red -- so the version moves only
+# when someone moves it.
+dev = ["pytest>=7.4", "pytest-cov", "ruff==0.16.10", "codespell>=2.2"]
 # only for re-rendering the TikZ figures; also needs pdflatex on PATH
 docs = ["pymupdf>=1.23"]
 
