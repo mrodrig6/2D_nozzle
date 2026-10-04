@@ -383,18 +383,17 @@ def plot_jet_cells(
 #: * **velocity** and **Mach** are *magnitudes* with no special middle value, so
 #:   viridis is exactly the right tool: perceptually uniform, monotone in
 #:   lightness, and readable under every common colour-vision deficiency.
-#: * **pressure** is really a *polarity* -- above or below the ambient the jet is
-#:   trying to match.  A diverging ramp would put a neutral midpoint on
-#:   :math:`p_{amb}` and let the eye read the sign straight off.  Viridis is
-#:   sequential, so that sign has to be read from the colourbar instead, where
-#:   ambient is drawn as an explicit line and the ticks are labelled with the
-#:   ratio.  Pass ``cmap='coolwarm'`` to :func:`plot_jet_field` to get the
-#:   diverging encoding back.
+#: * **pressure** is a *polarity* -- above or below the ambient the jet is trying
+#:   to match -- so it keeps a diverging ramp, whose neutral midpoint sits
+#:   exactly on :math:`p_{amb}`.  That puts the sign in the hue, where the eye
+#:   reads it without consulting the colourbar, which a sequential ramp cannot
+#:   do however well it is labelled.  Pass ``cmap='viridis'`` to
+#:   :func:`plot_jet_field` for one ramp across every field.
 #:
-#: Still scaled on :math:`\log(p/p_{amb})`, whichever ramp is used, because a
-#: pressure ratio is symmetric in the log and not in the value.
+#: Pressure is scaled on :math:`\log(p/p_{amb})` whichever ramp is used, because
+#: a pressure ratio is symmetric in the log and not in the value.
 FIELD_RAMPS = {
-    "pressure": ("viridis", "diverging", r"$p / p_{amb}$"),
+    "pressure": ("coolwarm", "diverging", r"$p / p_{amb}$"),
     "velocity": ("viridis", "sequential", r"$v / a_t$"),
     "mach": ("viridis", "sequential", r"$M$"),
 }

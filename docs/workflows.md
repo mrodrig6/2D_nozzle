@@ -189,7 +189,8 @@ two quantities are encoded differently on purpose: pressure is a *polarity* —
 which side of ambient a region sits on — so it gets a diverging ramp pinned at
 `p_amb`, on `log(p/p_amb)` so that twice ambient and half ambient are equal and
 opposite departures. Velocity is a magnitude with no special middle value, so it
-gets a single-hue sequential ramp.
+gets viridis — perceptually uniform, monotone in lightness, and readable under
+every common colour-vision deficiency. Pass `cmap=` to override either.
 
 ![Shock-cell fields](figures/jet_fields.png)
 
