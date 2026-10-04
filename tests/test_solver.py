@@ -9,7 +9,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dgnozzle import (
+from src import (
     FlowConditions,
     NozzleGeometry,
     SolverOptions,
@@ -17,8 +17,8 @@ from dgnozzle import (
     solve_nozzle,
     solve_quasi1d,
 )
-from dgnozzle.api import build_case
-from dgnozzle.initialize import change_order
+from src.api import build_case
+from src.initialize import change_order
 
 pytestmark = pytest.mark.slow
 
@@ -130,9 +130,7 @@ def test_p_continuation_reaches_the_same_answer():
     with_cont = solve_nozzle(order=2, p_continuation=True, **BASE)
     without = solve_nozzle(order=2, p_continuation=False, **BASE)
     assert with_cont.converged and without.converged
-    assert performance(with_cont).thrust == pytest.approx(
-        performance(without).thrust, rel=1e-4
-    )
+    assert performance(with_cont).thrust == pytest.approx(performance(without).thrust, rel=1e-4)
 
 
 def test_order_continuation_is_exact():
@@ -170,8 +168,9 @@ def test_convergence_is_independent_of_the_initial_guess():
 
 def test_refinement_reduces_the_entropy_error():
     errors = [
-        performance(solve_nozzle(order=1, geometry_order=2, refine=r,
-                                 contour="smooth", verbose=False)).entropy_error
+        performance(
+            solve_nozzle(order=1, geometry_order=2, refine=r, contour="smooth", verbose=False)
+        ).entropy_error
         for r in (0, 1)
     ]
     rate = np.log(errors[0] / errors[1]) / np.log(2.0)
@@ -179,7 +178,7 @@ def test_refinement_reduces_the_entropy_error():
 
 
 def test_backends_reach_the_same_steady_state():
-    from dgnozzle.backends import available_backends
+    from src.backends import available_backends
 
     results = {}
     for backend in available_backends():
@@ -199,18 +198,31 @@ def test_divergence_is_reported_not_hidden():
 
 def test_a_mismatched_warm_start_is_rejected():
     case = build_case(NozzleGeometry(contour="smooth"), FlowConditions(), order=1)
-    from dgnozzle.solver import solve_steady
+    from src.solver import solve_steady
 
     bad = np.zeros((case.operators.n_elem, 99, 4))
     with pytest.raises(ValueError, match="expected"):
-        solve_steady(case.operators, case.flow, case.geometry,
-                     case.discretization, SolverOptions(print_interval=0), U0=bad)
+        solve_steady(
+            case.operators,
+            case.flow,
+            case.geometry,
+            case.discretization,
+            SolverOptions(print_interval=0),
+            U0=bad,
+        )
 
 
 def test_unphysical_convergence_is_not_reported_as_success():
     """Residual convergence to a negative-pressure state must not count."""
-    res = solve_nozzle(order=1, contour="smooth", area_ratio=4.0, refine=0,
-                       limiter="none", verbose=False, max_iterations=20000)
+    res = solve_nozzle(
+        order=1,
+        contour="smooth",
+        area_ratio=4.0,
+        refine=0,
+        limiter="none",
+        verbose=False,
+        max_iterations=20000,
+    )
     if res.min_pressure <= 0.0:
         assert not res.converged
         assert "not physical" in res.message

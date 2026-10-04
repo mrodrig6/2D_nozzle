@@ -3,7 +3,7 @@
 
 The geometry figure draws the *actual* contour the solver uses rather than a
 freehand sketch, so it stays honest when the contour families change.  Run this
-after editing :mod:`dgnozzle.geometry`, then recompile the figure::
+after editing :mod:`src.geometry`, then recompile the figure::
 
     python docs/make_tikz.py
     python docs/render_figures.py
@@ -19,11 +19,12 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
+# the package sits at the repository root, so a clone is importable as it stands
+sys.path.insert(0, str(ROOT))
 
 import numpy as np  # noqa: E402
 
-from dgnozzle.geometry import NozzleGeometry  # noqa: E402
+from src.geometry import NozzleGeometry  # noqa: E402
 
 SCALE = 12.0
 TARGET = ROOT / "docs" / "tikz" / "nozzle_geometry.tex"
@@ -68,14 +69,16 @@ def _substitute(text: str, new_coords: str, sign: str, expected: int, what: str)
 def main() -> int:
     geom = NozzleGeometry(contour="bell", area_ratio=2.5019, throat_x=0.1388)
     upper, lower = coordinate_lists(geom)
-    text = TARGET.read_text()
+    text = TARGET.read_text(encoding="utf-8")
 
     print(f"contour: {geom.describe()}")
     text = _substitute(text, upper, r"", EXPECTED_UPPER, "upper")
     text = _substitute(text, lower, r"-", EXPECTED_LOWER, "lower")
-    TARGET.write_text(text)
-    print(f"rewrote {EXPECTED_UPPER} upper and {EXPECTED_LOWER} lower "
-          f"coordinate list(s) in {TARGET.name}")
+    TARGET.write_text(text, encoding="utf-8")
+    print(
+        f"rewrote {EXPECTED_UPPER} upper and {EXPECTED_LOWER} lower "
+        f"coordinate list(s) in {TARGET.name}"
+    )
     print("done -- re-render with: python docs/render_figures.py")
     return 0
 

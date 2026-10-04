@@ -1,0 +1,4 @@
+# geometry only: a bell contour to inspect with 'geometry', no flow solve
+contour=bell
+ar=2.5
+theta_initial_deg=30

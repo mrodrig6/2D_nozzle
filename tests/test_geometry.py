@@ -7,8 +7,8 @@ import warnings
 import numpy as np
 import pytest
 
-from dgnozzle import CONTOURS, NozzleGeometry, check_contour
-from dgnozzle.geometry import (
+from src import CONTOURS, NozzleGeometry, check_contour
+from src.geometry import (
     ANALYTIC_AREA_RATIO,
     ANALYTIC_THROAT_X,
     ANALYTIC_THROAT_Y,

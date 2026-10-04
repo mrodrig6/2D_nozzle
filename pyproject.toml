@@ -28,21 +28,27 @@ jax = ["jax>=0.4.20"]
 plot = ["matplotlib>=3.7"]
 # everything a student needs for the lab
 all = ["numba>=0.58", "jax>=0.4.20", "matplotlib>=3.7"]
-dev = ["pytest>=7.4", "pytest-cov", "ruff"]
+# ruff is pinned, not floated.  An unpinned formatter means CI can turn red
+# with no change to the repository: 0.16 began formatting Python code blocks
+# inside Markdown, which added three files to `ruff format` overnight and broke
+# a green build.  For a teaching code that is the worst kind of failure -- the
+# student changed nothing and the build is red -- so the version moves only
+# when someone moves it.
+dev = ["pytest>=7.4", "pytest-cov", "ruff==0.16.10", "codespell>=2.2"]
 # only for re-rendering the TikZ figures; also needs pdflatex on PATH
 docs = ["pymupdf>=1.23"]
 
 [project.scripts]
-dgnozzle = "dgnozzle.cli:main"
+dgnozzle = "src.cli:main"
 
 [tool.setuptools.packages.find]
-where = ["src"]
+include = ["src*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
 markers = [
-    "slow: tests that run a full solve (deselect with -m 'not slow')",
+    "slow: tests that run a full solve (use --fast to skip them, --slow for only them)",
     "jax: tests that need JAX",
     "numba: tests that need Numba",
 ]
@@ -54,3 +60,16 @@ target-version = "py310"
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B"]
 ignore = ["E741"]
+
+[tool.codespell]
+# Every entry here is a false positive that codespell flags in aerodynamics or
+# LaTeX, checked one by one -- not a way of silencing real typos:
+#   Ue    the element state vector, U_e
+#   nd    a normal component, n_d
+#   oint  from the LaTeX \oint contour integral
+#   pres  a local name for pressure
+#   numer from the journal abbreviation "SIAM J. Numer. Anal."
+#   iy    an index
+ignore-words-list = "ue,nd,oint,pres,numer,iy"
+skip = "*.png,*.pdf,./.git,./docs/figures"
+quiet-level = 2

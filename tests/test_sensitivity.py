@@ -13,7 +13,7 @@ pytestmark = [pytest.mark.slow, pytest.mark.jax]
 
 pytest.importorskip("jax")
 
-from dgnozzle.sensitivity import (  # noqa: E402
+from src.sensitivity import (  # noqa: E402
     ALL_DESIGN_PARAMETERS,
     OBJECTIVES,
     check_gradient,
@@ -27,8 +27,12 @@ def dcase():
     # 'smooth' and a shock-free operating point: the limiter stays inactive, so
     # the discrete objective is smooth in the design variables
     return differentiable_case(
-        contour="smooth", order=1, refine=0,
-        back_pressure_ratio=0.15, tolerance=1e-11, max_iterations=200_000,
+        contour="smooth",
+        order=1,
+        refine=0,
+        back_pressure_ratio=0.15,
+        tolerance=1e-11,
+        max_iterations=200_000,
     )
 
 
@@ -70,7 +74,7 @@ def test_back_pressure_gradient_vanishes_at_a_supersonic_exit(dcase):
     A gradient of exactly zero here is physics, not a failure to propagate.
     """
     _, grad, result = dcase.value_and_gradient("thrust", names=("back_pressure",))
-    from dgnozzle.postprocess import performance
+    from src.postprocess import performance
 
     assert performance(result).exit_mach_area_averaged > 1.0
     assert abs(grad["back_pressure"]) < 1e-12
@@ -93,8 +97,12 @@ def test_forward_solve_uses_the_frozen_logical_grid(dcase):
 
 def test_a_failed_forward_solve_refuses_to_produce_a_gradient():
     bad = differentiable_case(
-        contour="smooth", order=1, refine=0, back_pressure_ratio=0.15,
-        cfl=90.0, max_iterations=500,
+        contour="smooth",
+        order=1,
+        refine=0,
+        back_pressure_ratio=0.15,
+        cfl=90.0,
+        max_iterations=500,
     )
     with pytest.raises(RuntimeError, match="did not converge"):
         bad.value_and_gradient("thrust", names=("area_ratio",))

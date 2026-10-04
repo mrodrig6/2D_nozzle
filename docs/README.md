@@ -2,6 +2,10 @@
 
 | File | Contents |
 |---|---|
+| [`usage.md`](usage.md) | **Driving the code.** Launcher reference, the Python API, every design variable, and how to choose a resolution. |
+| [`workflows.md`](workflows.md) | **What to do with it.** Parameter sweeps, sensitivity analysis, shape optimisation, and the external flow outside the exit. |
+| [`performance.md`](performance.md) | Backends, the time step, and what made it fast. |
+| [`verification.md`](verification.md) | What is checked, and what to do when a run misbehaves. |
 | [`theory.md`](theory.md) | **The formulation and geometry definition.** Governing equations, DG weak form, Roe flux, boundary conditions, limiters, quasi-1D theory, performance metrics, verification evidence, and the adjoint. Markdown with LaTeX equations — it renders on GitHub, so there is nothing to build to read it. |
 | [`lab_guide.md`](lab_guide.md) | Student-facing exercises. |
 | [`tikz/`](tikz/) | TikZ sources for every figure in `theory.md`. |
@@ -48,6 +52,6 @@ cd docs/tikz && pdflatex nozzle_geometry.tex
 | `mesh_map.tex` | the fixed logical grid and the design-dependent map onto it |
 
 The wall in `nozzle_geometry.tex` is the **actual** contour the solver
-produces, sampled from `dgnozzle.geometry` — not a freehand sketch. `make_tikz.py`
+produces, sampled from `src.geometry` — not a freehand sketch. `make_tikz.py`
 fails loudly rather than silently doing nothing if the figure source changes
 shape, which is what makes the CI staleness check on it worth having.

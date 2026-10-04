@@ -18,6 +18,7 @@ matches on the name, so `./dg2d.sh run 02` works too.
 | **`optimise`** | `04_optimise.py` | **L-BFGS-B on a Bézier wall using adjoint gradients** | JAX, SciPy | 5 min |
 | `convergence` | `05_convergence.py` | observed order of accuracy, and why the contour matters | — | 5 min |
 | `shock` | `06_shock.py` | back-pressure sweep across all four operating regimes | — | 5 min |
+| `external` | `07_external.py` | the wave structure *outside* the lip, and the shock-cell pattern downstream | — | 30 s |
 
 The three in bold are the workflows the course is built around — parameter
 sweeps, sensitivity analysis and shape optimisation. They are the ones to read
@@ -28,8 +29,7 @@ Each is self-contained, prints what it is doing, and writes a PNG into the
 directory you ran it from. They are meant to be copied and edited: changing a
 geometry in one of these is the normal way to start a study.
 
-Running them directly works too, if you have the package installed or `src/` on
-your `PYTHONPATH`:
+Running them directly works too, from the repository root:
 
 ```bash
 python examples/02_sweep.py

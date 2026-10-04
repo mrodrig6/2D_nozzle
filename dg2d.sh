@@ -3,8 +3,8 @@
 # dg2d.sh -- one entry point for the 2D DG nozzle code.
 #
 # The point of this script is that nothing has to be set up first.  It finds a
-# Python, puts `src/` on the import path if the package is not installed, and
-# runs what you asked for from wherever you happen to be:
+# Python, puts the repository on the import path if the package is not installed,
+# and runs what you asked for from wherever you happen to be:
 #
 #     ./dg2d.sh run sweep
 #     ./dg2d.sh solve area_ratio=3.0 back_pressure_ratio=0.12 order=1
@@ -40,20 +40,102 @@ find_python() {
 
 die() { printf '%s: %s\n' "$SELF" "$*" >&2; exit 2; }
 
-# An installed package wins; otherwise src/ goes on the path, so the code runs
-# straight out of a clone with no install step and no need to cd anywhere.
-# This is deliberately not an error: `install` is a convenience, not a
-# prerequisite.
+# An installed package wins; otherwise the repository root goes on the path, so
+# the code runs straight out of a clone with no install step and from any working
+# directory.  This is deliberately not an error: `install` is a convenience, not
+# a prerequisite.  The package sits at the root, so `python -m src` already
+# works when you are standing in the clone -- this is what makes it work when
+# you are not.
 setup_import_path() {
-    if ! "$PY" -c 'import dgnozzle' >/dev/null 2>&1; then
-        export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+    if ! "$PY" -c 'import src' >/dev/null 2>&1; then
+        export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
     fi
-    if ! "$PY" -c 'import dgnozzle' >/dev/null 2>&1; then
-        printf '%s: cannot import dgnozzle.  ' "$SELF" >&2
-        "$PY" -c 'import dgnozzle' 2>&1 | tail -3 >&2
+    if ! "$PY" -c 'import src' >/dev/null 2>&1; then
+        printf '%s: cannot import the solver package.  ' "$SELF" >&2
+        "$PY" -c 'import src' 2>&1 | tail -3 >&2
         printf '\nTry:  %s/%s install\n' "." "$SELF" >&2
         exit 2
     fi
+}
+
+# --------------------------------------------------------------------------
+# Argument decks
+# --------------------------------------------------------------------------
+# `@name` is replaced by the `name=value` lines in that file, so a case you run
+# often lives in a file instead of in your shell history:
+#
+#     ./dg2d.sh solve @design              # cases/design.dg
+#     ./dg2d.sh solve @design pb=0.12      # the same deck, one value overridden
+#     ./dg2d.sh sweep back_pressure_ratio 0.05 0.3 12 @design
+#
+# A deck holds exactly what you would have typed, so there is no second
+# vocabulary to learn and no schema to keep in step with the code: `#` starts a
+# comment, blank lines are ignored, and a deck may name another deck to include
+# it.  Later arguments win, which is what makes the override above work.
+#
+# Because this is argument expansion and nothing more, a deck works with any
+# subcommand that accepts the keys in it: `solve`, `sweep` and `bench` take the
+# full set, while `geometry` takes only the geometry keys and will say
+# `unrecognized arguments` if handed a deck carrying solver options.  That is
+# the intended behaviour -- it names the keys it rejected rather than ignoring
+# them, which is what a typo needs too.
+DECK_DIR="$ROOT/cases"
+DECK_EXT=".dg"
+DECK_MAX_DEPTH=8
+
+list_decks() {
+    local path stem found=0
+    for path in "$DECK_DIR"/*"$DECK_EXT"; do
+        [[ -e $path ]] || continue
+        found=1
+        stem=$(basename "$path" "$DECK_EXT")
+        printf '  @%-13s %s\n' "$stem" "$(deck_summary "$path")"
+    done
+    (( found )) || printf '  (none in %s)\n' "${DECK_DIR#"$ROOT"/}"
+}
+
+deck_summary() {
+    # the summary is the first comment line, which is why decks start with one
+    sed -n '1{/^[[:space:]]*#/{s/^[[:space:]]*#[[:space:]]*//;p;};q;}' "$1"
+}
+
+resolve_deck() {
+    local want=$1 candidate
+    for candidate in \
+        "$want" "$want$DECK_EXT" \
+        "$DECK_DIR/$want" "$DECK_DIR/$want$DECK_EXT"
+    do
+        if [[ -f $candidate ]]; then printf '%s\n' "$candidate"; return 0; fi
+    done
+    printf '%s: no deck named %s.  Available:\n' "$SELF" "$want" >&2
+    list_decks >&2
+    return 1
+}
+
+# Replace every `@deck` token with that deck's lines, recursively.
+# EXPANDED is set as a side effect; bash functions cannot return arrays.
+expand_decks() {
+    local depth=$1; shift
+    (( depth <= DECK_MAX_DEPTH )) || die \
+        "decks nested more than $DECK_MAX_DEPTH deep -- does a deck include itself?"
+    local out=() lines=() token path line
+    for token in ${@+"$@"}; do
+        if [[ $token != @* || $token == *::* ]]; then
+            out+=("$token")
+            continue
+        fi
+        path=$(resolve_deck "${token#@}") || exit 2
+        lines=()
+        while IFS= read -r line || [[ -n $line ]]; do
+            line=${line%%#*}                        # drop comments
+            line=${line#"${line%%[![:space:]]*}"}   # trim left
+            line=${line%"${line##*[![:space:]]}"}   # trim right
+            [[ -n $line ]] && lines+=("$line")
+        done < "$path"
+        expand_decks $((depth + 1)) ${lines[@]+"${lines[@]}"}
+        out+=(${EXPANDED[@]+"${EXPANDED[@]}"})
+    done
+    EXPANDED=(${out[@]+"${out[@]}"})
 }
 
 # --------------------------------------------------------------------------
@@ -66,8 +148,10 @@ setup_import_path() {
 #
 # TRANSLATED is set as a side effect; bash functions cannot return arrays.
 translate() {
+    expand_decks 1 ${@+"$@"}
+    set -- ${EXPANDED[@]+"${EXPANDED[@]}"}
     local out=() token key value
-    for token in "$@"; do
+    for token in ${@+"$@"}; do
         if [[ $token == -* || $token != *=* ]]; then
             out+=("$token")
             continue
@@ -78,6 +162,9 @@ translate() {
             p|order)                              key=order ;;
             Q|geometry_order|geometry-order)      key=geometry-order ;;
             ref|refine)                           key=refine ;;
+            # NOT `M`: in a compressible-flow code M is the Mach number,
+            # and the TVB constant is not a Mach number
+            tvb|tvb_constant|tvb-constant)        key=tvb-constant ;;
             ar|area_ratio|area-ratio)             key=area-ratio ;;
             pb|back_pressure|back_pressure_ratio) key=back-pressure-ratio ;;
             *)                                    key=${key//_/-} ;;
@@ -100,7 +187,7 @@ translate() {
 dgnozzle() {
     local subcommand=$1; shift
     translate "$@"
-    exec "$PY" -m dgnozzle "$subcommand" ${TRANSLATED[@]+"${TRANSLATED[@]}"}
+    exec "$PY" -m src "$subcommand" ${TRANSLATED[@]+"${TRANSLATED[@]}"}
 }
 
 # --------------------------------------------------------------------------
@@ -161,7 +248,7 @@ Usage: ./$SELF <command> [arguments]
 Getting started
   install            install the package and its optional extras with pip
   check              report the Python, the version, and which backends work
-  list               list the cases 'run' can execute
+  list               list the cases 'run' can execute and the decks '@' expands
 
 Running
   run <case> [...]   run one of the case scripts in examples/
@@ -181,18 +268,37 @@ Arguments are 'name=value', using the same names as the Python API:
   ./$SELF geometry contour=bezier bezier_w1=0.7
   ./$SELF run sensitivity
 
-Aliases: p=order, Q=geometry_order, ref=refine, ar=area_ratio,
-pb=back_pressure_ratio.  Ordinary --flags work too, so anything
-'python -m dgnozzle --help' documents is still available.
+A '@name' argument is replaced by the lines of cases/name.dg, so a case you run
+often lives in a file rather than in your shell history.  Later arguments win,
+so a deck is a starting point you can override:
 
-Cases:
+  ./$SELF solve @design                 # exactly the lines in cases/design.dg
+  ./$SELF solve @design pb=0.12         # the deck, with one value changed
+  ./$SELF sweep back_pressure_ratio 0.05 0.3 12 @design
+  ./$SELF bench @converged
+  ./$SELF geometry @contour              # a geometry-only deck
+
+Decks are the same 'name=value' lines you would have typed, '#' starts a
+comment, and a deck may name another deck to build on it.  A deck works with
+any subcommand that accepts the keys it holds -- 'solve', 'sweep' and 'bench'
+take the full set, 'geometry' only the geometry ones.
+
+Aliases: p=order, Q=geometry_order, ref=refine, ar=area_ratio,
+pb=back_pressure_ratio, tvb=tvb_constant.  Ordinary --flags work too, so
+anything 'python -m src --help' documents is still available.
+'M' is deliberately NOT an alias: in this code M always means Mach number.
+
+Cases ('run <name>'):
 $(list_cases)
+
+Decks ('@name'):
+$(list_decks)
 
 Environment
   DG2D_PYTHON        the interpreter to use (default: python3, then python)
 
-No install is required: if dgnozzle is not importable, src/ is put on
-PYTHONPATH automatically.  Documentation is in docs/ -- start with
+No install is required: if the solver package is not importable, the repository root is
+put on PYTHONPATH automatically.  Documentation is in docs/ -- start with
 docs/theory.md for the formulation and docs/lab_guide.md for the exercises.
 EOF
 }
@@ -213,16 +319,16 @@ from pathlib import Path
 
 print(f"python   {sys.version.split()[0]}  ({sys.executable})")
 
-spec = importlib.util.find_spec("dgnozzle")
+spec = importlib.util.find_spec("src")
 if spec is None:
-    print("dgnozzle NOT IMPORTABLE")
+    print("solver package NOT IMPORTABLE")
     raise SystemExit(2)
 
-import dgnozzle
-from dgnozzle.backends import available_backends
+import src
+from src.backends import available_backends
 
-where = Path(dgnozzle.__file__).parent
-print(f"dgnozzle {dgnozzle.__version__}  ({where})")
+where = Path(src.__file__).parent
+print(f"dgnozzle {src.__version__}  ({where})")
 print(f"backends {', '.join(available_backends())}")
 
 for name, what in (("numba", "the fast solver"),
@@ -245,7 +351,18 @@ cmd_run() {
 
 cmd_test() {
     translate "$@"
-    exec "$PY" -m pytest "$ROOT" ${TRANSLATED[@]+"${TRANSLATED[@]}"}
+    # Only default to the whole tree when no path was given -- appending $ROOT
+    # unconditionally made `dg2d.sh test tests/test_docs.py` run everything,
+    # which looks like the filter being ignored because it is.
+    local target=("$ROOT")
+    local arg
+    for arg in ${TRANSLATED[@]+"${TRANSLATED[@]}"}; do
+        if [[ -e $arg || $arg == *::* ]]; then
+            target=()
+            break
+        fi
+    done
+    exec "$PY" -m pytest ${target[@]+"${target[@]}"} ${TRANSLATED[@]+"${TRANSLATED[@]}"}
 }
 
 cmd_docs() {
@@ -273,7 +390,8 @@ main() {
     case $command in
         install)   cmd_install ${1+"$1"} ;;
         check)     setup_import_path; cmd_check ;;
-        list)      list_cases ;;
+        list)      printf "Cases ('run <name>'):\n"; list_cases
+                   printf "\nDecks ('@name'):\n"; list_decks ;;
         docs)      cmd_docs ;;
         run)       setup_import_path; cmd_run "$@" ;;
         test)      setup_import_path; cmd_test "$@" ;;

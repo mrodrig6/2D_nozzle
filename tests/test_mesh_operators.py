@@ -10,11 +10,11 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dgnozzle import BoundaryTag, NozzleGeometry, build_nozzle_mesh
-from dgnozzle import physics as ph
-from dgnozzle.assembly import face_term, volume_term
-from dgnozzle.config import FlowConditions
-from dgnozzle.operators import build_operators
+from src import BoundaryTag, NozzleGeometry, build_nozzle_mesh
+from src import physics as ph
+from src.assembly import face_term, volume_term
+from src.config import FlowConditions
+from src.operators import build_operators
 
 KINDS = ["tri", "quad"]
 ORDERS = [0, 1, 2]
@@ -150,8 +150,9 @@ def test_freestream_preservation(geom, kind, order, q):
 @pytest.mark.parametrize("q", GEOM_ORDERS)
 def test_curved_elements_improve_the_geometry(geom, q):
     """Q=2 must represent the curved wall far better than Q=1 at equal element count."""
-    exact = float(np.trapezoid(np.asarray(geom.wall(np.linspace(0, 1, 400_001))),
-                               np.linspace(0, 1, 400_001)))
+    exact = float(
+        np.trapezoid(np.asarray(geom.wall(np.linspace(0, 1, 400_001))), np.linspace(0, 1, 400_001))
+    )
     errors = {}
     for qq in (1, 2):
         topo, coords, _ = build_nozzle_mesh(geom, geometry_order=qq)
@@ -169,7 +170,7 @@ def test_inverted_mesh_is_rejected_with_a_useful_message(geom):
 
 
 def test_non_conforming_mesh_is_detected(geom):
-    from dgnozzle.mesh import build_edges, nozzle_boundary_tagger
+    from src.mesh import build_edges, nozzle_boundary_tagger
 
     topo, coords, _ = build_nozzle_mesh(geom)
     coords = np.asarray(coords)

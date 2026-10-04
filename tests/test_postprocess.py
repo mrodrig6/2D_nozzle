@@ -5,10 +5,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dgnozzle import BoundaryTag, FlowConditions, NozzleGeometry, build_case, performance
-from dgnozzle import physics as ph
-from dgnozzle.initialize import quasi1d_initial
-from dgnozzle.postprocess import (
+from src import BoundaryTag, FlowConditions, NozzleGeometry, build_case, performance
+from src import physics as ph
+from src.initialize import quasi1d_initial
+from src.postprocess import (
     boundary_trace,
     centreline_profile,
     entropy_error,
@@ -17,7 +17,7 @@ from dgnozzle.postprocess import (
     scalar_field,
     wall_profile,
 )
-from dgnozzle.solver import SolveHistory, SolveResult
+from src.solver import SolveHistory, SolveResult
 
 
 @pytest.fixture(scope="module")
@@ -27,9 +27,17 @@ def projected():
     case = build_case(NozzleGeometry(contour="smooth"), FlowConditions(), order=1)
     U = quasi1d_initial(case.operators, case.flow, case.geometry)
     return SolveResult(
-        U=U, operators=case.operators, flow=case.flow, geometry=case.geometry,
-        discretization=case.discretization, converged=True, iterations=0,
-        residual=0.0, residual_initial=1.0, history=SolveHistory(), backend="numpy",
+        U=U,
+        operators=case.operators,
+        flow=case.flow,
+        geometry=case.geometry,
+        discretization=case.discretization,
+        converged=True,
+        iterations=0,
+        residual=0.0,
+        residual_initial=1.0,
+        history=SolveHistory(),
+        backend="numpy",
     )
 
 
@@ -55,8 +63,9 @@ def test_entropy_error_is_zero_for_an_isentropic_field():
     case = build_case(NozzleGeometry(contour="smooth"), FlowConditions(), order=1)
     flow = case.flow
     ops = case.operators
-    s_t = (flow.total_pressure ** (1 - flow.gamma)
-           * (flow.Rgas * flow.total_temperature) ** flow.gamma)
+    s_t = (
+        flow.total_pressure ** (1 - flow.gamma) * (flow.Rgas * flow.total_temperature) ** flow.gamma
+    )
     rho = 1.7
     p = s_t * rho**flow.gamma
     U = np.zeros((ops.n_elem, ops.ref.n_basis, 4))
@@ -69,13 +78,15 @@ def test_entropy_error_is_positive_off_the_isentrope(projected):
     assert entropy_error(projected.U, projected.operators, projected.flow) >= 0.0
 
 
-@pytest.mark.parametrize("name", ["mach", "pressure", "density", "temperature",
-                                  "vx", "vy", "velocity", "entropy"])
+@pytest.mark.parametrize(
+    "name", ["mach", "pressure", "density", "temperature", "vx", "vy", "velocity", "entropy"]
+)
 def test_scalar_fields_are_finite_and_sensible(projected, name):
-    from dgnozzle.postprocess import solution_at_quadrature
+    from src.postprocess import solution_at_quadrature
 
-    values = scalar_field(solution_at_quadrature(projected.U, projected.operators),
-                          projected.flow, name)
+    values = scalar_field(
+        solution_at_quadrature(projected.U, projected.operators), projected.flow, name
+    )
     assert np.all(np.isfinite(values))
     if name in ("mach", "pressure", "density", "temperature", "velocity", "entropy"):
         assert np.all(values >= 0.0)
@@ -124,8 +135,7 @@ def test_performance_reports_full_nozzle_quantities(projected):
 
 def test_node_coordinates_are_recovered_exactly(projected):
     """postprocess rebuilds coordinates from the geometry; they must match."""
-    from dgnozzle.postprocess import _node_coords
+    from src.postprocess import _node_coords
 
-    case = build_case(projected.geometry, projected.flow,
-                      projected.discretization)
+    case = build_case(projected.geometry, projected.flow, projected.discretization)
     assert np.allclose(_node_coords(projected), case.node_coords)

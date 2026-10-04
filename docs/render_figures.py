@@ -41,9 +41,16 @@ DPI = 200
 def _compile(source: Path, workdir: Path) -> Path:
     """Compile one standalone TikZ file, returning the PDF."""
     subprocess.run(
-        ["pdflatex", "-interaction=nonstopmode", "-halt-on-error",
-         f"-output-directory={workdir}", str(source)],
-        check=True, capture_output=True, text=True,
+        [
+            "pdflatex",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            f"-output-directory={workdir}",
+            str(source),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
     )
     return workdir / (source.stem + ".pdf")
 
@@ -83,12 +90,13 @@ def main(argv: list[str] | None = None) -> int:
             try:
                 pdf = _compile(source, workdir)
             except subprocess.CalledProcessError as exc:
-                print(f"{source.name}: pdflatex failed\n{exc.stdout[-2000:]}",
-                      file=sys.stderr)
+                print(f"{source.name}: pdflatex failed\n{exc.stdout[-2000:]}", file=sys.stderr)
                 return 1
             _rasterise(pdf, png, args.dpi)
-            print(f"{source.name} -> {png.relative_to(DOCS.parent)}"
-                  f"  ({png.stat().st_size // 1024} kB)")
+            print(
+                f"{source.name} -> {png.relative_to(DOCS.parent)}"
+                f"  ({png.stat().st_size // 1024} kB)"
+            )
     return 0
 
 

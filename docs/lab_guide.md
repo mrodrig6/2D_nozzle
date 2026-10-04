@@ -23,7 +23,7 @@ Nothing has to be installed first; `./dg2d.sh help` lists every command, and
 Then get comfortable with the one function you need:
 
 ```python
-from dgnozzle import solve_nozzle, performance
+from src import solve_nozzle, performance
 
 result = solve_nozzle(area_ratio=2.5, back_pressure_ratio=0.15, order=1)
 assert result.converged, result.message
@@ -49,7 +49,8 @@ control it:
 Before running anything, ask the solver what regimes exist for your geometry:
 
 ```python
-from dgnozzle import critical_ratios
+from src import critical_ratios
+
 print(critical_ratios(2.5).describe())
 # first=0.9609 (choking), second=0.4345 (shock at exit), third=0.0639 (design)
 ```
@@ -74,11 +75,15 @@ thrust? Why is it not simply the largest one?
 
 ```python
 import numpy as np
-from dgnozzle import sweep
+from src import sweep
 
-table = sweep(area_ratio=np.linspace(2.0, 4.5, 11),
-              contour="smooth", order=1, refine=1,
-              back_pressure_ratio=0.15)
+table = sweep(
+    area_ratio=np.linspace(2.0, 4.5, 11),
+    contour="smooth",
+    order=1,
+    refine=1,
+    back_pressure_ratio=0.15,
+)
 print(table.table())
 ```
 
@@ -100,10 +105,15 @@ Sweep only the **shock-free** range — below the second critical ratio — beca
 shocked points do not converge (see *Limitations* at the end of this guide):
 
 ```python
-from dgnozzle import critical_ratios
+from src import critical_ratios
+
 crit = critical_ratios(2.5)
-table = sweep(back_pressure_ratio=np.linspace(0.05, crit.second * 0.95, 12),
-              area_ratio=2.5, contour="smooth", order=1)
+table = sweep(
+    back_pressure_ratio=np.linspace(0.05, crit.second * 0.95, 12),
+    area_ratio=2.5,
+    contour="smooth",
+    order=1,
+)
 print(table.table(("mass_flow_in", "exit_mach", "thrust_coefficient")))
 ```
 
@@ -116,10 +126,12 @@ including the shocked part, so use it to show where the mass flow *would* start
 to respond:
 
 ```python
-from dgnozzle import solve_quasi1d, NozzleGeometry, FlowConditions
+from src import solve_quasi1d, NozzleGeometry, FlowConditions
+
 for pb in (0.999, 0.99, 0.97, 0.9, 0.5, 0.15):
-    s = solve_quasi1d(NozzleGeometry(contour="smooth", area_ratio=2.5),
-                      FlowConditions(back_pressure_ratio=pb))
+    s = solve_quasi1d(
+        NozzleGeometry(contour="smooth", area_ratio=2.5), FlowConditions(back_pressure_ratio=pb)
+    )
     print(f"{pb:.3f}  mdot={s.mass_flow:.6f}  {s.regime.value}")
 ```
 
@@ -135,12 +147,14 @@ to back pressure?
 Quasi-1D theory answers this exactly:
 
 ```python
-from dgnozzle import solve_quasi1d, NozzleGeometry, FlowConditions
+from src import solve_quasi1d, NozzleGeometry, FlowConditions
+
 geom = NozzleGeometry(contour="smooth", area_ratio=2.5)
 for pb in (0.9, 0.7, 0.5):
     s = solve_quasi1d(geom, FlowConditions(back_pressure_ratio=pb))
-    print(f"pb/pt={pb}: shock at x={s.shock_x:.4f}, M1={s.shock_mach:.3f}, "
-          f"M_exit={s.exit_mach:.3f}")
+    print(
+        f"pb/pt={pb}: shock at x={s.shock_x:.4f}, M1={s.shock_mach:.3f}, M_exit={s.exit_mach:.3f}"
+    )
 ```
 
 **What to report.** Shock position and upstream Mach number against back
@@ -150,12 +164,14 @@ never *designed* to run in this regime.
 **Now try the DG solver on the same point** and watch it fail:
 
 ```python
-r = solve_nozzle(back_pressure_ratio=0.70, order=0, refine=1,
-                 contour="smooth", max_iterations=40000)
+r = solve_nozzle(
+    back_pressure_ratio=0.70, order=0, refine=1, contour="smooth", max_iterations=40000
+)
 print(r.converged, r.message)
 import matplotlib.pyplot as plt
-from dgnozzle.plotting import plot_convergence
-plot_convergence(r)     # the residual falls, then parks
+from src.plotting import plot_convergence
+
+plot_convergence(r)  # the residual falls, then parks
 plt.show()
 ```
 
@@ -179,8 +195,9 @@ shapes give different thrust?
 
 ```python
 for contour in ("conical", "smooth", "bell", "moc", "bezier"):
-    r = solve_nozzle(contour=contour, area_ratio=2.5, order=1,
-                     refine=1, geometry_order=2, verbose=False)
+    r = solve_nozzle(
+        contour=contour, area_ratio=2.5, order=1, refine=1, geometry_order=2, verbose=False
+    )
     print(f"{contour:9s} c_F = {performance(r).thrust_coefficient:.5f}")
 ```
 
@@ -221,14 +238,14 @@ Two consequences you should internalise:
 **Question.** Which design variable does thrust care about most?
 
 ```python
-from dgnozzle import differentiable_case, check_gradient
+from src import differentiable_case, check_gradient
 
-dc = differentiable_case(contour="bezier", order=1,
-                         back_pressure_ratio=0.15, tolerance=1e-11)
-check_gradient(dc, "thrust", names=("area_ratio", "throat_x"))   # do this first
+dc = differentiable_case(contour="bezier", order=1, back_pressure_ratio=0.15, tolerance=1e-11)
+check_gradient(dc, "thrust", names=("area_ratio", "throat_x"))  # do this first
 
 value, grad, _ = dc.value_and_gradient(
-    "thrust", names=("area_ratio", "throat_x", "bezier_w1", "bezier_w2"))
+    "thrust", names=("area_ratio", "throat_x", "bezier_w1", "bezier_w2")
+)
 ```
 
 **Verify before you trust.** Run `check_gradient` once and confirm the adjoint
@@ -288,27 +305,16 @@ Read the message. Every failure names both cause and remedy.
 
 ## Limitations
 
-**Shocked operating points do not converge.** For `back_pressure_ratio` between
-the second and first critical ratios, the residual falls about an order of
-magnitude and then parks:
-
-| settings | residual floor (scaled) |
-|---|---|
-| `p=0`, `refine=0/1/2` | 6.1e-2 / 4.9e-2 / 5.6e-2 |
-| `p=1` + `barth-jespersen` + `ssprk3`, `refine=0/1` | 1.5 / 2.6 |
-
-The `p=0` floor is mesh-independent, and `p>=1` with a limiter is *worse* than
-`p=0`. Localising the residual shows 85% of it in the single axial band
-`x ∈ [0.2, 0.3)` — where the shock sits — and only 0.1% at the outflow, which
-rules out the boundary conditions. The exit plane also shows reverse flow
-(minimum normal Mach −0.22): a 2D recirculation quasi-1D theory cannot
-represent. The solver reports these as `converged=False` and does not pass the
-numbers off as trustworthy, but it cannot currently compute them. Use
-`solve_quasi1d` for shock physics.
+**Shocked operating points usually do not converge.** For
+`back_pressure_ratio` between the second and first critical ratios the march
+generally stalls at `p=0` and diverges at `p>=1`. Try `p=0` and check
+`converged` — some shocked points do reach the tolerance. Use `solve_quasi1d`
+for shock physics.
 
 Everything shock-free is verified and converges cleanly: the design point,
 over-expanded and under-expanded operation, the whole area-ratio design space,
 and all sensitivity and optimisation work.
+
 
 ---
 

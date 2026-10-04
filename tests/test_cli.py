@@ -3,7 +3,7 @@
 Every subcommand is invoked here, because the absence of that coverage is how a
 real defect survived: ``_collect`` read solver attributes by direct attribute
 access, but the ``geometry`` subparser declares no solver options, so
-``python -m dgnozzle geometry`` raised ``AttributeError`` before doing any work.
+``python -m src geometry`` raised ``AttributeError`` before doing any work.
 Nothing that only inspects ``--help`` would have caught it.
 
 Only ``geometry`` runs here without a flow solve; the subcommands that do are
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-from dgnozzle.cli import _collect, build_parser, main
+from src.cli import _collect, build_parser, main
 
 SUBCOMMANDS = ("solve", "sweep", "geometry", "bench")
 
@@ -85,9 +85,7 @@ def _choices_for(option: str, subcommand: str = "solve") -> tuple[str, ...]:
     subparsers = next(
         a for a in parser._actions if isinstance(a.choices, dict) and subcommand in a.choices
     )
-    action = next(
-        a for a in subparsers.choices[subcommand]._actions if a.dest == option
-    )
+    action = next(a for a in subparsers.choices[subcommand]._actions if a.dest == option)
     return tuple(action.choices or ())
 
 
@@ -97,7 +95,7 @@ def test_every_x_spacing_the_cli_offers_actually_builds_a_mesh():
     The choices are read off the parser rather than written out here, so this
     keeps checking the real invariant if they are ever renamed.
     """
-    from dgnozzle import NozzleGeometry, build_case
+    from src import NozzleGeometry, build_case
 
     choices = _choices_for("x_spacing")
     assert choices, "the CLI declares no x_spacing choices"
@@ -109,7 +107,7 @@ def test_every_x_spacing_the_cli_offers_actually_builds_a_mesh():
 
 
 def test_every_contour_the_cli_offers_is_a_real_contour():
-    from dgnozzle import CONTOURS
+    from src import CONTOURS
 
     # --contour is free text rather than a choice list, so check the default
     parser = build_parser()
@@ -127,20 +125,45 @@ def test_solve_subcommand_end_to_end(capsys):
 @pytest.mark.slow
 def test_solve_subcommand_reports_failure_in_its_exit_code():
     """A run that does not converge must not exit 0."""
-    assert main([
-        "solve", "--order", "1", "--contour", "smooth",
-        "--cfl", "80", "--max-iterations", "600", "--quiet",
-    ]) == 1
+    assert (
+        main(
+            [
+                "solve",
+                "--order",
+                "1",
+                "--contour",
+                "smooth",
+                "--cfl",
+                "80",
+                "--max-iterations",
+                "600",
+                "--quiet",
+            ]
+        )
+        == 1
+    )
 
 
 @pytest.mark.slow
 def test_sweep_subcommand_writes_a_csv(tmp_path):
     csv = tmp_path / "sweep.csv"
-    code = main([
-        "sweep", "area_ratio", "2.0", "2.5", "2",
-        "--order", "0", "--contour", "smooth", "--quiet", "--csv", str(csv),
-    ])
+    code = main(
+        [
+            "sweep",
+            "area_ratio",
+            "2.0",
+            "2.5",
+            "2",
+            "--order",
+            "0",
+            "--contour",
+            "smooth",
+            "--quiet",
+            "--csv",
+            str(csv),
+        ]
+    )
     assert code == 0
-    lines = csv.read_text().strip().splitlines()
+    lines = csv.read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 3
     assert "area_ratio" in lines[0]

@@ -1,0 +1,7 @@
+# a normal shock in the diverging section -- p=0, because p>=1 diverges here
+ar=2.5
+pb=0.70
+p=0
+Q=2
+ref=1
+scheme=ssprk3

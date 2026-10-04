@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dgnozzle import elements as el
+from src import elements as el
 
 
 @pytest.mark.parametrize("order", [0, 1, 2, 3])
