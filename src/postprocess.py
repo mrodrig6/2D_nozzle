@@ -100,6 +100,15 @@ class Performance:
     exit_mach_area_averaged: float
     exit_pressure_ratio: float
     """Area-averaged exit static pressure over ``p_t``."""
+    exit_temperature_ratio: float
+    r"""Area-averaged exit static temperature over ``T_t``.
+
+    Reported as a ratio rather than in kelvin because the solver is
+    non-dimensional: it is :math:`T_e/T_t`, which for an isentropic expansion
+    would be :math:`(1 + \tfrac{\gamma-1}{2}M_e^2)^{-1}`.  Comparing the two is
+    the cheapest check that the expansion is clean -- they part company exactly
+    where total temperature has stopped being conserved.
+    """
     specific_thrust: float
     """``thrust / mass_flow``, the effective exhaust velocity."""
     ideal_thrust: float
@@ -116,7 +125,8 @@ class Performance:
             f"mass flow     in {self.mass_flow_in:.6f}, out {self.mass_flow_out:.6f}  "
             f"(imbalance {self.mass_imbalance:.2e})\n"
             f"exit          M = {self.exit_mach_area_averaged:.4f}, "
-            f"p/p_t = {self.exit_pressure_ratio:.5f}\n"
+            f"p/p_t = {self.exit_pressure_ratio:.5f}, "
+            f"T/T_t = {self.exit_temperature_ratio:.5f}\n"
             f"entropy error {self.entropy_error:.4e}"
         )
 
@@ -188,6 +198,8 @@ def performance(result: SolveResult, *, quasi1d: Quasi1DSolution | None = None) 
     area_e = float(outlet.weight.sum())
     mach_e = float((ph.mach_number(outlet.state, gamma) * outlet.weight).sum() / area_e)
     pr_e = float((p_e * outlet.weight).sum() / area_e / flow.total_pressure)
+    t_e = p_e / (flow.Rgas * rho_e)
+    tr_e = float((t_e * outlet.weight).sum() / area_e / flow.total_temperature)
 
     q1d = quasi1d if quasi1d is not None else solve_quasi1d(result.geometry, flow)
     ideal = _ideal_thrust(q1d, flow)
@@ -203,6 +215,7 @@ def performance(result: SolveResult, *, quasi1d: Quasi1DSolution | None = None) 
         entropy_error=entropy_error(U, ops, flow),
         exit_mach_area_averaged=mach_e,
         exit_pressure_ratio=pr_e,
+        exit_temperature_ratio=tr_e,
         specific_thrust=thrust / mdot_in if mdot_in else float("nan"),
         ideal_thrust=ideal,
         thrust_efficiency=thrust / ideal if ideal else float("nan"),
@@ -269,8 +282,13 @@ def sample_boundary(
         "mach": np.asarray(ph.mach_number(state, gamma))[order],
         "pressure": np.asarray(pres)[order],
         "density": np.asarray(rho)[order],
+        # static temperature from the ideal gas law, the same expression
+        # `scalar_field` uses, so a profile and a contour of the same quantity
+        # cannot drift apart
+        "temperature": np.asarray(pres / (result.flow.Rgas * rho))[order],
         "vx": np.asarray(vx)[order],
         "vy": np.asarray(vy)[order],
+        "velocity": np.asarray(np.sqrt(vx * vx + vy * vy))[order],
     }
 
 

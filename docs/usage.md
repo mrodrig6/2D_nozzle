@@ -215,14 +215,58 @@ sweep, a gradient and an optimisation.
 ### Plotting
 
 ```python
-from src.plotting import overview, plot_field, plot_centreline
 import matplotlib.pyplot as plt
 
-overview(result)  # four-panel summary
-plot_field(result, "mach")  # any of: mach, pressure, density, temperature,
-#         vx, vy, velocity, entropy
-plot_centreline(result)  # axial profile against quasi-1D theory
+from src.plotting import overview, plot_centreline, plot_field
+
+overview(result)  # four-panel summary; its top panel is the Mach contour
 plt.show()
+```
+
+**Contours of any derived scalar.** `plot_field` fills contours over the
+nozzle, mirrored about the axis so you see the physical channel rather than the
+meshed half. Mach is the default because it is the field you read a nozzle by:
+
+```python
+plot_field(result, "mach")  # the default
+plot_field(result, "temperature")
+plot_field(result, "pressure")
+```
+
+| `name=` | Quantity |
+|---|---|
+| `mach` *(default)* | Mach number |
+| `pressure` | static pressure |
+| `density` | density |
+| `temperature` | static temperature, `p/(R rho)` |
+| `vx`, `vy`, `velocity` | axial, transverse and total speed |
+| `entropy` | `(p/rho^gamma)` over its reservoir value |
+
+Each element is subdivided `subdivisions` times per edge, so the variation
+*inside* an element is drawn — plotting only the vertices would throw away most
+of what `p = 2` buys.
+
+**Axial profiles against quasi-1D theory.** `plot_centreline` draws the DG
+solution along the symmetry axis with the quasi-1D prediction over it. The gap
+between the two curves *is* the two-dimensionality of the flow:
+
+```python
+plot_centreline(result)  # Mach number, the default
+plot_centreline(result, quantity="temperature")
+```
+
+`quantity` is one of `mach`, `pressure`, `density`, `temperature`, `vx` or
+`velocity`; anything else is refused by name rather than failing inside
+Matplotlib.
+
+**Line-outs as arrays**, if you would rather have the numbers than a picture —
+each returns a dict of `x`, `y` and every scalar above:
+
+```python
+from src.postprocess import centreline_profile, exit_profile, wall_profile
+
+cl = centreline_profile(result)
+print(cl["temperature"].min(), cl["mach"].max())
 ```
 
 ---
