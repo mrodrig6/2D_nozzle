@@ -55,5 +55,5 @@ class NumpyBackend(Backend):
         # A diverging march overflows here by design; the caller checks for a
         # non-finite norm and reports divergence, so the warning is noise.
         with np.errstate(over="ignore", invalid="ignore"):
-            A = np.asarray(A)
+            A = np.asarray(A) * self.component_weight
             return float(np.sqrt(np.mean(A * A)))

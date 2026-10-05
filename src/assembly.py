@@ -269,6 +269,12 @@ def residual_scale(flow: FlowConditions, length: float) -> float:
     :math:`\rho_t a_t / L`.  Dividing by it turns the residual into a
     dimensionless number that means the same thing on every mesh, at every
     order, and from every initial guess.
+
+    This is the *mass* component's scale, and on its own it is not enough: the
+    momentum and energy components carry extra powers of :math:`a_t`.  They are
+    brought onto this same scale first, by
+    :func:`~src.backends.base.component_weights`, and only then does dividing by
+    one number mean anything.
     """
     return float(flow.stagnation_density * flow.stagnation_sound_speed / max(length, 1e-30))
 

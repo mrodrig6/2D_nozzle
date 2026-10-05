@@ -30,6 +30,45 @@ from ..config import FlowConditions, SolverOptions
 from ..operators import Operators
 
 
+def component_weights(flow: FlowConditions) -> np.ndarray:
+    r"""Per-component factors that make the residual norm reference-invariant.
+
+    The conserved variables do not share a scale.  With :math:`\rho_t` and
+    :math:`a_t` the reservoir density and sound speed, the four components of
+    :math:`\dot{U}` scale as
+
+    .. math::
+
+        \frac{\rho_t a_t}{L},\quad \frac{\rho_t a_t^2}{L},\quad
+        \frac{\rho_t a_t^2}{L},\quad \frac{\rho_t a_t^3}{L}
+
+    -- three different powers of :math:`a_t`.  A plain RMS over all four divided
+    by the single scale :math:`\rho_t a_t / L` is therefore a *mixed-dimension*
+    norm: no single scale can non-dimensionalise it, so changing :math:`T_t` or
+    :math:`R` silently reweights the components against each other.
+
+    The solution it converges to never moved -- that was measured, and it is why
+    this was documented before it was fixed.  What moved was the **stopping
+    point**: at ``tolerance=1e-10``, scaling :math:`T_t` by 4 changed the
+    converged answer by 7e-11 and the iteration count by 50, because the march
+    crossed the threshold in a slightly different place.
+
+    Dividing component :math:`k` by its own power of :math:`a_t` first makes
+    every term dimensionless against the same reference, so the norm means the
+    same thing whatever the reservoir state is.  The weights are
+    :math:`(1,\; a_t^{-1},\; a_t^{-1},\; a_t^{-2})`, applied on the state axis.
+    They are not a no-op even at the default operating point, where
+    :math:`a_t = 0.7483` gives :math:`(1, 1.336, 1.336, 1.786)`.
+
+    Returns
+    -------
+    numpy.ndarray
+        Shape ``(1, 1, 4)``, to broadcast against ``(n_elem, n_basis, 4)``.
+    """
+    a_t = flow.stagnation_sound_speed
+    return np.array([1.0, 1.0 / a_t, 1.0 / a_t, 1.0 / a_t**2]).reshape(1, 1, 4)
+
+
 class Backend(ABC):
     """Execution strategy for one fixed mesh, order and operating point."""
 
@@ -46,6 +85,7 @@ class Backend(ABC):
         self.n_limited = 0
         self.n_mean_repaired = 0
         self.n_limit_calls = 0
+        self.component_weight = component_weights(flow)
 
     def limiter_activity(self) -> float:
         """Mean number of elements limited per limiter call; NaN if not tracked."""
@@ -85,7 +125,12 @@ class Backend(ABC):
 
     @abstractmethod
     def norm(self, A) -> float:
-        """Root-mean-square norm of an array."""
+        r"""Component-weighted RMS norm of a rate array.
+
+        See :func:`component_weights` for why the weights are there.  Every
+        backend applies the same weights to the same axis, which is what keeps
+        their convergence histories comparable to round-off.
+        """
 
     def asarray(self, A):
         return np.asarray(A)

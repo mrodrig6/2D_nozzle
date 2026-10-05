@@ -687,15 +687,28 @@ def apply_inverse_mass(inv_mass, R, out):
 
 
 @njit(parallel=True, **_JIT)
-def rms(A):
-    """Root-mean-square of a state array, without materialising ``A * A``."""
+def rms_weighted(A, w):
+    """RMS of ``A`` with component ``s`` scaled by ``w[s]`` first.
+
+    ``w`` carries the per-component factors that make the norm independent of
+    the reference state -- see ``backends.base.component_weights``.  Folded into
+    the reduction rather than applied as ``A * w`` beforehand, because this runs
+    once per stage and materialising a second state array for it would undo the
+    allocation work the rest of this module does.
+
+    There is deliberately **no unweighted companion** to this.  An unweighted
+    ``rms`` lived here until the weights were introduced, and the two fused
+    steppers below went on calling it -- so the weighted norm was correct,
+    exactly invariant, and never reached by a solve.  Leaving no unweighted
+    version means a future fused path cannot make that mistake again.
+    """
     nelem, nbf, ns = A.shape
     total = 0.0
     for e in prange(nelem):
         acc = 0.0
         for i in range(nbf):
             for s in range(ns):
-                v = A[e, i, s]
+                v = A[e, i, s] * w[s]
                 acc += v * v
         total += acc
     return np.sqrt(total / (nelem * nbf * ns))

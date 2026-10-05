@@ -619,7 +619,7 @@ def plot_nozzle_and_plume(
     :func:`src.plotting.plot_dg_vs_quasi1d`.
     """
     import matplotlib.pyplot as plt
-    from matplotlib.colors import Normalize
+    from matplotlib.colors import LogNorm, Normalize
 
     if quantity not in PLUME_QUANTITIES:
         raise ValueError(f"quantity must be one of {sorted(PLUME_QUANTITIES)}, got {quantity!r}")
@@ -637,16 +637,30 @@ def plot_nozzle_and_plume(
 
     lo = float(min(inner.min(), min(outer))) if outer else float(inner.min())
     hi = float(max(inner.max(), max(outer))) if outer else float(inner.max())
-    norm = Normalize(vmin=lo, vmax=hi)
     ramp = plt.get_cmap(cmap)
-    levels = np.linspace(lo, hi, 24)
+
+    # Pressure gets a log scale; everything else a linear one.  Not a stylistic
+    # preference -- over the nozzle *and* the plume, p/p_t runs from about 1 at
+    # the reservoir to 0.01 in the expanded jet, more than a decade and a half.
+    # On a linear ramp the entire exterior collapses into the bottom colour step
+    # and the shock-cell structure, which is the whole subject of the figure,
+    # disappears.  M, T/T_t and v/a_t each span well under a factor of five and
+    # are honest on a linear scale, where a reader can take a colour difference
+    # as proportional to a difference in the quantity.
+    log_scaled = quantity == "pressure" and lo > 0.0
+    if log_scaled:
+        norm = LogNorm(vmin=lo, vmax=hi)
+        levels = np.logspace(np.log10(lo), np.log10(hi), 24)
+    else:
+        norm = Normalize(vmin=lo, vmax=hi)
+        levels = np.linspace(lo, hi, 24)
 
     # ---- inside: quasi-1D, constant across the channel at each station -----
     wall = np.asarray(geom.wall(q1d.x))
     xx = np.repeat(np.asarray(q1d.x)[:, None], 2, axis=1)
     yy = np.stack([-wall, wall], axis=1)
     zz = np.repeat(inner[:, None], 2, axis=1)
-    art = ax.contourf(xx, yy, zz, levels=levels, cmap=ramp, extend="both")
+    art = ax.contourf(xx, yy, zz, levels=levels, norm=norm, cmap=ramp, extend="both")
 
     # ---- outside: one flat colour per wave cell ----------------------------
     for (region, poly), value in zip(polys, outer, strict=True):
@@ -661,7 +675,10 @@ def plot_nozzle_and_plume(
                 zorder=2,
             )
 
-    plot_contour(geom, ax=ax, mirror=True, color="k", lw=1.4)
+    # The frame is twelve nozzle lengths wide, so the word "throat" would sit on
+    # the filled field in a grey that cannot be read against it.  The dashed line
+    # still marks the station.
+    plot_contour(geom, ax=ax, mirror=True, color="k", lw=1.4, label_throat=False)
     ax.axvline(cells.lip_x, color="k", lw=1.0, ls="--", zorder=4)
     ax.axhline(0.0, color="0.4", lw=0.5, ls=":", zorder=4)
     ax.set_xlabel("$x$")
@@ -670,7 +687,22 @@ def plot_nozzle_and_plume(
     for side in ("top", "right"):
         ax.spines[side].set_visible(False)
     if colorbar:
-        plt.colorbar(art, ax=ax, label=PLUME_QUANTITIES[quantity], pad=0.015, fraction=0.04)
+        label = PLUME_QUANTITIES[quantity]
+        if log_scaled:
+            # Say so on the bar itself.  A log ramp read as linear is a worse
+            # misreading than no colourbar at all.
+            label += "  (log)"
+        bar = plt.colorbar(art, ax=ax, label=label, pad=0.015, fraction=0.04)
+        if log_scaled:
+            # Left alone, a contour colourbar labels its 24 *levels*, which on a
+            # log ramp come out as 2.89583 x 10^-1 and similar -- six significant
+            # figures of a number nobody wants to six figures.  Tick the decades
+            # and their 2 and 5 subdivisions instead, formatted short.
+            from matplotlib import ticker
+
+            bar.locator = ticker.LogLocator(base=10.0, subs=(1.0, 2.0, 5.0))
+            bar.formatter = ticker.FuncFormatter(lambda v, _: f"{v:g}")
+            bar.update_ticks()
 
     ew = cells.exit_waves
     ax.set_title(

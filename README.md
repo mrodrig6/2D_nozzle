@@ -77,10 +77,18 @@ one solve per variable. → [`docs/workflows.md`](docs/workflows.md)
 
 **Looks outside the nozzle.** A nozzle designed to be shock free inside has its
 whole wave system *outside* the exit, so `src/external/` computes that in closed
-form — the lip wave and the repeating shock-cell pattern downstream.
+form — the lip wave and the repeating shock-cell pattern downstream. One
+command draws the whole flow in a single frame: quasi-1D inside the nozzle,
+stitched at the exit plane to the wave-cell march outside.
 → [`docs/workflows.md`](docs/workflows.md)
 
-![Shock cells outside the nozzle](docs/figures/jet_fields.png)
+![The nozzle stitched to its plume: Mach number, pressure and temperature from the reservoir through three shock cells](docs/figures/nozzle_plume.png)
+
+Everything drawn is a ratio — $M$, $p/p_t$, $T/T_t$ — because the two regions
+report in different units. The small step in colour at the dashed exit line is
+not a drawing artefact: inside is quasi-1D theory, outside is a march started
+from the *computed* exit state, and the gap between them is the
+two-dimensionality of the exit flow.
 
 **Runs fast.** A Numba backend with fused Runge–Kutta stages, a NumPy reference
 backend, and JAX for gradients. → [`docs/performance.md`](docs/performance.md)
@@ -145,4 +153,4 @@ draws.
 This project is licensed under the MIT License — see the [`LICENSE`](LICENSE)
 file for details.
 
-Copyright (c) 2026 dgnozzle contributors
+Copyright (c) 2026 Mauro Rodriguez

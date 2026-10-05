@@ -99,29 +99,54 @@ def test_the_solution_is_invariant_under_a_reservoir_pressure_rescale():
 
 @pytest.mark.slow
 @pytest.mark.parametrize("kw", [{"total_temperature": 4.0}, {"Rgas": 1.0}])
-def test_changing_the_sound_speed_moves_only_where_the_march_stops(kw):
-    r"""``T_t`` and ``R`` change :math:`a_t`, and that exposes a real wrinkle.
+def test_changing_the_sound_speed_changes_nothing_at_all(kw):
+    r"""``T_t`` and ``R`` change :math:`a_t`, and nothing else may move.
 
-    The conserved variables scale as :math:`\rho_t`, :math:`\rho_t a_t` and
-    :math:`\rho_t a_t^2` -- three *different* powers of :math:`a_t` -- but the
-    convergence residual is one RMS norm over all four components divided by the
-    single scale :math:`\rho_t a_t / L`.  No single scale can non-dimensionalise
-    a mixed-dimension norm, so changing :math:`a_t` reweights the components and
-    the march crosses the tolerance a few iterations earlier or later.
+    This one used to be a *tolerance* test rather than an equality test, and the
+    difference is the whole point of it.
 
-    **The answer is still invariant; only the stopping point moves.**  That is
-    what this test pins: the drift must sit at the tolerance, not above it.  At
-    ``tolerance=1e-10`` it is ~7e-11, and it shrinks in proportion when the
-    tolerance is tightened -- measured 4.8e-6, 1.2e-6, 7.5e-9, 7.0e-11 at
-    tolerances of 1e-5, 1e-6, 1e-8 and 1e-10.
+    The four conserved variables scale as :math:`\rho_t`, :math:`\rho_t a_t`
+    and :math:`\rho_t a_t^2` -- three different powers of :math:`a_t` -- so an
+    unweighted RMS over all four, divided by the single scale
+    :math:`\rho_t a_t / L`, is a mixed-dimension norm.  Changing :math:`a_t`
+    reweighted the components against each other and the march crossed the
+    tolerance in a different place: the converged answer drifted by ~7e-11 at
+    ``tolerance=1e-10`` and the iteration count moved by 50.
 
-    If this ever fails *upward*, the residual norm has become genuinely
-    inconsistent rather than merely imprecise about where to stop.
+    The norm now weights each component by its own power of :math:`a_t` first
+    (:func:`src.backends.base.component_weights`), so the criterion is
+    reference-invariant and the march is bit-identical.  The iteration count is
+    asserted as well as the answer, because that is the part that used to move
+    and the part a weaker assertion would let regress silently.
     """
-    _, ref = _solve()
-    _, got = _solve(**kw)
+    r0, ref = _solve()
+    r1, got = _solve(**kw)
 
     for name in DIMENSIONLESS:
         a, b = getattr(ref, name), getattr(got, name)
         drift = abs(b - a) / max(abs(a), 1e-30)
-        assert drift < 1e-7, f"{name}: relative drift {drift:.2e} is far above tolerance"
+        assert drift < 1e-12, f"{name}: relative drift {drift:.2e} is above round-off"
+    assert r1.iterations == r0.iterations, "the march no longer stops in the same place"
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("backend", ["numpy", "numba"])
+def test_every_step_path_uses_the_weighted_norm(backend):
+    """The fused steppers must not carry their own copy of the norm.
+
+    This is the bug that hid the problem for a whole round.  ``Backend.norm``
+    was the one definition, but the Numba backend's fused RK4 and SSP-RK3 called
+    the unweighted reduction kernel directly, so fixing ``norm`` changed nothing
+    that a solve could see -- the weighted version was correct, exactly
+    invariant, and simply never called.
+
+    Comparing a fused backend against the reference one catches that: NumPy
+    steps through ``Backend.rk4_step`` and so can only use ``norm``, while Numba
+    runs its fused path.  If a fused path grows its own norm again, these two
+    stop agreeing.
+    """
+    pytest.importorskip("numba") if backend == "numba" else None
+    common = dict(order=1, refine=0, back_pressure_ratio=0.15, max_iterations=200, verbose=False)
+    ref = solve_nozzle(**common, backend="numpy")
+    got = solve_nozzle(**common, backend=backend)
+    assert got.residual_scaled == pytest.approx(ref.residual_scaled, rel=1e-10)
