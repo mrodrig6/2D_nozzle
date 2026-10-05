@@ -67,6 +67,9 @@ class JaxBackend(Backend):
         self.jax, self.jnp = require_jax()
         self._step_jit = {}
         self._run_jit = {}
+        # On device, so the weighting stays inside the fused loop rather than
+        # forcing a host round trip once per stage.
+        self._component_weight = self.jnp.asarray(self.component_weight)
 
     # -- primitives --------------------------------------------------------
     def residual(self, U):
@@ -97,7 +100,8 @@ class JaxBackend(Backend):
         return self.positivity_scale() * dt[:, None, None]
 
     def norm(self, A):
-        """Device-side RMS norm; kept as an array so it can live inside a loop."""
+        """Device-side weighted RMS norm; kept as an array so it can live inside a loop."""
+        A = A * self._component_weight
         return self.jnp.sqrt(self.jnp.mean(A * A))
 
     def asarray(self, A):

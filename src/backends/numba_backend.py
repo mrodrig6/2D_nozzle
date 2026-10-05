@@ -64,6 +64,8 @@ class NumbaBackend(Backend):
                 f"Add a kernel for it, or use backend='numpy'."
             )
         self._flux_id = _KERNEL_FLUXES[_flux]
+        # Flat and contiguous: the reduction kernel indexes it as w[s].
+        self._weight_flat = _c(self.component_weight.reshape(-1))
         self._low_mach = float(getattr(flow, "hllc_low_mach", 0.0))
         self._rho_t_bf = float(flow.stagnation_density) if getattr(flow, "backflow", False) else 0.0
         self._p_t_bf = float(flow.total_pressure)
@@ -174,7 +176,7 @@ class NumbaBackend(Backend):
     def norm(self, A) -> float:
         A = _c(A)
         with np.errstate(over="ignore", invalid="ignore"):
-            return float(nk.rms(A))
+            return float(nk.rms_weighted(A, self._weight_flat))
 
     # -- fused internals ---------------------------------------------------
     def _edges(self, U) -> None:
@@ -300,7 +302,7 @@ class NumbaBackend(Backend):
         F = self._F
         self._rate_into(U, F[0])
         dt = self._dt_into()
-        res = float(nk.rms(F[0]))
+        res = float(nk.rms_weighted(F[0], self._weight_flat))
 
         W = self._S[2]
         nk.stage(U, F[0], 0.5, dt, W)
@@ -324,7 +326,7 @@ class NumbaBackend(Backend):
         F = self._F
         self._rate_into(U, F[0])
         dt = self._dt_into()
-        res = float(nk.rms(F[0]))
+        res = float(nk.rms_weighted(F[0], self._weight_flat))
 
         U1 = self._S[2]
         nk.stage(U, F[0], 1.0, dt, U1)

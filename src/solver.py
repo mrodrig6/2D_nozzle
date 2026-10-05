@@ -8,9 +8,18 @@ footprint is tiny, and there is no linear solver to precondition.
 Convergence is measured on the **rate of change**,
 
 .. math::
-    \|\dot{U}\|_{\mathrm{rms}} = \sqrt{\frac{1}{4 N} \sum \bigl(M^{-1} R\bigr)^2},
+    \|\dot{U}\|_{\mathrm{rms}}
+      = \sqrt{\frac{1}{4 N} \sum_k \sum \bigl(w_k \,[M^{-1} R]_k\bigr)^2},
 
-scaled by the problem's own physical magnitude :math:`\rho_t a_t / L`.
+scaled by the problem's own physical magnitude :math:`\rho_t a_t / L`, with the
+per-component weights :math:`w = (1, a_t^{-1}, a_t^{-1}, a_t^{-2})`.
+
+Those weights are not cosmetic.  The four conserved variables scale as three
+different powers of :math:`a_t`, so an unweighted sum over them is a
+mixed-dimension norm that no single scale can non-dimensionalise -- and changing
+:math:`T_t` or :math:`R` then silently reweights the components against one
+another, moving where the march crosses the tolerance.  See
+:func:`~src.backends.base.component_weights`.
 
 That scaling is deliberate, and the third choice tried here.  Testing the
 *unnormalised* residual against a fixed threshold makes "converged" mean
