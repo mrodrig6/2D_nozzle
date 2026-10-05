@@ -46,9 +46,21 @@ def _axes(ax=None, figsize=(9.0, 3.2)):
 
 # --------------------------------------------------------------------------
 def plot_contour(
-    geom: NozzleGeometry, ax=None, *, n: int = 400, mirror: bool = True, **kwargs: Any
+    geom: NozzleGeometry,
+    ax=None,
+    *,
+    n: int = 400,
+    mirror: bool = True,
+    label_throat: bool = True,
+    **kwargs: Any,
 ):
-    """Draw the nozzle wall (and its mirror image), with the throat marked."""
+    """Draw the nozzle wall (and its mirror image), with the throat marked.
+
+    ``label_throat=False`` keeps the throat's dashed line but drops the word.
+    That is for figures where the nozzle is a small part of a much wider frame
+    -- the plume stitch spans twelve nozzle lengths -- and the annotation would
+    land on top of a filled field in a grey that is unreadable against it.
+    """
     ax = _axes(ax)
     x = np.linspace(0.0, geom.length, n)
     y = np.asarray(geom.wall(x))
@@ -60,16 +72,17 @@ def plot_contour(
         ax.axhline(0.0, color="0.7", lw=0.6, ls=":")
     xt = geom.throat_location()
     ax.axvline(xt, color="0.6", lw=0.7, ls="--")
-    ax.annotate(
-        "throat",
-        (xt, 0.0),
-        textcoords="offset points",
-        xytext=(4, 6),
-        fontsize=8,
-        color="0.4",
-    )
-    ax.set_xlabel("$x$ [m]")
-    ax.set_ylabel("$y$ [m]")
+    if label_throat:
+        ax.annotate(
+            "throat",
+            (xt, 0.0),
+            textcoords="offset points",
+            xytext=(4, 6),
+            fontsize=8,
+            color="0.4",
+        )
+    ax.set_xlabel("$x$")
+    ax.set_ylabel("$y$")
     ax.set_aspect("equal")
     return ax
 
@@ -131,8 +144,8 @@ def plot_mesh(
         ax.legend(fontsize=8, loc="upper left", frameon=False, ncol=4)
 
     ax.autoscale_view()
-    ax.set_xlabel("$x$ [m]")
-    ax.set_ylabel("$y$ [m]")
+    ax.set_xlabel("$x$")
+    ax.set_ylabel("$y$")
     ax.set_aspect("equal")
     ax.set_title(f"{topo.n_elem} {topo.kind} elements, $Q={topo.geometry_order}$", fontsize=10)
     return ax
@@ -232,7 +245,7 @@ def plot_centreline(
             )
 
     ax.axvline(result.geometry.throat_location(), color="0.7", lw=0.7, ls="--")
-    ax.set_xlabel("$x$ [m]")
+    ax.set_xlabel("$x$")
     ax.set_ylabel(ylabel)
     ax.legend(fontsize=8, frameon=False)
     ax.grid(alpha=0.25)
@@ -244,7 +257,7 @@ def plot_wall(result: SolveResult, ax=None):
     ax = _axes(ax, figsize=(7.5, 3.4))
     wp = wall_profile(result)
     ax.plot(wp["x"], wp["pressure"], "-", color="tab:red", lw=1.5)
-    ax.set_xlabel("$x$ [m]")
+    ax.set_xlabel("$x$")
     ax.set_ylabel("wall $p$", color="tab:red")
     ax.tick_params(axis="y", colors="tab:red")
     twin = ax.twinx()
@@ -268,7 +281,7 @@ def plot_exit_profile(result: SolveResult, ax=None, *, n_points: int = 40):
     q = solve_quasi1d(result.geometry, result.flow)
     ax.axvline(q.exit_mach, color="0.4", ls="--", lw=1.2, label="quasi-1D")
     ax.set_xlabel("Mach number")
-    ax.set_ylabel("$y$ [m]")
+    ax.set_ylabel("$y$")
     ax.set_title("exit plane", fontsize=10)
     ax.legend(fontsize=8, frameon=False)
     ax.grid(alpha=0.25)

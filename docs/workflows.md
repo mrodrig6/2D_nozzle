@@ -229,6 +229,14 @@ Everything plotted is a ratio — `M`, `p/p_t`, `T/T_t`, `v/a_t` — because the
 regions report in different units, and stitching raw values would join two
 scales and look seamless while being wrong.
 
+**Pressure alone is drawn on a log ramp**, and the colourbar says so. Across the
+nozzle *and* the plume, `p/p_t` runs from about 1 at the reservoir to 0.01 in the
+expanded jet — more than a decade and a half. On a linear ramp the whole exterior
+collapses into the bottom colour step and the shock-cell structure, which is the
+subject of the figure, vanishes. `M`, `T/T_t` and `v/a_t` each span well under a
+factor of five, so they stay linear, where a colour difference can be read as
+proportional to a difference in the quantity.
+
 **The small step at the dashed exit line is real, and it is the point.** Inside
 is quasi-1D theory; outside is a march started from the *computed* exit state,
 which is a 2D solve. Quasi-1D assumes parallel streamlines at the exit and the

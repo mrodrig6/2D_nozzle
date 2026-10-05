@@ -432,6 +432,38 @@ def test_every_stitched_plume_quantity_draws(supersonic_result, quantity):
     plt.close(fig)
 
 
+@pytest.mark.parametrize(
+    ("quantity", "log_expected"),
+    [("pressure", True), ("mach", False), ("temperature", False), ("velocity", False)],
+)
+def test_only_pressure_is_drawn_on_a_log_ramp(supersonic_result, quantity, log_expected):
+    """Pressure spans more than a decade across the nozzle and plume; nothing else does.
+
+    On a linear ramp the whole exterior collapses into the bottom colour step
+    and the shock cells -- the subject of the figure -- disappear.  The other
+    three span under a factor of five and stay linear, so a colour difference
+    can be read as proportional to a difference in the quantity.
+
+    This pins the choice per quantity, because the failure it guards against is
+    silent: the figure still draws, it just stops showing anything.
+    """
+    matplotlib = pytest.importorskip("matplotlib")
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import LogNorm
+
+    from src.external import jet_wave_cells, plot_nozzle_and_plume
+
+    jc = jet_wave_cells(supersonic_result, ambient_pressure_ratio=0.030, cells=2)
+    fig, ax = plt.subplots()
+    plot_nozzle_and_plume(supersonic_result, jc, quantity=quantity, ax=ax)
+    norms = [isinstance(c.norm, LogNorm) for c in ax.collections if hasattr(c, "norm")]
+    assert norms, "nothing drawn to check the norm of"
+    assert any(norms) == log_expected, f"{quantity}: log ramp {any(norms)}, wanted {log_expected}"
+    plt.close(fig)
+
+
 def test_an_unknown_plume_quantity_is_refused(supersonic_result):
     pytest.importorskip("matplotlib")
     from src.external import plot_nozzle_and_plume

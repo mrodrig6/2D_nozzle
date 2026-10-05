@@ -402,13 +402,20 @@ isentropic tables apply directly.
 | `contour` | wall family, see below | `'bell'` |
 | `area_ratio` | exit-to-throat area ratio; sets the design Mach number | `2.5019` |
 | `throat_x` | throat location as a fraction of length | `0.1388` |
-| `throat_half_height` | throat half-height [m]; scales the whole nozzle | `0.13989434` |
-| `inlet_half_height` | inlet half-height [m] | `0.15` |
-| `length` | axial length [m] | `1.0` |
+| `throat_half_height` | throat half-height; scales the whole nozzle | `0.13989434` |
+| `inlet_half_height` | inlet half-height | `0.15` |
+| `length` | axial length | `1.0` |
 | `theta_initial_deg` | wall angle just past the throat | auto (monotone) |
 | `theta_exit_deg` | wall angle at the exit plane | `0.0` |
 | `bezier_w1`, `bezier_w2` | Bézier shape weights | `0.55`, `0.90` |
 | `back_pressure_ratio` | `p_back / p_total`; sets the operating point | `0.15` |
+
+The three lengths carry **no units** — see
+[units](#units-the-solver-is-non-dimensional). Only their ratios enter the
+solution, which is why multiplying all three by the same factor leaves every
+dimensionless output bit-identical and is pinned by a test. Scaling `length`
+*alone* is not a rescale: it holds the heights fixed and so makes the nozzle
+more slender, which is a different shape entitled to a different answer.
 
 ### Contour families
 

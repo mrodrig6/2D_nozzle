@@ -178,9 +178,9 @@ every one of which is differentiable ([Design sensitivities](#design-sensitiviti
 |---|---|---|
 | $\mathrm{AR}$ | `area_ratio` | exit-to-throat area ratio |
 | $x_{\mathrm{th}}$ | `throat_x` | throat location as a fraction of $L$ |
-| $y_{\mathrm{th}}$ | `throat_half_height` | throat half-height [m]; scales the nozzle |
-| $y_{\mathrm{in}}$ | `inlet_half_height` | inlet half-height [m]; must exceed $y_{\mathrm{th}}$ |
-| $L$ | `length` | axial length [m] |
+| $y_{\mathrm{th}}$ | `throat_half_height` | throat half-height; scales the nozzle |
+| $y_{\mathrm{in}}$ | `inlet_half_height` | inlet half-height; must exceed $y_{\mathrm{th}}$ |
+| $L$ | `length` | axial length |
 | $\theta_i$ | `theta_initial_deg` | wall angle just downstream of the throat |
 | $\theta_e$ | `theta_exit_deg` | wall angle at the exit plane |
 | $w_1, w_2$ | `bezier_w1` / `bezier_w2` | Bézier shape weights |
