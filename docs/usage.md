@@ -212,6 +212,99 @@ past the matched condition the nozzle over-expands. That trade is Exercise 1 of
 workflows](workflows.md#what-students-do-with-it) below are the same file grown into a
 sweep, a gradient and an optimisation.
 
+### Units: the solver is non-dimensional
+
+**Nothing in this code is in SI.** There are no metres, kelvin or newtons
+anywhere in the solve, and no unit conversion is applied on the way out. The
+equations are solved in a non-dimensional form fixed by four choices:
+
+| Reference | Symbol | Value | Set by |
+|---|---|---|---|
+| Reservoir pressure | $p_t$ | `1` | `total_pressure` |
+| Reservoir temperature | $T_t$ | `1` | `total_temperature` |
+| Gas constant | $R$ | `0.4` | `Rgas`, chosen as $\gamma - 1$ |
+| Length | $L$ | `1` | **every length together** — see below |
+
+> **`length` is not the length scale.** It sets the axial extent while
+> `throat_half_height` and `inlet_half_height` set the transverse one, so
+> changing `length` alone makes the nozzle more *slender* — a different shape,
+> entitled to a different answer. Changing all three together is the rescale,
+> and that is exactly invariant.
+
+Everything else follows, and these two are worth knowing because they are
+**not** 1:
+
+```math
+\rho_t = \frac{p_t}{R T_t} = 2.5, \qquad
+a_t = \sqrt{\gamma R T_t} = 0.7483
+```
+
+Taking $R = \gamma - 1$ is the choice that makes the rest tidy: static
+temperature is then numerically equal to the specific internal energy,
+$T = p/(\rho R) = e$.
+
+**Read every output as a ratio.** The reported quantities are already
+non-dimensional, or are reported alongside a non-dimensional form:
+
+| Output | Non-dimensionalised by | Note |
+|---|---|---|
+| `thrust_coefficient` | $p_t A^{*}$ | the headline number |
+| `discharge_coefficient` | $\rho_t a_t A^{*}$ | choked flow fixes this at 0.5787 for $\gamma=1.4$ |
+| `exit_pressure_ratio` | $p_t$ | |
+| `exit_temperature_ratio` | $T_t$ | |
+| `specific_thrust_ratio` | $a_t$ | effective exhaust velocity as a Mach number |
+| `thrust_efficiency`, `entropy_error` | — | already dimensionless |
+| `exit_mach_area_averaged` | — | already dimensionless |
+| `thrust`, `mass_flow_in/out`, `specific_thrust` | — | **carry the scales above**: $p_t L$, $\rho_t a_t L$ and $a_t$ respectively |
+
+So `thrust = 0.049868` is a force per unit depth in units of $p_t L$; to compare
+two nozzles, use `thrust_coefficient` instead. `C_d` is the better mass-flow
+number for the same reason — once the throat is sonic it depends on $\gamma$
+alone, so it is the same for every choked run regardless of reservoir and
+throat size. Measured 0.5756 against the closed form
+
+```math
+\frac{\dot m}{\rho_t a_t A^{*}}
+  = \left(\frac{2}{\gamma+1}\right)^{\frac{\gamma+1}{2(\gamma-1)}} = 0.5787
+```
+
+a 0.5% gap that is discretisation error, and is pinned by a test.
+
+### Is it actually non-dimensional? Measured, not asserted
+
+Invariance is the property being claimed, so it is tested rather than stated.
+`tests/test_nondimensional.py` rescales the references and compares converged
+solves:
+
+| Rescaling | Dimensionless outputs | Dimensional outputs | Iterations |
+|---|---|---|---|
+| every length $\times 2$, $\times 5$, $\times \tfrac14$ | **exactly 0 drift** | scale by the factor to 1e-10 | identical |
+| $p_t \times 10$ | exact, 1e-16 | scale by 10 | identical |
+| $T_t \times 4$ | 7e-11 at `tolerance=1e-10` | — | 1751 vs 1701 |
+| $R \times 2.5$ | 7e-11 at `tolerance=1e-10` | — | 1751 vs 1701 |
+
+The first two are exact. The last two carry one wrinkle worth understanding,
+because it is a genuine imprecision rather than noise.
+
+**The convergence criterion is not reference-invariant.** The conserved
+variables scale as $\rho_t$, $\rho_t a_t$ and $\rho_t a_t^2$ — three different
+powers of $a_t$ — but the residual is a single RMS norm over all four
+components, divided by the single scale $\rho_t a_t / L$. No one scale can
+non-dimensionalise a mixed-dimension norm, so changing $a_t$ (via $T_t$ or $R$)
+reweights the components slightly and the march crosses the tolerance a few
+iterations earlier or later.
+
+**The answer is unaffected; only the stopping point moves.** The drift tracks
+the tolerance exactly — 4.8e-6, 1.2e-6, 7.5e-9 and 7.0e-11 at tolerances of
+1e-5, 1e-6, 1e-8 and 1e-10 — so tightening the tolerance removes it. Scaling
+$p_t$ is immune because it multiplies all three by the *same* factor.
+
+**To put results in physical units**, multiply by your own reference values:
+thrust by $p_t L$ (times the depth), mass flow by $\rho_t a_t L$, and so on.
+Nothing in the solver needs to change — the non-dimensional solution is the
+same for every reservoir condition at a given $\gamma$ and back-pressure ratio,
+which is exactly why it is solved this way.
+
 ### Plotting
 
 ```python
@@ -258,6 +351,30 @@ plot_centreline(result, quantity="temperature")
 `quantity` is one of `mach`, `pressure`, `density`, `temperature`, `vx` or
 `velocity`; anything else is refused by name rather than failing inside
 Matplotlib.
+
+**The 2D solution and quasi-1D theory in one picture**, inside the nozzle.
+`plot_dg_vs_quasi1d` puts
+the DG field above the axis and the quasi-1D prediction for the same geometry
+below it, on one shared colour scale:
+
+```python
+from src.plotting import plot_dg_vs_quasi1d
+
+plot_dg_vs_quasi1d(result, "mach")
+plot_dg_vs_quasi1d(result, "temperature")
+```
+
+![DG above, quasi-1D below](figures/stitched.png)
+
+Because the nozzle is symmetric, the lower half is *where the mirror image of
+the DG solution would have gone* — so **contours that fail to meet at the axis
+are the two-dimensionality of the flow**, read off at a glance instead of
+inferred from two separate plots. Quasi-1D has no transverse coordinate, so its
+half is flat in `y` at each station: seeing it flat is seeing the assumption.
+
+The shared colour scale is the point. Giving each half its own would make even
+a large disagreement look like agreement. Quantities quasi-1D does not predict
+(`vy`, `entropy`) are refused rather than drawn against an implicit zero.
 
 **Line-outs as arrays**, if you would rather have the numbers than a picture —
 each returns a dict of `x`, `y` and every scalar above:

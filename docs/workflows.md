@@ -213,6 +213,34 @@ every common colour-vision deficiency. Pass `cmap=` to override either.
 
 ![Shock-cell fields](figures/jet_fields.png)
 
+**The nozzle and the plume as one field.** `plot_nozzle_and_plume` draws the
+quasi-1D solution *inside* the nozzle and the wave-cell march *outside* on one
+axis and one colour scale:
+
+```python
+from src.external import plot_nozzle_and_plume
+
+plot_nozzle_and_plume(result, quantity="mach", ambient_pressure_ratio=0.03)
+```
+
+![Nozzle stitched to the plume](figures/nozzle_plume.png)
+
+Everything plotted is a ratio — `M`, `p/p_t`, `T/T_t`, `v/a_t` — because the two
+regions report in different units, and stitching raw values would join two
+scales and look seamless while being wrong.
+
+**The small step at the dashed exit line is real, and it is the point.** Inside
+is quasi-1D theory; outside is a march started from the *computed* exit state,
+which is a 2D solve. Quasi-1D assumes parallel streamlines at the exit and the
+real flow is still diverging, so the two disagree by roughly 0.3–1%. That step
+is the two-dimensionality of the exit flow — the same effect that puts this
+nozzle's true design point at `p_b/p_t ≈ 0.0669` rather than the quasi-1D
+`0.0640`. Drawing both sides from one model would hide it, which is why the
+test pins the step as *non-zero* as well as small.
+
+For the 2D solution against quasi-1D **inside** the nozzle, see
+[`plot_dg_vs_quasi1d`](usage.md#plotting).
+
 Two things to know before reading numbers off it. **Every wave is treated as
 isentropic**, which is what makes the pattern exactly periodic; a real jet's
 compressions steepen into shocks, lose total pressure, and the cells decay

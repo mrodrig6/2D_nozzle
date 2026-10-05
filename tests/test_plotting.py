@@ -19,7 +19,9 @@ import matplotlib.pyplot as plt  # noqa: E402
 from src.api import solve_nozzle  # noqa: E402
 from src.plotting import (  # noqa: E402
     CENTRELINE_QUANTITIES,
+    COMPARE_QUANTITIES,
     plot_centreline,
+    plot_dg_vs_quasi1d,
     plot_field,
 )
 from src.postprocess import SCALARS, centreline_profile  # noqa: E402
@@ -62,3 +64,31 @@ def test_field_contours_draw_for_the_headline_scalars(solved, name):
     fig, ax = plt.subplots()
     plot_field(solved, name, ax=ax, subdivisions=1, levels=8)
     plt.close(fig)
+
+
+@pytest.mark.parametrize("name", sorted(COMPARE_QUANTITIES))
+def test_every_stitched_quantity_draws(solved, name):
+    fig, ax = plt.subplots()
+    plot_dg_vs_quasi1d(solved, name, ax=ax, subdivisions=1, levels=8)
+    plt.close(fig)
+
+
+def test_stitching_refuses_what_quasi1d_does_not_predict(solved):
+    """Quasi-1D has no transverse velocity, so ``vy`` has nothing to compare to.
+
+    Drawing it against an implicit zero would look like agreement where there is
+    simply no prediction, which is worse than refusing.
+    """
+    for name in ("vy", "entropy"):
+        with pytest.raises(ValueError, match="does not predict"):
+            plot_dg_vs_quasi1d(solved, name)
+
+
+def test_stitched_quantities_are_all_real_quasi1d_fields(solved):
+    """The table may only name attributes the quasi-1D solution actually has."""
+    from src.quasi1d import solve_quasi1d
+
+    q = solve_quasi1d(solved.geometry, solved.flow)
+    for name, attr in COMPARE_QUANTITIES.items():
+        assert hasattr(q, attr), f"{name} maps to a missing quasi-1D field {attr!r}"
+        assert name in SCALARS, f"{name} is not a DG scalar"

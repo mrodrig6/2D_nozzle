@@ -111,6 +111,19 @@ class Performance:
     """
     specific_thrust: float
     """``thrust / mass_flow``, the effective exhaust velocity."""
+    specific_thrust_ratio: float
+    r"""``specific_thrust / a_t``: the effective exhaust velocity as a Mach number.
+
+    The non-dimensional form of :attr:`specific_thrust`, which carries the
+    solver's velocity scale.  Reporting both means a student never has to know
+    that :math:`a_t = \sqrt{\gamma R T_t} = 0.7483` to compare two runs.
+    """
+    discharge_coefficient: float
+    r"""``mass_flow_in / (rho_t a_t A_throat)``: non-dimensional mass flow.
+
+    Choked flow fixes this number for a given :math:`\gamma`, independent of
+    reservoir conditions and throat size, which is what makes it the right thing
+    to compare across a sweep."""
     ideal_thrust: float
     """Quasi-1D shock-free thrust for the same geometry and reservoir."""
     thrust_efficiency: float
@@ -123,7 +136,8 @@ class Performance:
             f"  wall form   {self.thrust_wall:.6f}  "
             f"(imbalance {self.thrust_imbalance:.2e})\n"
             f"mass flow     in {self.mass_flow_in:.6f}, out {self.mass_flow_out:.6f}  "
-            f"(imbalance {self.mass_imbalance:.2e})\n"
+            f"(imbalance {self.mass_imbalance:.2e}, "
+            f"C_d = {self.discharge_coefficient:.6f})\n"
             f"exit          M = {self.exit_mach_area_averaged:.4f}, "
             f"p/p_t = {self.exit_pressure_ratio:.5f}, "
             f"T/T_t = {self.exit_temperature_ratio:.5f}\n"
@@ -217,6 +231,12 @@ def performance(result: SolveResult, *, quasi1d: Quasi1DSolution | None = None) 
         exit_pressure_ratio=pr_e,
         exit_temperature_ratio=tr_e,
         specific_thrust=thrust / mdot_in if mdot_in else float("nan"),
+        specific_thrust_ratio=(
+            thrust / mdot_in / flow.stagnation_sound_speed if mdot_in else float("nan")
+        ),
+        discharge_coefficient=(
+            mdot_in / (flow.stagnation_density * flow.stagnation_sound_speed * a_throat)
+        ),
         ideal_thrust=ideal,
         thrust_efficiency=thrust / ideal if ideal else float("nan"),
     )
