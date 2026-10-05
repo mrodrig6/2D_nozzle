@@ -24,7 +24,7 @@ from .postprocess import (
     sample_field,
     wall_profile,
 )
-from .quasi1d import solve_quasi1d
+from .quasi1d import Quasi1DSolution, solve_quasi1d
 from .solver import SolveResult
 from .sweep import SweepResult
 
@@ -375,3 +375,126 @@ def overview(result: SolveResult, figsize=(12.0, 8.0)):
     plot_centreline(result, ax=fig.add_subplot(gs[2, 0]))
     plot_exit_profile(result, ax=fig.add_subplot(gs[2, 1]))
     return fig
+
+
+#: Which quasi-1D field each stitched quantity is drawn against.  Only the
+#: quantities quasi-1D theory actually predicts appear here: it has no transverse
+#: velocity by construction, so ``vy`` is absent rather than silently zero.
+STITCH_QUANTITIES = {
+    "mach": "mach",
+    "pressure": "pressure",
+    "density": "density",
+    "temperature": "temperature",
+    "velocity": "velocity",
+}
+
+
+def plot_stitched(
+    result: SolveResult,
+    name: str = "mach",
+    ax=None,
+    *,
+    subdivisions: int = 3,
+    levels: int | Sequence[float] = 24,
+    cmap: str = "viridis",
+    colorbar: bool = True,
+    quasi1d: Quasi1DSolution | None = None,
+    label: bool = True,
+):
+    r"""The 2D solution and quasi-1D theory in one picture, split at the axis.
+
+    The upper half is the DG field; the lower half is the quasi-1D prediction
+    for the same geometry and reservoir, drawn on the same contour levels and
+    the same colour scale.  Because the nozzle is symmetric, the lower half is
+    *where the DG mirror image would have gone* -- so the two halves are
+    directly comparable and **contours that fail to meet at the axis are the
+    two-dimensionality of the flow**, read off at a glance rather than inferred
+    from two separate plots.
+
+    Quasi-1D has no transverse coordinate: its prediction is a function of
+    :math:`x` alone, so the lower half is constant in :math:`y` within the
+    contour at each station.  That is not a drawing shortcut -- it *is* the
+    assumption, and seeing it flat is seeing the assumption.
+
+    Parameters
+    ----------
+    name
+        One of :data:`STITCH_QUANTITIES`.  Quantities quasi-1D does not predict
+        (``vy``, ``entropy``) are refused rather than drawn against nothing.
+    quasi1d
+        A previously computed solution, to avoid recomputing it.
+
+    Notes
+    -----
+    Both halves share one colour scale, which is the point: a shared scale is
+    what makes "the colours do not line up" mean something.  Giving each half
+    its own would make even a large disagreement look like agreement.
+    """
+    if name not in STITCH_QUANTITIES:
+        raise ValueError(
+            f"name must be one of {sorted(STITCH_QUANTITIES)} -- quasi-1D theory "
+            f"does not predict {name!r}"
+        )
+    plt = _require_matplotlib()
+    ax = _axes(ax, figsize=(9.5, 3.8))
+
+    import matplotlib.tri as mtri
+
+    pts, tris, vals = sample_field(result, name, subdivisions)
+    q = quasi1d if quasi1d is not None else solve_quasi1d(result.geometry, result.flow)
+    q_vals = getattr(q, STITCH_QUANTITIES[name])
+
+    # one scale across both halves, from both halves
+    lo = float(min(vals.min(), q_vals.min()))
+    hi = float(max(vals.max(), q_vals.max()))
+    if isinstance(levels, int):
+        levels = np.linspace(lo, hi, levels)
+
+    # upper half: the DG solution as computed
+    art = ax.tricontourf(
+        mtri.Triangulation(pts[:, 0], pts[:, 1], tris), vals, levels=levels, cmap=cmap
+    )
+
+    # lower half: quasi-1D, constant in y at each station, filling the mirrored
+    # channel down to the reflected wall
+    wall = np.asarray(result.geometry.wall(q.x))
+    xx = np.repeat(q.x[:, None], 2, axis=1)
+    yy = np.stack([np.zeros_like(wall), -wall], axis=1)
+    zz = np.repeat(np.asarray(q_vals)[:, None], 2, axis=1)
+    ax.contourf(xx, yy, zz, levels=levels, cmap=cmap)
+
+    plot_contour(result.geometry, ax=ax, mirror=True, color="k", lw=1.2)
+    ax.axhline(0.0, color="k", lw=0.9, ls="-")
+    if colorbar:
+        plt.colorbar(art, ax=ax, label=name.replace("_", " "), pad=0.02)
+
+    if label:
+        ax.text(
+            0.012,
+            0.97,
+            "DG (2D)",
+            transform=ax.transAxes,
+            va="top",
+            ha="left",
+            fontsize=9,
+            bbox={"facecolor": "white", "alpha": 0.75, "edgecolor": "none"},
+        )
+        ax.text(
+            0.012,
+            0.03,
+            "quasi-1D theory",
+            transform=ax.transAxes,
+            va="bottom",
+            ha="left",
+            fontsize=9,
+            bbox={"facecolor": "white", "alpha": 0.75, "edgecolor": "none"},
+        )
+    ax.set_xlabel("$x$")
+    ax.set_ylabel("$y$")
+    ax.set_title(
+        f"{name}: DG above the axis, quasi-1D below "
+        f"($p_b/p_t$={result.flow.back_pressure_ratio:.3f}, "
+        f"$p$={result.discretization.order})",
+        fontsize=10,
+    )
+    return ax

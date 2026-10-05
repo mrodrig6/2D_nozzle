@@ -65,14 +65,19 @@ def latex_rc(use_latex: str | bool = "auto") -> dict:
         }
     return {
         "text.usetex": False,
+        # Computer Modern for the *maths*, which is what carries the LaTeX look
+        # in these figures -- the labels are nearly all $x$, $y$, $p_b/p_t$,
+        # $M_e$.
         "mathtext.fontset": "cm",
         "font.family": "serif",
-        # cmr10 is the Computer Modern roman Matplotlib ships; it has no
-        # U+2212, so the unicode minus has to go with it or every negative
-        # tick label warns
-        "font.serif": ["cmr10", "DejaVu Serif"],
+        # ...but DejaVu Serif for the prose.  Matplotlib ships `cmr10`, the real
+        # Computer Modern roman, and it is the obvious choice here -- except that
+        # it covers little beyond ASCII, so an em dash or a Greek letter in a
+        # title silently renders as a tofu box rather than failing.  A teaching
+        # code should not have that trap in it, and the difference between the
+        # two serifs in a title is far smaller than the cost of a broken glyph.
+        "font.serif": ["DejaVu Serif"],
         "axes.formatter.use_mathtext": True,
-        "axes.unicode_minus": False,
     }
 
 

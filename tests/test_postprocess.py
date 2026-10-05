@@ -205,3 +205,55 @@ def test_the_summary_reports_temperature(projected):
     """It is only an output if a student actually sees it."""
     text = performance(projected).summary()
     assert "T/T_t" in text
+
+
+def test_the_discharge_coefficient_matches_the_choked_value(projected):
+    r"""``C_d`` must land on the closed-form choked mass flow.
+
+    For a choked nozzle the non-dimensional mass flow is fixed by ``gamma``
+    alone -- independent of reservoir conditions and throat size -- at
+
+    .. math::
+        \frac{\dot m}{\rho_t a_t A^*}
+            = \left(\frac{2}{\gamma + 1}\right)^{\frac{\gamma+1}{2(\gamma-1)}}
+
+    which is 0.5787 for ``gamma = 1.4``.  That makes it a check on the
+    non-dimensionalisation *and* on the solve: if the reference scales were
+    wrong, this number would be wrong by exactly that factor.
+    """
+    perf = performance(projected)
+    gamma = projected.flow.gamma
+    choked = (2.0 / (gamma + 1.0)) ** ((gamma + 1.0) / (2.0 * (gamma - 1.0)))
+    assert choked == pytest.approx(0.5787, abs=1e-4)
+    assert perf.discharge_coefficient == pytest.approx(choked, rel=0.03)
+
+
+def test_the_non_dimensional_forms_agree_with_their_dimensional_ones(projected):
+    """The ratio forms must be the dimensional ones over the reference scales.
+
+    Trivial arithmetic, but it is the thing that silently rots if a reference
+    scale is ever changed in one place and not the other.
+    """
+    perf = performance(projected)
+    flow = projected.flow
+    a_t = flow.stagnation_sound_speed
+    assert perf.specific_thrust_ratio == pytest.approx(perf.specific_thrust / a_t, rel=1e-12)
+
+    a_throat = 2.0 * projected.geometry.throat_height()
+    scale = flow.stagnation_density * a_t * a_throat
+    assert perf.discharge_coefficient == pytest.approx(perf.mass_flow_in / scale, rel=1e-12)
+
+
+def test_the_reference_scales_are_the_documented_ones():
+    """``R = gamma - 1`` is what makes the non-dimensionalisation what it is.
+
+    With that choice ``T`` is numerically the specific internal energy, and
+    ``p_t = T_t = L = 1`` fixes everything else: ``rho_t = 2.5`` and
+    ``a_t = 0.7483``.  The documentation quotes these numbers, so pin them.
+    """
+    flow = FlowConditions()
+    assert flow.Rgas == pytest.approx(flow.gamma - 1.0, rel=1e-15)
+    assert flow.total_pressure == 1.0
+    assert flow.total_temperature == 1.0
+    assert flow.stagnation_density == pytest.approx(2.5, rel=1e-12)
+    assert flow.stagnation_sound_speed == pytest.approx(0.7483314773547882, rel=1e-12)
