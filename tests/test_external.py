@@ -410,3 +410,61 @@ def test_an_unknown_field_quantity_is_refused():
 
     with pytest.raises(ValueError, match="quantity must be one of"):
         plot_jet_field(None, object(), quantity="entropy")
+
+
+# --------------------------------------------------------------------------
+# The nozzle stitched to the plume
+# --------------------------------------------------------------------------
+@pytest.mark.slow
+@pytest.mark.parametrize("quantity", ["mach", "pressure", "temperature", "velocity"])
+def test_every_stitched_plume_quantity_draws(supersonic_result, quantity):
+    pytest.importorskip("matplotlib")
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    from src.external import jet_wave_cells, plot_nozzle_and_plume
+
+    jc = jet_wave_cells(supersonic_result, ambient_pressure_ratio=0.030, cells=2)
+    fig, ax = plt.subplots()
+    plot_nozzle_and_plume(supersonic_result, jc, quantity=quantity, ax=ax)
+    plt.close(fig)
+
+
+def test_an_unknown_plume_quantity_is_refused(supersonic_result):
+    pytest.importorskip("matplotlib")
+    from src.external import plot_nozzle_and_plume
+
+    with pytest.raises(ValueError, match="quantity must be one of"):
+        plot_nozzle_and_plume(supersonic_result, quantity="density")
+
+
+@pytest.mark.slow
+def test_the_stitch_is_continuous_at_the_lip_to_the_two_dimensional_offset(
+    supersonic_result,
+):
+    """Interior and exterior must agree at the exit to within the 2D effect.
+
+    They cannot agree *exactly*: inside is quasi-1D, outside is a march started
+    from the computed 2D exit state, and those exit states differ because
+    quasi-1D assumes parallel streamlines where the real flow is still
+    diverging.  So the test is two-sided -- the step must be small enough that
+    the picture reads as one flow, and non-zero, because a zero step would mean
+    one of the two sides was not what it claims to be.
+    """
+    from src.external import jet_wave_cells
+    from src.external.plotting import _exterior_ratio, _interior_ratios
+    from src.quasi1d import solve_quasi1d
+
+    jc = jet_wave_cells(supersonic_result, ambient_pressure_ratio=0.030, cells=2)
+    q = solve_quasi1d(supersonic_result.geometry, supersonic_result.flow)
+    first_region = jc.region_polygons()[0][0]
+    gamma = supersonic_result.flow.gamma
+
+    for name in ("mach", "pressure", "temperature", "velocity"):
+        inner = float(_interior_ratios(q, supersonic_result.flow, name)[-1])
+        outer = _exterior_ratio(first_region, gamma, name)
+        step = abs(inner - outer) / abs(inner)
+        assert step < 0.02, f"{name}: {step:.3e} is too large to read as one flow"
+        assert step > 1e-6, f"{name}: a zero step means one side is not what it claims"

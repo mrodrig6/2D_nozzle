@@ -19,10 +19,10 @@ import matplotlib.pyplot as plt  # noqa: E402
 from src.api import solve_nozzle  # noqa: E402
 from src.plotting import (  # noqa: E402
     CENTRELINE_QUANTITIES,
-    STITCH_QUANTITIES,
+    COMPARE_QUANTITIES,
     plot_centreline,
+    plot_dg_vs_quasi1d,
     plot_field,
-    plot_stitched,
 )
 from src.postprocess import SCALARS, centreline_profile  # noqa: E402
 
@@ -66,10 +66,10 @@ def test_field_contours_draw_for_the_headline_scalars(solved, name):
     plt.close(fig)
 
 
-@pytest.mark.parametrize("name", sorted(STITCH_QUANTITIES))
+@pytest.mark.parametrize("name", sorted(COMPARE_QUANTITIES))
 def test_every_stitched_quantity_draws(solved, name):
     fig, ax = plt.subplots()
-    plot_stitched(solved, name, ax=ax, subdivisions=1, levels=8)
+    plot_dg_vs_quasi1d(solved, name, ax=ax, subdivisions=1, levels=8)
     plt.close(fig)
 
 
@@ -81,7 +81,7 @@ def test_stitching_refuses_what_quasi1d_does_not_predict(solved):
     """
     for name in ("vy", "entropy"):
         with pytest.raises(ValueError, match="does not predict"):
-            plot_stitched(solved, name)
+            plot_dg_vs_quasi1d(solved, name)
 
 
 def test_stitched_quantities_are_all_real_quasi1d_fields(solved):
@@ -89,6 +89,6 @@ def test_stitched_quantities_are_all_real_quasi1d_fields(solved):
     from src.quasi1d import solve_quasi1d
 
     q = solve_quasi1d(solved.geometry, solved.flow)
-    for name, attr in STITCH_QUANTITIES.items():
+    for name, attr in COMPARE_QUANTITIES.items():
         assert hasattr(q, attr), f"{name} maps to a missing quasi-1D field {attr!r}"
         assert name in SCALARS, f"{name} is not a DG scalar"

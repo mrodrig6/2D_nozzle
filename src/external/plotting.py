@@ -12,16 +12,19 @@ import functools
 import numpy as np
 
 from ..plotting import plot_contour
+from ..quasi1d import solve_quasi1d
 from .jet import JetCells, jet_wave_cells
 from .plume import ExitWaves, exit_wave_structure
 
 __all__ = [
     "FIELD_RAMPS",
+    "PLUME_QUANTITIES",
     "REGIME_COLOURS",
     "latex_rc",
     "plot_exit_waves",
     "plot_jet_cells",
     "plot_jet_field",
+    "plot_nozzle_and_plume",
 ]
 
 
@@ -522,4 +525,158 @@ def plot_jet_field(
             cb.set_ticks(ticks)
             cb.set_ticklabels([f"{np.exp(t):.2f}" for t in ticks])
             cb.ax.axhline(0.0, color="0.2", lw=1.0)  # ambient
+    return ax
+
+
+#: What each stitched quantity is, on both sides of the exit plane.  Every one
+#: is a *ratio*, which is what makes the two sides commensurate: the interior
+#: comes from the quasi-1D solution in solver units and the exterior from the
+#: wave march in its own, so stitching raw values would join two different
+#: scales and look continuous while being wrong.
+PLUME_QUANTITIES = {
+    "mach": r"$M$",
+    "pressure": r"$p / p_t$",
+    "temperature": r"$T / T_t$",
+    "velocity": r"$v / a_t$",
+}
+
+
+def _interior_ratios(q1d, flow, quantity: str) -> np.ndarray:
+    """The quasi-1D interior field, as the same ratio the exterior reports."""
+    if quantity == "mach":
+        return np.asarray(q1d.mach)
+    if quantity == "pressure":
+        return np.asarray(q1d.pressure) / flow.total_pressure
+    if quantity == "temperature":
+        return np.asarray(q1d.temperature) / flow.total_temperature
+    return np.asarray(q1d.velocity) / flow.stagnation_sound_speed
+
+
+def _exterior_ratio(region, gamma: float, quantity: str) -> float:
+    """The same ratio for one external wave-cell region."""
+    if quantity == "mach":
+        return region.mach
+    if quantity == "pressure":
+        return region.pressure_ratio
+    if quantity == "temperature":
+        # isentropic from the region's Mach number, which is what the march
+        # tracks; p and T are not independent along an isentrope
+        return 1.0 / (1.0 + 0.5 * (gamma - 1.0) * region.mach**2)
+    return region.velocity_ratio
+
+
+@_styled
+def plot_nozzle_and_plume(
+    result,
+    cells: JetCells | None = None,
+    *,
+    quantity: str = "mach",
+    n_cells: int = 3,
+    ambient_pressure_ratio: float | None = None,
+    ax=None,
+    colorbar: bool = True,
+    cmap: str = "viridis",
+):
+    r"""The quasi-1D nozzle and the external plume, stitched into one field.
+
+    Left of the exit plane is the **quasi-1D solution inside the nozzle**; right
+    of it is the **wave-cell march outside**, both on one colour scale and one
+    axis. The two are joined at the lip, which is where they genuinely meet: the
+    march is started from the exit state the quasi-1D solution ends at, so the
+    picture is continuous because the physics is, not because it was drawn that
+    way.
+
+    This is the whole flow a student is reasoning about -- reservoir, throat,
+    expansion, and then the shock cells that carry on downstream -- in a single
+    frame, rather than an interior plot and an exterior plot that have to be
+    mentally joined.
+
+    **The small step at the lip is real, and it is the point.**  Inside is
+    quasi-1D theory; outside is a march started from the *computed* exit state,
+    which is a 2D solve.  Those two exit states are not the same -- quasi-1D
+    assumes parallel streamlines at the exit and the real flow is still
+    diverging -- so the colour jumps by roughly half a percent to one percent
+    across the dashed exit line.  That jump is the two-dimensionality of the
+    exit flow, the same effect that puts this nozzle's true design point at
+    :math:`p_b/p_t \approx 0.0669` rather than the quasi-1D 0.0640.  Drawing the
+    two sides from one model would hide it.
+
+    Parameters
+    ----------
+    quantity
+        One of :data:`PLUME_QUANTITIES`.  Everything is a ratio, because the two
+        regions report in different units and stitching raw values would join
+        two scales and look seamless while being wrong.
+    n_cells
+        Shock cells to march downstream, if ``cells`` is not supplied.
+
+    Notes
+    -----
+    Inside the nozzle the field is constant across ``y`` at each station, which
+    is the quasi-1D assumption drawn rather than described.  Outside, each wave
+    cell is uniform, which is the wave march's own assumption.  Neither is a
+    2D solution -- for that, inside the nozzle, see
+    :func:`src.plotting.plot_dg_vs_quasi1d`.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import Normalize
+
+    if quantity not in PLUME_QUANTITIES:
+        raise ValueError(f"quantity must be one of {sorted(PLUME_QUANTITIES)}, got {quantity!r}")
+    if cells is None:
+        cells = jet_wave_cells(result, ambient_pressure_ratio=ambient_pressure_ratio, cells=n_cells)
+    if ax is None:
+        _, ax = plt.subplots(figsize=(11.0, 3.6), constrained_layout=True)
+
+    geom, flow = result.geometry, result.flow
+    q1d = solve_quasi1d(geom, flow)
+    inner = _interior_ratios(q1d, flow, quantity)
+
+    polys = cells.region_polygons()
+    outer = [_exterior_ratio(r, flow.gamma, quantity) for r, _ in polys]
+
+    lo = float(min(inner.min(), min(outer))) if outer else float(inner.min())
+    hi = float(max(inner.max(), max(outer))) if outer else float(inner.max())
+    norm = Normalize(vmin=lo, vmax=hi)
+    ramp = plt.get_cmap(cmap)
+    levels = np.linspace(lo, hi, 24)
+
+    # ---- inside: quasi-1D, constant across the channel at each station -----
+    wall = np.asarray(geom.wall(q1d.x))
+    xx = np.repeat(np.asarray(q1d.x)[:, None], 2, axis=1)
+    yy = np.stack([-wall, wall], axis=1)
+    zz = np.repeat(inner[:, None], 2, axis=1)
+    art = ax.contourf(xx, yy, zz, levels=levels, cmap=ramp, extend="both")
+
+    # ---- outside: one flat colour per wave cell ----------------------------
+    for (region, poly), value in zip(polys, outer, strict=True):
+        del region
+        for sign in (1.0, -1.0):
+            ax.fill(
+                poly[:, 0],
+                sign * poly[:, 1],
+                facecolor=ramp(norm(value)),
+                edgecolor="white",
+                linewidth=0.9,
+                zorder=2,
+            )
+
+    plot_contour(geom, ax=ax, mirror=True, color="k", lw=1.4)
+    ax.axvline(cells.lip_x, color="k", lw=1.0, ls="--", zorder=4)
+    ax.axhline(0.0, color="0.4", lw=0.5, ls=":", zorder=4)
+    ax.set_xlabel("$x$")
+    ax.set_ylabel("$y$")
+    ax.set_aspect("equal", adjustable="box")
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    if colorbar:
+        plt.colorbar(art, ax=ax, label=PLUME_QUANTITIES[quantity], pad=0.015, fraction=0.04)
+
+    ew = cells.exit_waves
+    ax.set_title(
+        f"quasi-1D nozzle stitched to the {cells.regime} plume   "
+        f"$p_e/p_{{amb}}$ = {ew.pressure_mismatch:.3f}   $M_e$ = {ew.exit_mach:.2f}",
+        fontsize=10,
+        loc="left",
+    )
     return ax

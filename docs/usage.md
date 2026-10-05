@@ -222,8 +222,14 @@ equations are solved in a non-dimensional form fixed by four choices:
 |---|---|---|---|
 | Reservoir pressure | $p_t$ | `1` | `total_pressure` |
 | Reservoir temperature | $T_t$ | `1` | `total_temperature` |
-| Nozzle length | $L$ | `1` | `length` |
 | Gas constant | $R$ | `0.4` | `Rgas`, chosen as $\gamma - 1$ |
+| Length | $L$ | `1` | **every length together** — see below |
+
+> **`length` is not the length scale.** It sets the axial extent while
+> `throat_half_height` and `inlet_half_height` set the transverse one, so
+> changing `length` alone makes the nozzle more *slender* — a different shape,
+> entitled to a different answer. Changing all three together is the rescale,
+> and that is exactly invariant.
 
 Everything else follows, and these two are worth knowing because they are
 **not** 1:
@@ -263,6 +269,35 @@ throat size. Measured 0.5756 against the closed form
 ```
 
 a 0.5% gap that is discretisation error, and is pinned by a test.
+
+### Is it actually non-dimensional? Measured, not asserted
+
+Invariance is the property being claimed, so it is tested rather than stated.
+`tests/test_nondimensional.py` rescales the references and compares converged
+solves:
+
+| Rescaling | Dimensionless outputs | Dimensional outputs | Iterations |
+|---|---|---|---|
+| every length $\times 2$, $\times 5$, $\times \tfrac14$ | **exactly 0 drift** | scale by the factor to 1e-10 | identical |
+| $p_t \times 10$ | exact, 1e-16 | scale by 10 | identical |
+| $T_t \times 4$ | 7e-11 at `tolerance=1e-10` | — | 1751 vs 1701 |
+| $R \times 2.5$ | 7e-11 at `tolerance=1e-10` | — | 1751 vs 1701 |
+
+The first two are exact. The last two carry one wrinkle worth understanding,
+because it is a genuine imprecision rather than noise.
+
+**The convergence criterion is not reference-invariant.** The conserved
+variables scale as $\rho_t$, $\rho_t a_t$ and $\rho_t a_t^2$ — three different
+powers of $a_t$ — but the residual is a single RMS norm over all four
+components, divided by the single scale $\rho_t a_t / L$. No one scale can
+non-dimensionalise a mixed-dimension norm, so changing $a_t$ (via $T_t$ or $R$)
+reweights the components slightly and the march crosses the tolerance a few
+iterations earlier or later.
+
+**The answer is unaffected; only the stopping point moves.** The drift tracks
+the tolerance exactly — 4.8e-6, 1.2e-6, 7.5e-9 and 7.0e-11 at tolerances of
+1e-5, 1e-6, 1e-8 and 1e-10 — so tightening the tolerance removes it. Scaling
+$p_t$ is immune because it multiplies all three by the *same* factor.
 
 **To put results in physical units**, multiply by your own reference values:
 thrust by $p_t L$ (times the depth), mass flow by $\rho_t a_t L$, and so on.
@@ -317,15 +352,16 @@ plot_centreline(result, quantity="temperature")
 `velocity`; anything else is refused by name rather than failing inside
 Matplotlib.
 
-**The 2D solution and quasi-1D theory in one picture.** `plot_stitched` puts
+**The 2D solution and quasi-1D theory in one picture**, inside the nozzle.
+`plot_dg_vs_quasi1d` puts
 the DG field above the axis and the quasi-1D prediction for the same geometry
 below it, on one shared colour scale:
 
 ```python
-from src.plotting import plot_stitched
+from src.plotting import plot_dg_vs_quasi1d
 
-plot_stitched(result, "mach")
-plot_stitched(result, "temperature")
+plot_dg_vs_quasi1d(result, "mach")
+plot_dg_vs_quasi1d(result, "temperature")
 ```
 
 ![DG above, quasi-1D below](figures/stitched.png)

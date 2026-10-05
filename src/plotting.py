@@ -380,7 +380,7 @@ def overview(result: SolveResult, figsize=(12.0, 8.0)):
 #: Which quasi-1D field each stitched quantity is drawn against.  Only the
 #: quantities quasi-1D theory actually predicts appear here: it has no transverse
 #: velocity by construction, so ``vy`` is absent rather than silently zero.
-STITCH_QUANTITIES = {
+COMPARE_QUANTITIES = {
     "mach": "mach",
     "pressure": "pressure",
     "density": "density",
@@ -389,7 +389,7 @@ STITCH_QUANTITIES = {
 }
 
 
-def plot_stitched(
+def plot_dg_vs_quasi1d(
     result: SolveResult,
     name: str = "mach",
     ax=None,
@@ -419,7 +419,7 @@ def plot_stitched(
     Parameters
     ----------
     name
-        One of :data:`STITCH_QUANTITIES`.  Quantities quasi-1D does not predict
+        One of :data:`COMPARE_QUANTITIES`.  Quantities quasi-1D does not predict
         (``vy``, ``entropy``) are refused rather than drawn against nothing.
     quasi1d
         A previously computed solution, to avoid recomputing it.
@@ -430,9 +430,9 @@ def plot_stitched(
     what makes "the colours do not line up" mean something.  Giving each half
     its own would make even a large disagreement look like agreement.
     """
-    if name not in STITCH_QUANTITIES:
+    if name not in COMPARE_QUANTITIES:
         raise ValueError(
-            f"name must be one of {sorted(STITCH_QUANTITIES)} -- quasi-1D theory "
+            f"name must be one of {sorted(COMPARE_QUANTITIES)} -- quasi-1D theory "
             f"does not predict {name!r}"
         )
     plt = _require_matplotlib()
@@ -442,7 +442,7 @@ def plot_stitched(
 
     pts, tris, vals = sample_field(result, name, subdivisions)
     q = quasi1d if quasi1d is not None else solve_quasi1d(result.geometry, result.flow)
-    q_vals = getattr(q, STITCH_QUANTITIES[name])
+    q_vals = getattr(q, COMPARE_QUANTITIES[name])
 
     # one scale across both halves, from both halves
     lo = float(min(vals.min(), q_vals.min()))

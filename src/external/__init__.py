@@ -13,11 +13,13 @@ from __future__ import annotations
 from .jet import JetCells, JetRegion, jet_wave_cells
 from .plotting import (
     FIELD_RAMPS,
+    PLUME_QUANTITIES,
     REGIME_COLOURS,
     latex_rc,
     plot_exit_waves,
     plot_jet_cells,
     plot_jet_field,
+    plot_nozzle_and_plume,
 )
 from .plume import ExitWaves, exit_wave_structure
 from .waves import (
@@ -35,6 +37,7 @@ __all__ = [
     "JetCells",
     "JetRegion",
     "FIELD_RAMPS",
+    "PLUME_QUANTITIES",
     "REGIME_COLOURS",
     "deflection_from_wave_angle",
     "exit_wave_structure",
@@ -46,6 +49,7 @@ __all__ = [
     "plot_exit_waves",
     "plot_jet_cells",
     "plot_jet_field",
+    "plot_nozzle_and_plume",
     "prandtl_meyer",
     "prandtl_meyer_inverse",
     "pressure_ratio_across_oblique_shock",
