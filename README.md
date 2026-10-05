@@ -1,6 +1,5 @@
 # 2D Discontinuous Galerkin nozzle code
 
-[![tests](https://github.com/mrodrig6/2DDG/actions/workflows/test.yml/badge.svg)](https://github.com/mrodrig6/2DDG/actions/workflows/test.yml)
 [![ruff](https://img.shields.io/badge/lint%20%26%20format-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 [![codespell](https://img.shields.io/badge/spell%20check-codespell-blue.svg)](https://github.com/codespell-project/codespell)
 [![docs](https://img.shields.io/badge/docs-markdown-informational.svg)](docs/)
@@ -55,6 +54,21 @@ Run a worked case, or list them all:
 ./dg2d.sh list
 ./dg2d.sh run sweep             # examples/02_sweep.py
 ```
+
+### Checking it still works
+
+There is **no CI** — nothing runs on push, and no service decides whether a
+change is good. You do, on your own machine:
+
+```bash
+./dg2d.sh verify                # tests, lint, format, spelling
+./dg2d.sh verify --fast         # same, minus the full solves (seconds, not minutes)
+./dg2d.sh test tests/test_physics.py -k roe     # one file, or one test
+```
+
+`verify` skips any step whose tool is not installed and says so, rather than
+failing — a missing linter is not a broken solver. It exits non-zero if anything
+that did run failed.
 
 → Full launcher reference and the Python API: **[`docs/usage.md`](docs/usage.md)**
 

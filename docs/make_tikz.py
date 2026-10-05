@@ -51,9 +51,9 @@ def _substitute(text: str, new_coords: str, sign: str, expected: int, what: str)
     their first ``y`` value, which is the only thing distinguishing the upper
     wall from its mirror image in the source.  If a contour change moved that
     value so the pattern stopped matching, a silent no-op would leave the figure
-    stale while ``git diff`` stayed clean -- so the CI job that regenerates and
-    diffs this file would pass on an out-of-date figure.  Failing loudly here is
-    what makes that check trustworthy.
+    stale while ``git diff`` stayed clean -- so regenerating and diffing this
+    file would look clean on an out-of-date figure.  Failing loudly here is what
+    makes running this script a real check rather than a reassuring no-op.
     """
     pattern = re.compile(r"plot coordinates \{\(0\.0000," + sign + r"[0-9][^}]*\}")
     text, count = pattern.subn("plot coordinates {" + new_coords + "}", text)

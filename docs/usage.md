@@ -22,6 +22,7 @@ names as the Python API, so there is one vocabulary to learn rather than two.
 | `./dg2d.sh geometry ...` | inspect a contour; no flow solve |
 | `./dg2d.sh bench ...` | time the backends against each other |
 | `./dg2d.sh test` | run the test suite |
+| `./dg2d.sh verify` | tests, lint, format and spelling in one go — there is no CI, so this is it |
 | `./dg2d.sh install` | `pip install -e ".[all]"`, if you want it installed |
 | `./dg2d.sh docs` | where the documentation is |
 

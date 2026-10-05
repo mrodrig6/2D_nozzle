@@ -258,6 +258,8 @@ Running
   geometry [...]     inspect a contour; no flow solve
   bench [...]        time the backends against each other
   test [...]         run the test suite
+  verify [--fast]    everything the project checks about itself: tests, lint,
+                     format and spelling.  '--fast' skips the full solves.
   docs               print where the documentation is
 
 Arguments are 'name=value', using the same names as the Python API:
@@ -365,6 +367,62 @@ cmd_test() {
     exec "$PY" -m pytest ${target[@]+"${target[@]}"} ${TRANSLATED[@]+"${TRANSLATED[@]}"}
 }
 
+# Everything the project checks about itself, in one command.
+#
+# This used to be a GitHub Actions workflow across six OS/Python combinations.
+# It is a teaching code with one author, so a matrix proving it also works on
+# Windows py3.10 was buying nothing, and a push waiting on a queue is a worse
+# feedback loop than a terminal.  The checks themselves were worth keeping, so
+# they moved here, where they run on the machine the code is actually used on
+# and the author decides when.
+#
+# Each step is skipped with a note rather than failing if its tool is missing,
+# because a missing linter should not look like a broken solver.  The exit code
+# is non-zero if any step that *did* run failed.
+cmd_verify() {
+    local fast=0
+    [[ ${1:-} == --fast ]] && fast=1
+
+    local failed=()
+    local skipped=()
+
+    step() {  # step <name> <tool-to-probe> <command...>
+        local name=$1 probe=$2; shift 2
+        if [[ -n $probe ]] && ! "$PY" -c "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec('$probe') else 1)"; then
+            printf '\n==> %s -- SKIPPED (%s is not installed)\n' "$name" "$probe"
+            skipped+=("$name")
+            return 0
+        fi
+        printf '\n==> %s\n' "$name"
+        if "$@"; then
+            return 0
+        fi
+        failed+=("$name")
+    }
+
+    step "tests (fast)" pytest "$PY" -m pytest "$ROOT" -q --fast
+    if (( ! fast )); then
+        # 40-odd end-to-end solves, including finite-difference gradient checks.
+        # Minutes, not seconds -- which is why --fast exists.
+        step "tests (full solves and adjoint checks)" pytest \
+            "$PY" -m pytest "$ROOT" -q --slow --durations=10
+    fi
+    step "lint" ruff "$PY" -m ruff check "$ROOT"
+    step "format" ruff "$PY" -m ruff format --check "$ROOT"
+    step "spelling" codespell_lib "$PY" -m codespell_lib \
+        "$ROOT/src" "$ROOT/tests" "$ROOT/examples" "$ROOT/docs" "$ROOT/README.md"
+
+    printf '\n%s\n' "----------------------------------------------------------"
+    if (( ${#skipped[@]} )); then
+        printf 'skipped: %s\n' "${skipped[*]}"
+    fi
+    if (( ${#failed[@]} )); then
+        printf 'FAILED:  %s\n' "${failed[*]}"
+        return 1
+    fi
+    printf 'all checks passed\n'
+}
+
 cmd_docs() {
     cat <<EOF
 docs/theory.md      the formulation, the geometry definition and the
@@ -395,6 +453,7 @@ main() {
         docs)      cmd_docs ;;
         run)       setup_import_path; cmd_run "$@" ;;
         test)      setup_import_path; cmd_test "$@" ;;
+        verify)    setup_import_path; cmd_verify ${1+"$1"} ;;
         solve|sweep|geometry|bench)
                    setup_import_path; dgnozzle "$command" "$@" ;;
         *)         printf '%s: unknown command %s\n\n' "$SELF" "$command" >&2
