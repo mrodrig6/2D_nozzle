@@ -31,8 +31,8 @@ You need Python 3.10+ and nothing else — there is no install step and nothing
 to compile.
 
 ```bash
-git clone https://github.com/mrodrig6/dg.git
-cd dg
+git clone https://github.com/mrodrig6/2D_nozzle.git
+cd 2D_nozzle
 ./dg2d.sh check                 # what is available
 ./dg2d.sh solve area_ratio=3.0 back_pressure_ratio=0.12 order=1
 ```
