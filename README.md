@@ -1,7 +1,5 @@
 # 2D Discontinuous Galerkin nozzle code
 
-[![ruff](https://img.shields.io/badge/lint%20%26%20format-ruff-261230.svg)](https://github.com/astral-sh/ruff)
-[![codespell](https://img.shields.io/badge/spell%20check-codespell-blue.svg)](https://github.com/codespell-project/codespell)
 [![docs](https://img.shields.io/badge/docs-markdown-informational.svg)](docs/)
 [![licence: MIT](https://img.shields.io/badge/licence-MIT-green.svg)](LICENSE)
 
