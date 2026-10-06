@@ -54,4 +54,16 @@ cd docs/tikz && pdflatex nozzle_geometry.tex
 The wall in `nozzle_geometry.tex` is the **actual** contour the solver
 produces, sampled from `src.geometry` — not a freehand sketch. `make_tikz.py`
 fails loudly rather than silently doing nothing if the figure source changes
-shape, which is what makes the CI staleness check on it worth having.
+shape.
+
+This used to be checked on every push. It is not any more — there is no CI, by
+design — so it is a **manual step after changing the contour code**:
+
+```bash
+python docs/make_tikz.py            # regenerate from src.geometry
+git diff docs/tikz/                 # empty means the figure is still in sync
+python docs/render_figures.py       # only if the .tex changed; needs TeX
+```
+
+Nothing breaks if you forget: the committed PNG simply stops matching the code,
+which is a documentation bug rather than a solver one.

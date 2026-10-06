@@ -6,7 +6,12 @@ What is checked, and what to do when a run misbehaves.
 
 ## Verification
 
-Checks that hold to machine precision, all asserted in the test suite:
+All of this is asserted in the test suite, which **nothing runs for you** —
+there is no CI by design. `./dg2d.sh verify` is how you check it, and
+`./dg2d.sh verify --fast` skips the full solves when you want an answer in
+seconds.
+
+Checks that hold to machine precision:
 
 - **Freestream preservation** (the discrete geometric conservation law) to 1e-17
   — for triangles and quads, `Q=1` and `Q=2`, `p=0,1,2`.
