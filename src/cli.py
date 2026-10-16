@@ -16,6 +16,8 @@ from collections.abc import Sequence
 
 import numpy as np
 
+from .config import FLUXES
+
 
 def _geometry_args(p: argparse.ArgumentParser) -> None:
     g = p.add_argument_group("geometry")
@@ -40,8 +42,11 @@ def _disc_args(p: argparse.ArgumentParser) -> None:
     g.add_argument(
         "--flux",
         default="roe",
-        choices=("roe", "hllc"),
-        help="interface flux: Roe (most accurate) or HLLC (positivity-preserving)",
+        choices=FLUXES,
+        help=(
+            "interface flux: roe (default, most accurate), hllc "
+            "(positivity-preserving), ausmup (AUSM+-up, no wave decomposition)"
+        ),
     )
     g.add_argument("-p", "--order", type=int, default=1, help="polynomial order p")
     g.add_argument("-Q", "--geometry-order", type=int, default=1, help="geometry order Q")

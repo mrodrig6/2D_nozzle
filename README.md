@@ -75,8 +75,9 @@ that did run failed.
 ## What it does
 
 **Solves.** Nodal DG on triangles or quads, polynomial order 0–4, curved
-elements, marched to steady state. Two interface fluxes: Roe with the
-Harten–Hyman entropy fix (the default) and HLLC with Batten's wave speeds.
+elements, marched to steady state. Three interface fluxes: Roe with the
+Harten–Hyman entropy fix (the default), HLLC with Batten's wave speeds, and
+AUSM+-up.
 → [`docs/theory.md`](docs/theory.md)
 
 **Designs.** Five contour families (conical, smooth, bell, method-of-

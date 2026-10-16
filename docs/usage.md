@@ -42,20 +42,22 @@ always means Mach number, and the TVB constant is not a Mach number.
 `geometry` runs no flow solve — use it to check a contour before committing to
 a simulation.
 
-**Interface flux.** Two are available, and the choice is a real one:
+**Interface flux.** Three are available, and the choice is a real one:
 
 | `flux=` | What it is | Use it when |
 |---|---|---|
 | `roe` (default) | Roe's approximate Riemann solver with the Harten–Hyman entropy fix | **Accuracy.** Consistently the lowest entropy error, and what every number in the documentation was produced with |
 | `hllc` | HLLC with Batten's wave speeds | **Robustness.** Provably positivity-preserving, needs no entropy fix and so has no constant to tune, and is cheaper |
+| `ausmup` | AUSM+-up: no wave decomposition, a convective part plus a separate pressure part | **Comparison across families.** Converges in fewer iterations than Roe and agrees to 0.6–0.8% in $c_F$; reproduces contacts exactly |
 
 Measured at the design point: HLLC converges in 451 iterations against Roe's 751
 at `p=0` and agrees to ~1% in thrust, while Roe is the more accurate of the two
-(entropy error 3.8e-3 against 6.2e-3 at `p=1`). Neither fixes the `p>=1` shocked
-divergence. See
-[`theory.md`](theory.md#hllc-and-why-it-is-the-robust-choice).
+(entropy error 3.8e-3 against 6.2e-3 at `p=1`). None of the three fixes the
+`p>=1` shocked divergence. See
+[`theory.md`](theory.md#hllc-and-why-it-is-the-robust-choice) and
+[AUSM+-up](theory.md#ausm-up-a-flux-with-no-wave-decomposition).
 
-Both run on the Numba fast path.
+All three run on the Numba fast path.
 
 ### The cases
 

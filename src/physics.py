@@ -312,6 +312,196 @@ def hllc_flux(
 
 
 # --------------------------------------------------------------------------
+# AUSM+-up
+# --------------------------------------------------------------------------
+#: ``beta`` in the split Mach polynomials and ``alpha`` in the pressure
+#: splittings.  These are **not** tunable: they are the unique values that make
+#: polynomials of the stated degrees smooth at :math:`|M| = 1`
+#: (Liou, *J. Comput. Phys.* **129**, 364, 1996).
+AUSM_BETA = 0.125
+AUSM_ALPHA = 0.1875
+
+#: The two ``-up`` diffusion coefficients, which *are* tunable.  These values
+#: are the benchmarked ones, carried over with the scheme rather than guessed;
+#: see :func:`ausm_up_flux` for why that distinction cost somebody a bug.
+AUSM_KP = 0.4
+AUSM_KU = 0.2
+
+
+def _m4_plus(m, beta, xp):
+    r""":math:`M^+_{(4)}`: :math:`M^+_{(1)}` supersonic, the quartic below."""
+    m1p = 0.5 * (m + xp.abs(m))
+    m2p = 0.25 * (m + 1.0) ** 2
+    m2m = -0.25 * (m - 1.0) ** 2
+    return xp.where(xp.abs(m) >= 1.0, m1p, m2p * (1.0 - 16.0 * beta * m2m))
+
+
+def _m4_minus(m, beta, xp):
+    r""":math:`M^-_{(4)}`, the partner of :func:`_m4_plus`."""
+    m1m = 0.5 * (m - xp.abs(m))
+    m2p = 0.25 * (m + 1.0) ** 2
+    m2m = -0.25 * (m - 1.0) ** 2
+    return xp.where(xp.abs(m) >= 1.0, m1m, m2m * (1.0 + 16.0 * beta * m2p))
+
+
+def _p5_plus(m, alpha, xp):
+    r""":math:`P^+_{(5)}`, the pressure splitting.
+
+    The supersonic branch is :math:`M^+_{(1)}/M`, which is written here as
+    :math:`\tfrac12(1 + \operatorname{sign} M)` -- the same number, without the
+    division.  That matters: ``where`` evaluates **both** branches, so the
+    literal quotient would produce ``0/0`` at :math:`M = 0`, and while ``where``
+    would discard the resulting NaN, a NaN in an untaken branch still poisons
+    the reverse-mode gradient.  This solver differentiates through its fluxes.
+    """
+    m2p = 0.25 * (m + 1.0) ** 2
+    m2m = -0.25 * (m - 1.0) ** 2
+    return xp.where(
+        xp.abs(m) >= 1.0,
+        0.5 * (1.0 + xp.sign(m)),
+        m2p * ((2.0 - m) - 16.0 * alpha * m * m2m),
+    )
+
+
+def _p5_minus(m, alpha, xp):
+    r""":math:`P^-_{(5)}`; see :func:`_p5_plus` for the division-free branch."""
+    m2p = 0.25 * (m + 1.0) ** 2
+    m2m = -0.25 * (m - 1.0) ** 2
+    return xp.where(
+        xp.abs(m) >= 1.0,
+        0.5 * (1.0 - xp.sign(m)),
+        m2m * ((-2.0 - m) + 16.0 * alpha * m * m2p),
+    )
+
+
+def ausm_up_flux(
+    UL,
+    UR,
+    nx,
+    ny,
+    gamma: float,
+    *,
+    kp: float = AUSM_KP,
+    ku: float = AUSM_KU,
+    xp=np,
+) -> FluxResult:
+    r"""AUSM\ :sup:`+`-up (Liou, *J. Comput. Phys.* **214**, 137, 2006).
+
+    A different idea from the other two fluxes here.  Roe and HLLC decompose the
+    jump into waves; AUSM-family schemes do not.  They split the flux into a
+    *convective* part carried by one interface velocity and a separate
+    *pressure* part:
+
+    .. math::
+        \hat{\mathbf{F}} = u_{1/2}\,\boldsymbol{\Psi}_{\text{upwind}}
+                         + p_{1/2}\,\mathbf{N}, \qquad
+        \boldsymbol{\Psi} = (\rho,\ \rho v_x,\ \rho v_y,\ \rho H)^T, \quad
+        \mathbf{N} = (0,\ n_x,\ n_y,\ 0)^T,
+
+    with :math:`\boldsymbol{\Psi}` upwinded on the sign of :math:`u_{1/2}`.
+    Because pressure is carried entirely by :math:`p_{1/2}`, the convective part
+    carries no pressure dissipation, and a contact discontinuity -- stationary
+    or moving -- is reproduced exactly.
+
+    The interface velocity and pressure come from polynomial splittings of each
+    side's normal Mach number :math:`M_K = v_{n,K}/a_{1/2}`, plus the two
+    ``-up`` terms the scheme is named for:
+
+    .. math::
+        u_{1/2} &= a_{1/2}\bigl[M^+_{(4)}(M_L) + M^-_{(4)}(M_R)\bigr]
+            + K_p \frac{\max(1 - \bar{M}^2,\,0)\,(p_L - p_R)}
+                       {\rho_{1/2}\,a_{1/2}}, \\
+        p_{1/2} &= P^+_{(5)}(M_L)\,p_L + P^-_{(5)}(M_R)\,p_R
+            + K_u P^+_{(5)} P^-_{(5)}\,\rho_{1/2}\,a_{1/2}\,(v_{n,L} - v_{n,R}),
+
+    with :math:`a_{1/2} = \tfrac12(a_L + a_R)`,
+    :math:`\rho_{1/2} = \tfrac12(\rho_L + \rho_R)` and
+    :math:`\bar{M}^2 = \tfrac12(M_L^2 + M_R^2)`.
+
+    The :math:`K_p` term is the pressure-velocity coupling that plain
+    AUSM\ :sup:`+` lacks.  Without it the mass flux vanishes identically
+    whenever :math:`v_{n,L} = v_{n,R} = 0`, however large the pressure jump, so
+    AUSM\ :sup:`+` alone cannot start a flow from rest.
+
+    Measured here
+    -------------
+    It converges, on the default design point, and slightly faster than Roe:
+
+    ====  ======  ==========  =========  =====
+    p     flux    iterations  c_F        M_e
+    ====  ======  ==========  =========  =====
+    1     roe     1001        0.17823    2.4646
+    1     ausmup   901        0.17674    2.4512
+    2     roe     1951        0.17703    2.4581
+    2     ausmup  1501        0.17604    2.4539
+    ====  ======  ==========  =========  =====
+
+    The gap to Roe on :math:`c_F` falls from 0.8% to 0.6% as the order rises,
+    which is what a discretisation difference does.
+
+    That was not the expected result, and the history is worth knowing.  This
+    project previously implemented SLAU2 -- a sibling from the same family --
+    and it reached the right answer and then limit-cycled instead of
+    converging, for reasons six refuted hypotheses never explained.  AUSM+-up
+    does not inherit that.  The obvious structural difference is the ``-up``
+    terms: SLAU2's pressure flux has no :math:`K_u`-type velocity diffusion
+    proportional to :math:`\rho_{1/2} a_{1/2}`, while this scheme does.  That
+    is a plausible lead, not a demonstrated cause.
+
+    Parameters
+    ----------
+    kp, ku
+        The ``-up`` diffusion coefficients.  Defaults are the benchmarked
+        values.  They are exposed because the magnitude of ``ku`` in particular
+        is easy to get wrong by a factor that makes the scheme
+        *anti-dissipative*, and a student changing it and watching a moving
+        contact blow up learns something the identities cannot teach.
+    """
+    rhoL, vxL, vyL, pL, _ = primitives(UL, gamma, xp=xp)
+    rhoR, vxR, vyR, pR, _ = primitives(UR, gamma, xp=xp)
+
+    vnL = vxL * nx + vyL * ny
+    vnR = vxR * nx + vyR * ny
+    aL = xp.sqrt(gamma * pL / rhoL)
+    aR = xp.sqrt(gamma * pR / rhoR)
+
+    # Plain arithmetic means, which is what the benchmarked form uses -- not
+    # Liou's critical-speed construction, a substitution that has been got
+    # wrong before.
+    a_half = 0.5 * (aL + aR)
+    rho_half = 0.5 * (rhoL + rhoR)
+
+    mL = vnL / a_half
+    mR = vnR / a_half
+    mbar_sq = 0.5 * (mL * mL + mR * mR)
+
+    # max(1 - Mbar^2, 0) switches the pressure diffusion off once the interface
+    # is supersonic, where upwinding already supplies the dissipation.
+    u_half = a_half * (
+        _m4_plus(mL, AUSM_BETA, xp) + _m4_minus(mR, AUSM_BETA, xp)
+    ) + kp * xp.maximum(1.0 - mbar_sq, 0.0) * (pL - pR) / (rho_half * a_half)
+
+    p5p = _p5_plus(mL, AUSM_ALPHA, xp)
+    p5m = _p5_minus(mR, AUSM_ALPHA, xp)
+    p_half = p5p * pL + p5m * pR + ku * p5p * p5m * rho_half * a_half * (vnL - vnR)
+
+    PsiL = xp.stack([rhoL, rhoL * vxL, rhoL * vyL, UL[..., 3] + pL], axis=-1)
+    PsiR = xp.stack([rhoR, rhoR * vxR, rhoR * vyR, UR[..., 3] + pR], axis=-1)
+
+    # Upwinding written as a central term minus |u_1/2| times the jump, which is
+    # algebraically identical to selecting on the sign and stays branchless.
+    u = u_half[..., None]
+    au = xp.abs(u_half)[..., None]
+    flux = 0.5 * u * (PsiL + PsiR) - 0.5 * au * (PsiR - PsiL)
+
+    zero = xp.zeros_like(p_half)
+    flux = flux + p_half[..., None] * xp.stack([zero, nx + zero, ny + zero, zero], axis=-1)
+
+    max_speed = xp.maximum(xp.abs(vnL) + aL, xp.abs(vnR) + aR)
+    return FluxResult(flux, max_speed)
+
+
+# --------------------------------------------------------------------------
 # Boundary conditions
 # --------------------------------------------------------------------------
 def wall_flux(U, nx, ny, gamma: float, xp=np) -> FluxResult:

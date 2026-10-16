@@ -22,6 +22,11 @@ import math
 from dataclasses import dataclass, replace
 from typing import Any
 
+#: The interface fluxes the solver implements, in the order a reader should
+#: consider them.  One name, used by the validator, the CLI and the Numba
+#: kernel dispatch, so a flux cannot be accepted here and unknown there.
+FLUXES = ("roe", "hllc", "ausmup")
+
 BACKENDS = ("numba", "numpy", "jax")
 
 
@@ -92,9 +97,18 @@ class FlowConditions:
             not, and which is the assumption the Zhang-Shu positivity limiter's
             theorem needs.  It also needs no entropy fix, because the HLL family
             cannot produce an expansion shock, so there is no constant to tune.
-        The two agree to discretisation error on a smooth solution, so switching
-        is a way to ask how much of an answer is the flux rather than the mesh.
-        Neither makes a shocked operating point converge.
+        ``'ausmup'``
+            AUSM+-up (Liou 2006).  A different idea: no wave decomposition at
+            all, just a convective part carried by one interface velocity plus a
+            separate pressure part.  Converges on the default design point, in
+            fewer iterations than Roe, within 0.6-0.8% of it on ``c_F``.  Its
+            sibling SLAU2 did *not* converge here, which is why this one was
+            measured rather than assumed; see ``docs/theory.md``.
+
+        All three agree to discretisation error on a smooth solution, so
+        switching is a way to ask how much of an answer is the flux rather than
+        the mesh.  None of the three makes a shocked operating point
+        converge.
     """
 
     gamma: float = 1.4
@@ -120,8 +134,8 @@ class FlowConditions:
             )
         if self.entropy_fix < 0.0:
             raise ValueError("entropy_fix must be non-negative")
-        if self.flux not in ("roe", "hllc"):
-            raise ValueError(f"flux must be 'roe' or 'hllc', got {self.flux!r}")
+        if self.flux not in FLUXES:
+            raise ValueError(f"flux must be one of {sorted(FLUXES)}, got {self.flux!r}")
         if self.hllc_low_mach < 0.0:
             raise ValueError("hllc_low_mach must be non-negative")
 

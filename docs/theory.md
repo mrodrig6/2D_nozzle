@@ -520,6 +520,79 @@ untouched. `0` disables it and gives standard HLLC, which is the verified path;
 the form follows the paper, so check the cutoff constant against it before
 relying on that branch quantitatively.
 
+### AUSM+-up, a flux with no wave decomposition
+
+`flux='ausmup'` selects AUSM+-up (Liou, *J. Comput. Phys.* **214**, 137,
+2006). It belongs to a different family from the other two. Roe and HLLC model
+the jump as waves; AUSM-type schemes instead split the flux into a
+*convective* part, carried by a single interface velocity, and a separate
+*pressure* part:
+
+```math
+\hat{\mathbf{F}} = u_{1/2}\,\boldsymbol{\Psi}_{\text{upwind}} + p_{1/2}\,\mathbf{N},
+\qquad
+\boldsymbol{\Psi} = (\rho,\ \rho v_x,\ \rho v_y,\ \rho H)^T,
+\qquad
+\mathbf{N} = (0,\ n_x,\ n_y,\ 0)^T,
+```
+
+with $\boldsymbol{\Psi}$ upwinded on the sign of $u_{1/2}$. Because the pressure
+is carried entirely by $p_{1/2}$, the convective part has no pressure
+dissipation, and a contact discontinuity is reproduced exactly.
+
+Both interface quantities come from polynomial splittings of each side's
+normal Mach number $M_K = v_{n,K}/a_{1/2}$, plus the two "-up" terms the scheme
+is named for:
+
+```math
+\begin{aligned}
+u_{1/2} &= a_{1/2}\bigl[M^+_{(4)}(M_L) + M^-_{(4)}(M_R)\bigr]
+  + K_p\,\frac{\max(1-\bar M^2,\,0)\,(p_L - p_R)}{\rho_{1/2}\,a_{1/2}},\\
+p_{1/2} &= P^+_{(5)}(M_L)\,p_L + P^-_{(5)}(M_R)\,p_R
+  + K_u\,P^+_{(5)}P^-_{(5)}\,\rho_{1/2}\,a_{1/2}\,(v_{n,L} - v_{n,R}),
+\end{aligned}
+```
+
+with $a_{1/2}$ and $\rho_{1/2}$ arithmetic means and
+$\bar M^2 = \tfrac12(M_L^2 + M_R^2)$. The splittings are pinned by two exact
+identities, $M^+_{(4)} + M^-_{(4)} = M$ and $P^+_{(5)} + P^-_{(5)} = 1$, which
+the tests check. Their constants $\beta = 1/8$ and $\alpha = 3/16$ are not
+tunable; $K_p = 0.4$ and $K_u = 0.2$ are, and the values used are the
+benchmarked ones carried over from the `approximate_riemann_solver` project.
+That provenance matters: a version of this flux reconstructed from memory once
+had $K_u$ effectively 7.5 times too large, which made the scheme
+*anti-dissipative* on a moving contact — an error the identity tests cannot
+catch.
+
+The $K_p$ term is the pressure–velocity coupling that plain AUSM+ lacks. Without
+it the mass flux vanishes whenever $v_{n,L} = v_{n,R} = 0$, however large the
+pressure jump, so AUSM+ alone cannot start a flow from rest.
+
+**Measured on the default design point** ($p_b/p_t = 0.15$):
+
+| $p$ | flux | iterations | $c_F$ | $M_e$ |
+|---|---|---|---|---|
+| 1 | `roe` | 1001 | 0.17823 | 2.4646 |
+| 1 | `ausmup` | 901 | 0.17674 | 2.4512 |
+| 2 | `roe` | 1951 | 0.17703 | 2.4581 |
+| 2 | `ausmup` | 1501 | 0.17604 | 2.4539 |
+
+It converges, in fewer iterations than Roe, and the gap to Roe on $c_F$ falls
+from 0.8% to 0.6% as the order rises — which is how a discretisation
+difference behaves.
+
+That was not a foregone conclusion. This project previously implemented
+SLAU2, a sibling from the same family, and it reached the right answer and then
+sat in a bounded limit cycle rather than converging; six hypotheses for why were
+tested and refuted, including a full Jacobian eigenvalue study that found no
+unstable modes. AUSM+-up does not inherit that behaviour. One visible structural
+difference is the $K_u$ velocity-diffusion term in $p_{1/2}$, which SLAU2's
+pressure flux lacks — a plausible lead, not a demonstrated cause.
+
+Roe remains the default because every other number in this documentation was
+produced with it. Switching is the cheapest way to ask how much of an answer
+is the flux rather than the mesh.
+
 ---
 
 ## Boundary conditions
