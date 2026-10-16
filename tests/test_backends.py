@@ -144,6 +144,18 @@ def test_the_numba_hllc_kernel_matches_the_shared_one():
     assert np.abs(a.U - b.U).max() / np.abs(a.U).max() < 1e-12
 
 
+def test_the_numba_ausm_up_kernel_matches_the_shared_one():
+    """Same contract as HLLC: the kernel is a transcription, so pin it."""
+    import numpy as np
+
+    from src.api import solve_nozzle
+
+    a = solve_nozzle(order=1, refine=0, flux="ausmup", backend="numpy", verbose=False)
+    b = solve_nozzle(order=1, refine=0, flux="ausmup", backend="numba", verbose=False)
+    assert a.iterations == b.iterations
+    assert np.abs(a.U - b.U).max() / np.abs(a.U).max() < 1e-12
+
+
 def test_the_folded_rate_kernel_matches_the_unfolded_one():
     """``element_rate`` must be the exact same rate, not merely a close one.
 

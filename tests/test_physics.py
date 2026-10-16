@@ -150,6 +150,49 @@ def test_outflow_is_continuous_across_the_sonic_point():
 
 
 # --------------------------------------------------------------------------
+# AUSM+-up
+# --------------------------------------------------------------------------
+
+
+def test_ausm_up_flux_is_consistent(states, normals):
+    nx, ny = normals
+    out = ph.ausm_up_flux(states, states, nx, ny, GAMMA)
+    assert np.allclose(out.flux, ph.normal_flux(states, nx, ny, GAMMA))
+
+
+def test_ausm_up_flux_is_conservative(states, normals):
+    nx, ny = normals
+    L, R = states[:2], states[1:]
+    a = ph.ausm_up_flux(L, R, nx[:2], ny[:2], GAMMA).flux
+    b = ph.ausm_up_flux(R, L, -nx[:2], -ny[:2], GAMMA).flux
+    assert np.allclose(a, -b)
+
+
+def test_ausm_splittings_satisfy_their_identities():
+    """``M+ + M- = M`` and ``P+ + P- = 1`` for every Mach number.
+
+    These two identities are what pin the polynomial splittings, independent
+    of ``alpha`` and ``beta``; a transcription error in either breaks one.
+    """
+    m = np.linspace(-3.0, 3.0, 2001)
+    m4 = ph._m4_plus(m, ph.AUSM_BETA, np) + ph._m4_minus(m, ph.AUSM_BETA, np)
+    p5 = ph._p5_plus(m, ph.AUSM_ALPHA, np) + ph._p5_minus(m, ph.AUSM_ALPHA, np)
+    assert np.allclose(m4, m, atol=1e-13)
+    assert np.allclose(p5, 1.0, atol=1e-13)
+
+
+def test_ausm_up_is_finite_at_rest():
+    """``M = 0`` must not produce a NaN, even in the untaken branch.
+
+    The supersonic pressure splitting is ``M+_(1)/M``; written literally,
+    ``where`` would evaluate ``0/0`` and the NaN would poison gradients.
+    """
+    U = np.array([[1.0, 0.0, 0.0, 2.5]])
+    out = ph.ausm_up_flux(U, U, np.array([1.0]), np.array([0.0]), GAMMA)
+    assert np.all(np.isfinite(out.flux))
+
+
+# --------------------------------------------------------------------------
 # HLLC
 # --------------------------------------------------------------------------
 

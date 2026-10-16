@@ -131,6 +131,104 @@ def _roe(UL, UR, nx, ny, gamma, efix, out):
     return smax
 
 
+# AUSM+-up.  Scalar and branchy here, unlike the array version in physics.py:
+# this runs per quadrature point inside a jitted loop, where a real branch is
+# cheaper than evaluating both sides of a select, and nothing differentiates
+# through it.
+_AUSM_BETA = 0.125
+_AUSM_ALPHA = 0.1875
+_AUSM_KP = 0.4
+_AUSM_KU = 0.2
+
+
+@njit(inline="always", **_JIT)
+def _m4p(m):
+    if abs(m) >= 1.0:
+        return 0.5 * (m + abs(m))
+    m2p = 0.25 * (m + 1.0) * (m + 1.0)
+    m2m = -0.25 * (m - 1.0) * (m - 1.0)
+    return m2p * (1.0 - 16.0 * _AUSM_BETA * m2m)
+
+
+@njit(inline="always", **_JIT)
+def _m4m(m):
+    if abs(m) >= 1.0:
+        return 0.5 * (m - abs(m))
+    m2p = 0.25 * (m + 1.0) * (m + 1.0)
+    m2m = -0.25 * (m - 1.0) * (m - 1.0)
+    return m2m * (1.0 + 16.0 * _AUSM_BETA * m2p)
+
+
+@njit(inline="always", **_JIT)
+def _p5p(m):
+    if m >= 1.0:
+        return 1.0
+    if m <= -1.0:
+        return 0.0
+    m2p = 0.25 * (m + 1.0) * (m + 1.0)
+    m2m = -0.25 * (m - 1.0) * (m - 1.0)
+    return m2p * ((2.0 - m) - 16.0 * _AUSM_ALPHA * m * m2m)
+
+
+@njit(inline="always", **_JIT)
+def _p5m(m):
+    if m >= 1.0:
+        return 0.0
+    if m <= -1.0:
+        return 1.0
+    m2p = 0.25 * (m + 1.0) * (m + 1.0)
+    m2m = -0.25 * (m - 1.0) * (m - 1.0)
+    return m2m * ((-2.0 - m) + 16.0 * _AUSM_ALPHA * m * m2p)
+
+
+@njit(inline="always", **_JIT)
+def _ausm_up(UL, UR, nx, ny, gamma, out):
+    """AUSM+-up; must agree with ``physics.ausm_up_flux`` to round-off."""
+    rL = max(UL[0], FLOOR)
+    vxL = UL[1] / rL
+    vyL = UL[2] / rL
+    pL = _pressure(UL[0], UL[1], UL[2], UL[3], gamma)
+    rR = max(UR[0], FLOOR)
+    vxR = UR[1] / rR
+    vyR = UR[2] / rR
+    pR = _pressure(UR[0], UR[1], UR[2], UR[3], gamma)
+
+    vnL = vxL * nx + vyL * ny
+    vnR = vxR * nx + vyR * ny
+    aL = np.sqrt(max(gamma * pL / rL, FLOOR))
+    aR = np.sqrt(max(gamma * pR / rR, FLOOR))
+
+    a_half = 0.5 * (aL + aR)
+    rho_half = 0.5 * (rL + rR)
+    mL = vnL / a_half
+    mR = vnR / a_half
+    mbar_sq = 0.5 * (mL * mL + mR * mR)
+
+    diff = 1.0 - mbar_sq
+    if diff < 0.0:
+        diff = 0.0
+    u_half = a_half * (_m4p(mL) + _m4m(mR)) + _AUSM_KP * diff * (pL - pR) / (rho_half * a_half)
+
+    p5p = _p5p(mL)
+    p5m = _p5m(mR)
+    p_half = p5p * pL + p5m * pR + _AUSM_KU * p5p * p5m * rho_half * a_half * (vnL - vnR)
+
+    if u_half > 0.0:
+        out[0] = u_half * rL
+        out[1] = u_half * UL[1] + p_half * nx
+        out[2] = u_half * UL[2] + p_half * ny
+        out[3] = u_half * (UL[3] + pL)
+    else:
+        out[0] = u_half * rR
+        out[1] = u_half * UR[1] + p_half * nx
+        out[2] = u_half * UR[2] + p_half * ny
+        out[3] = u_half * (UR[3] + pR)
+
+    sL = abs(vnL) + aL
+    sR = abs(vnR) + aR
+    return sL if sL > sR else sR
+
+
 @njit(inline="always", **_JIT)
 def _hllc(UL, UR, nx, ny, gamma, low_mach, out):
     """HLLC with Batten's wave speeds.  Returns the max signal speed.
@@ -448,6 +546,8 @@ def edge_pass(
                 ny = edge_normal[k, q, 1]
                 if flux_id == 1:
                     sp = _hllc(UL, UR, nx, ny, gamma, low_mach, flux)
+                elif flux_id == 2:
+                    sp = _ausm_up(UL, UR, nx, ny, gamma, flux)
                 else:
                     sp = _roe(UL, UR, nx, ny, gamma, efix, flux)
                 if sp > best:
