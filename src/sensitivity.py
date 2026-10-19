@@ -75,6 +75,7 @@ from .api import Case
 from .config import Discretization, FlowConditions, SolverOptions
 from .geometry.contour import DESIGN_PARAMETERS, NozzleGeometry
 from .geometry.mesh import BoundaryTag, MeshTopology, nozzle_node_coords
+from .post.postprocess import axial_momentum_flux, boundary_trace, mass_flux
 from .spatial import assembly as asm
 from .spatial.operators import ReferenceData, build_operators, reference_data
 from .timestepping import step as ts
@@ -92,53 +93,38 @@ OBJECTIVES = ("thrust", "thrust_coefficient", "exit_mach", "mass_flow", "exit_pr
 # --------------------------------------------------------------------------
 # Objectives, written in the injected array module so they can be differentiated
 # --------------------------------------------------------------------------
-def _boundary_slice(topology: MeshTopology, tag: BoundaryTag):
-    return topology.tag_slice(tag)
-
-
-def _trace(U, ops, tag: BoundaryTag, xp):
-    """State, unit normal and ``ds`` on a tagged boundary, differentiably."""
-    topo = ops.topology
-    sl = _boundary_slice(topo, tag)
-    edges = topo.edges
-    belem = edges.bedge_elem[sl]
-    bface = edges.bedge_face[sl]
-    phi = xp.asarray(ops.ref.phi_face[0])[bface]
-    state = xp.einsum("kiq,kis->kqs", phi, U[belem])
-    g = ops.n_interior + np.arange(sl.start, sl.stop)
-    ds = ops.edge_jac[g] * xp.asarray(ops.ref.w_face)[None, :]
-    return state, ops.edge_normal[g], ds
-
-
 def objective_value(U, ops, flow: FlowConditions, name: str, geom: NozzleGeometry, xp):
-    """Evaluate a named scalar objective.  All are for the full planar nozzle."""
+    """Evaluate a named scalar objective.  All are for the full planar nozzle.
+
+    The boundary trace and the flux integrands are the ones
+    :mod:`src.post.postprocess` reports, called with ``xp`` injected rather
+    than restated here.  That is what makes the gradient a gradient *of the
+    reported quantity*: a thrust integrand that drifted between the two would
+    give an exactly self-consistent adjoint of the wrong objective, which no
+    finite-difference check could catch.
+    """
     gamma = flow.gamma
     if name in ("thrust", "thrust_coefficient"):
-        out_s, out_n, out_ds = _trace(U, ops, BoundaryTag.OUTFLOW, xp)
-        in_s, in_n, in_ds = _trace(U, ops, BoundaryTag.INFLOW, xp)
-
-        def axial(state, n, ds):
-            rho, vx, vy, p, _ = ph.primitives(state, gamma, xp=xp)
-            vn = vx * n[..., 0] + vy * n[..., 1]
-            return ((rho * vx * vn + p * n[..., 0]) * ds).sum()
-
-        thrust = 2.0 * (axial(out_s, out_n, out_ds) + axial(in_s, in_n, in_ds))
+        out = boundary_trace(U, ops, BoundaryTag.OUTFLOW, xp=xp)
+        inl = boundary_trace(U, ops, BoundaryTag.INFLOW, xp=xp)
+        thrust = 2.0 * (
+            axial_momentum_flux(out, gamma, xp=xp) + axial_momentum_flux(inl, gamma, xp=xp)
+        )
         if name == "thrust":
             return thrust
         return thrust / (flow.total_pressure * 2.0 * geom.throat_height())
 
     if name == "mass_flow":
-        s, n, ds = _trace(U, ops, BoundaryTag.INFLOW, xp)
-        rho, vx, vy, _, _ = ph.primitives(s, gamma, xp=xp)
-        vn = vx * n[..., 0] + vy * n[..., 1]
-        return -2.0 * (rho * vn * ds).sum()
+        inl = boundary_trace(U, ops, BoundaryTag.INFLOW, xp=xp)
+        return -2.0 * mass_flux(inl, gamma, xp=xp)
 
     if name in ("exit_mach", "exit_pressure"):
-        s, n, ds = _trace(U, ops, BoundaryTag.OUTFLOW, xp)
+        out = boundary_trace(U, ops, BoundaryTag.OUTFLOW, xp=xp)
+        ds = out.weight
         area = ds.sum()
         if name == "exit_mach":
-            return (ph.mach_number(s, gamma, xp=xp) * ds).sum() / area
-        _, _, _, p, _ = ph.primitives(s, gamma, xp=xp)
+            return (ph.mach_number(out.state, gamma, xp=xp) * ds).sum() / area
+        _, _, _, p, _ = ph.primitives(out.state, gamma, xp=xp)
         return (p * ds).sum() / area / flow.total_pressure
 
     raise ValueError(f"unknown objective {name!r}; choose from {OBJECTIVES}")
@@ -342,6 +328,10 @@ class DifferentiableCase:
         def rate(lam):
             return -jnp.einsum("eij,ejs->eis", inv_mass, defect(lam))
 
+        # The adjoint's own integrator, not the flow solver's time scheme:
+        # lambda has its own pseudo-time march, and classical RK4 is a fine
+        # choice for it because there is no limiter and no positivity
+        # argument in play here.
         @jax.jit
         def rk4(lam):
             f0 = rate(lam)

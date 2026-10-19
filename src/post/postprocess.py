@@ -53,18 +53,25 @@ class BoundaryTrace(NamedTuple):
     xy: np.ndarray  # (nedge, nqf, 2)
 
 
-def boundary_trace(U, ops: Operators, tag: BoundaryTag) -> BoundaryTrace:
-    """Evaluate the solution on one tagged boundary."""
+def boundary_trace(U, ops: Operators, tag: BoundaryTag, *, xp=np) -> BoundaryTrace:
+    """Evaluate the solution on one tagged boundary.
+
+    Takes an ``xp`` array module for the same reason the fluxes do: the adjoint
+    in :mod:`src.sensitivity` needs this trace as part of a differentiable
+    objective, and a second NumPy-only copy of it would be a second place for
+    the basis indexing to go wrong.  Everything except ``state`` is static mesh
+    data, so only the contraction is traced.
+    """
     topo = ops.topology
     sl = topo.tag_slice(tag)
     edges = topo.edges
     belem = edges.bedge_elem[sl]
     bface = edges.bedge_face[sl]
-    phi = ops.ref.phi_face[0][bface]  # (n, nbf, nqf) owner-side basis
-    state = np.einsum("kiq,kis->kqs", phi, U[belem])
+    phi = xp.asarray(ops.ref.phi_face[0])[bface]  # (n, nbf, nqf) owner-side basis
+    state = xp.einsum("kiq,kis->kqs", phi, U[belem])
 
     g = ops.n_interior + np.arange(sl.start, sl.stop)
-    ds = ops.edge_jac[g] * ops.ref.w_face[None, :]
+    ds = ops.edge_jac[g] * xp.asarray(ops.ref.w_face)[None, :]
     return BoundaryTrace(state, ops.edge_normal[g], ds, ops.xy_face[g])
 
 
@@ -145,17 +152,23 @@ class Performance:
         )
 
 
-def _axial_momentum_flux(tr: BoundaryTrace, gamma: float) -> float:
-    r"""``\int (rho v_x (v.n) + p n_x) ds`` over a boundary, outward normal."""
-    rho, vx, vy, p, _ = ph.primitives(tr.state, gamma)
+def axial_momentum_flux(tr: BoundaryTrace, gamma: float, *, xp=np):
+    r"""``\int (rho v_x (v.n) + p n_x) ds`` over a boundary, outward normal.
+
+    This is the thrust integrand, so it is also what the adjoint differentiates
+    -- hence ``xp``, and hence no ``float()`` here: the caller decides whether
+    the result is a number or a tracer.
+    """
+    rho, vx, vy, p, _ = ph.primitives(tr.state, gamma, xp=xp)
     vn = vx * tr.normal[..., 0] + vy * tr.normal[..., 1]
-    return float(((rho * vx * vn + p * tr.normal[..., 0]) * tr.weight).sum())
+    return ((rho * vx * vn + p * tr.normal[..., 0]) * tr.weight).sum()
 
 
-def _mass_flux(tr: BoundaryTrace, gamma: float) -> float:
-    rho, vx, vy, _, _ = ph.primitives(tr.state, gamma)
+def mass_flux(tr: BoundaryTrace, gamma: float, *, xp=np):
+    r"""``\int rho (v.n) ds`` over a boundary, outward normal."""
+    rho, vx, vy, _, _ = ph.primitives(tr.state, gamma, xp=xp)
     vn = vx * tr.normal[..., 0] + vy * tr.normal[..., 1]
-    return float((rho * vn * tr.weight).sum())
+    return (rho * vn * tr.weight).sum()
 
 
 def entropy_error(U, ops: Operators, flow: FlowConditions) -> float:
@@ -190,8 +203,8 @@ def performance(result: SolveResult, *, quasi1d: Quasi1DSolution | None = None) 
 
     # factor 2: the mesh covers the upper half of a symmetric planar channel
     half_to_full = 2.0
-    mom_out = _axial_momentum_flux(outlet, gamma)
-    mom_in = _axial_momentum_flux(inlet, gamma)
+    mom_out = float(axial_momentum_flux(outlet, gamma))
+    mom_in = float(axial_momentum_flux(inlet, gamma))
     # the inlet's outward normal points upstream, so its flux already carries -1
     thrust = half_to_full * (mom_out + mom_in)
 
@@ -201,8 +214,8 @@ def performance(result: SolveResult, *, quasi1d: Quasi1DSolution | None = None) 
     denom = abs(thrust) if abs(thrust) > 0.0 else 1.0
     imbalance = abs(thrust - thrust_wall) / denom
 
-    mdot_in = half_to_full * (-_mass_flux(inlet, gamma))
-    mdot_out = half_to_full * _mass_flux(outlet, gamma)
+    mdot_in = half_to_full * float(-mass_flux(inlet, gamma))
+    mdot_out = half_to_full * float(mass_flux(outlet, gamma))
 
     a_throat = 2.0 * result.geometry.throat_height()
     cf = thrust / (flow.total_pressure * a_throat)
