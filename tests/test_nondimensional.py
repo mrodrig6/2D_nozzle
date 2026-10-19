@@ -16,7 +16,7 @@ import pytest
 
 from src import NozzleGeometry
 from src.api import solve_nozzle
-from src.postprocess import performance
+from src.post.postprocess import performance
 
 #: Tight, because the point is to separate a real inconsistency from the
 #: tolerance-level wobble of stopping the march at slightly different places.

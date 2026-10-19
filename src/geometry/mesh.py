@@ -27,8 +27,8 @@ from enum import IntEnum
 
 import numpy as np
 
-from . import elements as el
-from .geometry import NozzleGeometry, wall_half_height
+from ..reference import elements as el
+from .contour import NozzleGeometry, wall_half_height
 
 
 class BoundaryTag(IntEnum):

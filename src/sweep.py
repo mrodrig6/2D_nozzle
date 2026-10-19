@@ -37,9 +37,9 @@ import numpy as np
 
 from .api import solve_nozzle
 from .config import Discretization, FlowConditions, SolverOptions
-from .geometry import NozzleGeometry
-from .postprocess import Performance, performance
-from .quasi1d import operating_regime, solve_quasi1d
+from .geometry.contour import NozzleGeometry
+from .physics.quasi1d import operating_regime, solve_quasi1d
+from .post.postprocess import Performance, performance
 
 #: Metrics recorded at every sweep point.
 METRICS = (

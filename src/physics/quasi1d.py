@@ -34,8 +34,8 @@ from enum import Enum
 
 import numpy as np
 
-from .config import FlowConditions
-from .geometry import NozzleGeometry
+from ..config import FlowConditions
+from ..geometry.contour import NozzleGeometry
 
 
 class Regime(str, Enum):

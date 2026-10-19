@@ -44,7 +44,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ..postprocess import performance
+from ..post.postprocess import performance
 from . import waves
 
 __all__ = ["ExitWaves", "exit_wave_structure"]

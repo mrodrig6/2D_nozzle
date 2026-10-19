@@ -74,7 +74,7 @@ def test_back_pressure_gradient_vanishes_at_a_supersonic_exit(dcase):
     A gradient of exactly zero here is physics, not a failure to propagate.
     """
     _, grad, result = dcase.value_and_gradient("thrust", names=("back_pressure",))
-    from src.postprocess import performance
+    from src.post.postprocess import performance
 
     assert performance(result).exit_mach_area_averaged > 1.0
     assert abs(grad["back_pressure"]) < 1e-12

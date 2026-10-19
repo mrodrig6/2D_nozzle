@@ -24,7 +24,14 @@ from pathlib import Path
 
 import pytest
 
-DOCS = sorted([Path("README.md"), *Path("docs").glob("*.md"), Path("examples/README.md")])
+DOCS = sorted(
+    [
+        Path("README.md"),
+        *Path("docs").glob("*.md"),
+        Path("examples/README.md"),
+        *Path("src").rglob("*.md"),
+    ]
+)
 ROOT = Path(__file__).resolve().parents[1]
 
 

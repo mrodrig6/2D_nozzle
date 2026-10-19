@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from src import performance, solve_nozzle
-from src.plotting import plot_convergence_study
+from src.post.plotting import plot_convergence_study
 
 
 def study(contour: str, order: int, refines=(0, 1, 2)):

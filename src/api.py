@@ -40,14 +40,14 @@ from typing import Any
 
 import numpy as np
 
-from . import initialize as ini
-from . import quasi1d as q1d_mod
 from .config import Discretization, FlowConditions, SolverOptions
-from .geometry import NozzleGeometry, check_contour
-from .mesh import MeshTopology, build_nozzle_mesh
-from .operators import Operators, build_operators
-from .quasi1d import Quasi1DSolution, solve_quasi1d
-from .solver import SolveHistory, SolveResult, solve_steady
+from .geometry.contour import NozzleGeometry, check_contour
+from .geometry.mesh import MeshTopology, build_nozzle_mesh
+from .physics import quasi1d as q1d_mod
+from .physics.quasi1d import Quasi1DSolution, solve_quasi1d
+from .spatial.operators import Operators, build_operators
+from .timestepping import initialize as ini
+from .timestepping.march import SolveHistory, SolveResult, solve_steady
 
 #: Keyword shortcuts accepted by :func:`solve_nozzle`, grouped by target object.
 _GEOMETRY_KEYS = (
@@ -229,7 +229,7 @@ def case_from_grids(
     makes the adjoint gradient agree with a finite difference of the same
     discrete objective.
     """
-    from .mesh import nozzle_node_coords
+    from .geometry.mesh import nozzle_node_coords
 
     coords = np.asarray(nozzle_node_coords(x_frac, r_frac, geometry.params(), geometry.contour))
     ops = build_operators(topology, coords, discretization.order)

@@ -143,7 +143,7 @@ def _collect(args) -> dict:
 
 def _cmd_solve(args) -> int:
     from .api import solve_nozzle
-    from .postprocess import performance
+    from .post.postprocess import performance
 
     result = solve_nozzle(verbose=not args.quiet, backend=args.backend, **_collect(args))
     print()
@@ -152,7 +152,7 @@ def _cmd_solve(args) -> int:
         print(f"\nWARNING: not converged — {result.message}", file=sys.stderr)
 
     if args.figure:
-        from .plotting import overview
+        from .post.plotting import overview
 
         fig = overview(result)
         fig.savefig(args.figure, dpi=150)
@@ -184,7 +184,7 @@ def _cmd_sweep(args) -> int:
         result.to_csv(args.csv)
         print(f"\ntable written to {args.csv}")
     if args.figure:
-        from .plotting import plot_sweep
+        from .post.plotting import plot_sweep
 
         ax = plot_sweep(result, args.metrics[0])
         ax.figure.savefig(args.figure, dpi=150, bbox_inches="tight")
@@ -195,8 +195,8 @@ def _cmd_sweep(args) -> int:
 
 
 def _cmd_geometry(args) -> int:
-    from .geometry import NozzleGeometry, check_contour
-    from .quasi1d import critical_ratios
+    from .geometry.contour import NozzleGeometry, check_contour
+    from .physics.quasi1d import critical_ratios
 
     kw = _collect(args)
     geom = NozzleGeometry(
@@ -222,7 +222,7 @@ def _cmd_geometry(args) -> int:
     print()
     print("  " + critical_ratios(diag["area_ratio"], args.gamma).describe())
     if args.figure:
-        from .plotting import plot_contour
+        from .post.plotting import plot_contour
 
         ax = plot_contour(geom)
         ax.figure.savefig(args.figure, dpi=150, bbox_inches="tight")
@@ -236,7 +236,7 @@ def _cmd_bench(args) -> int:
     from .api import build_case
     from .backends import available_backends, get_backend
     from .config import SolverOptions
-    from .initialize import initial_state
+    from .timestepping.initialize import initial_state
 
     kw = _collect(args)
     case = build_case(

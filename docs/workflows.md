@@ -54,7 +54,7 @@ grid = sweep(
     back_pressure_ratio=np.linspace(0.08, 0.40, 6),
     order=1,
 )
-from src.plotting import plot_sweep
+from src.post.plotting import plot_sweep
 
 plot_sweep(grid, "thrust_coefficient")  # 2D contour map
 ```

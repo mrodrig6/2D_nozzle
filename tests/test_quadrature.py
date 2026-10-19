@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from src import quadrature as qd
+from src.reference import quadrature as qd
 
 
 def _exact_triangle_monomial(r: int, s: int) -> float:

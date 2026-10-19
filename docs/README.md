@@ -13,6 +13,10 @@
 | [`make_tikz.py`](make_tikz.py) | Regenerates the geometry figure's coordinates from the solver's own contour code. |
 | `figures/` | The PNGs the documents show. `figures/tikz/` is generated from `tikz/`; the rest come from the solver via `plotting`. |
 
+Also worth reading: [`../src/hierarchy.md`](../src/hierarchy.md) maps the
+source tree — which subpackage owns what, the dependency order to read it
+in, and where a new flux, element kind or time stepper goes.
+
 ## Why the figures are TikZ *and* PNG
 
 The figures are authored in TikZ, because that is the only way to keep the

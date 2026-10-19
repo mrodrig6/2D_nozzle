@@ -47,7 +47,7 @@ from src.external import (
     plot_jet_cells,
     plot_jet_field,
 )
-from src.postprocess import performance
+from src.post.postprocess import performance
 
 
 def main() -> None:

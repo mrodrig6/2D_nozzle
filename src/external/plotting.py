@@ -11,8 +11,8 @@ import functools
 
 import numpy as np
 
-from ..plotting import plot_contour
-from ..quasi1d import solve_quasi1d
+from ..physics.quasi1d import solve_quasi1d
+from ..post.plotting import plot_contour
 from .jet import JetCells, jet_wave_cells
 from .plume import ExitWaves, exit_wave_structure
 

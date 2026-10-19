@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from src import FlowConditions, NozzleGeometry, Regime, critical_ratios, solve_quasi1d
-from src.quasi1d import (
+from src.physics.quasi1d import (
     area_over_throat,
     mach_from_area,
     mach_from_pressure_ratio,

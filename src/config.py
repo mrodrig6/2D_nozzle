@@ -215,7 +215,7 @@ class Discretization:
 
     @property
     def n_basis(self) -> int:
-        from . import elements as el
+        from .reference import elements as el
 
         return el.n_basis(self.element, self.order)
 

@@ -16,17 +16,17 @@ from typing import Any
 
 import numpy as np
 
-from .geometry import NozzleGeometry
-from .mesh import TAG_NAMES, BoundaryTag, MeshTopology
+from ..geometry.contour import NozzleGeometry
+from ..geometry.mesh import TAG_NAMES, BoundaryTag, MeshTopology
+from ..physics.quasi1d import Quasi1DSolution, solve_quasi1d
+from ..sweep import SweepResult
+from ..timestepping.march import SolveResult
 from .postprocess import (
     centreline_profile,
     exit_profile,
     sample_field,
     wall_profile,
 )
-from .quasi1d import Quasi1DSolution, solve_quasi1d
-from .solver import SolveResult
-from .sweep import SweepResult
 
 
 def _require_matplotlib():
@@ -95,7 +95,7 @@ def plot_mesh(
     Accepts a :class:`~src.solver.SolveResult` or a
     ``(topology, node_coords)`` pair.
     """
-    from . import elements as el
+    from ..reference import elements as el
     from .postprocess import _node_coords
 
     ax = _axes(ax)

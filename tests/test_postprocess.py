@@ -7,8 +7,7 @@ import pytest
 
 from src import BoundaryTag, FlowConditions, NozzleGeometry, build_case, performance
 from src import physics as ph
-from src.initialize import quasi1d_initial
-from src.postprocess import (
+from src.post.postprocess import (
     boundary_trace,
     centreline_profile,
     entropy_error,
@@ -17,7 +16,8 @@ from src.postprocess import (
     scalar_field,
     wall_profile,
 )
-from src.solver import SolveHistory, SolveResult
+from src.timestepping.initialize import quasi1d_initial
+from src.timestepping.march import SolveHistory, SolveResult
 
 
 @pytest.fixture(scope="module")
@@ -82,7 +82,7 @@ def test_entropy_error_is_positive_off_the_isentrope(projected):
     "name", ["mach", "pressure", "density", "temperature", "vx", "vy", "velocity", "entropy"]
 )
 def test_scalar_fields_are_finite_and_sensible(projected, name):
-    from src.postprocess import solution_at_quadrature
+    from src.post.postprocess import solution_at_quadrature
 
     values = scalar_field(
         solution_at_quadrature(projected.U, projected.operators), projected.flow, name
@@ -135,7 +135,7 @@ def test_performance_reports_full_nozzle_quantities(projected):
 
 def test_node_coordinates_are_recovered_exactly(projected):
     """postprocess rebuilds coordinates from the geometry; they must match."""
-    from src.postprocess import _node_coords
+    from src.post.postprocess import _node_coords
 
     case = build_case(projected.geometry, projected.flow, projected.discretization)
     assert np.allclose(_node_coords(projected), case.node_coords)

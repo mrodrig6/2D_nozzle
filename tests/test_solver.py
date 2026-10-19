@@ -18,7 +18,7 @@ from src import (
     solve_quasi1d,
 )
 from src.api import build_case
-from src.initialize import change_order
+from src.timestepping.initialize import change_order
 
 pytestmark = pytest.mark.slow
 
@@ -198,7 +198,7 @@ def test_divergence_is_reported_not_hidden():
 
 def test_a_mismatched_warm_start_is_rejected():
     case = build_case(NozzleGeometry(contour="smooth"), FlowConditions(), order=1)
-    from src.solver import solve_steady
+    from src.timestepping.march import solve_steady
 
     bad = np.zeros((case.operators.n_elem, 99, 4))
     with pytest.raises(ValueError, match="expected"):

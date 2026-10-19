@@ -38,9 +38,9 @@ from typing import Any
 
 import numpy as np
 
-from . import elements as el
-from . import quadrature as qd
-from .mesh import MeshTopology
+from ..geometry.mesh import MeshTopology
+from ..reference import elements as el
+from ..reference import quadrature as qd
 
 
 @dataclass(frozen=True)

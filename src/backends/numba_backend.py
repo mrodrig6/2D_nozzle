@@ -32,8 +32,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from .. import assembly as asm
-from .. import limiter as lim
+from ..spatial import limiter as lim
+from ..timestepping import step as ts
 from . import _numba_kernels as nk
 from .base import Backend
 
@@ -168,7 +168,7 @@ class NumbaBackend(Backend):
         return out
 
     def time_step(self, wave_sum):
-        dt = asm.local_time_step(
+        dt = ts.local_time_step(
             wave_sum, self.ops, self.ops.ref.order, self.opts.cfl, self.opts.scheme, xp=np
         )
         return dt[:, None, None]
@@ -236,7 +236,7 @@ class NumbaBackend(Backend):
             self._wave,
             self._elem_area,
             self.positivity_scale()
-            * asm.step_coefficient(self.ops.ref.order, self.opts.cfl, self.opts.scheme),
+            * ts.step_coefficient(self.ops.ref.order, self.opts.cfl, self.opts.scheme),
             self._dt,
         )
         return self._dt

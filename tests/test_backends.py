@@ -6,9 +6,9 @@ import numpy as np
 import pytest
 
 from src import NozzleGeometry, build_case
-from src import assembly as asm
 from src.backends import available_backends, get_backend
 from src.config import FlowConditions, SolverOptions
+from src.spatial import assembly as asm
 
 
 @pytest.fixture(scope="module")
@@ -90,7 +90,7 @@ def test_the_fused_numba_step_matches_the_shared_one(setup, scheme, limiter):
     kernels here.  Ten steps is long enough that a wrong coefficient or a stale
     buffer shows up; `fastmath` reassociation keeps it from being exact.
     """
-    from src import initialize
+    from src.timestepping import initialize
 
     case, _ = setup
     ops, flow = case.operators, case.flow
@@ -171,7 +171,7 @@ def test_the_folded_rate_kernel_matches_the_unfolded_one():
     from src.backends import _numba_kernels as nk
     from src.backends import get_backend
     from src.config import SolverOptions
-    from src.initialize import initial_state
+    from src.timestepping.initialize import initial_state
 
     for order in (0, 1, 2):
         cs = build_case(discretization=Discretization(order=order, refine=0))

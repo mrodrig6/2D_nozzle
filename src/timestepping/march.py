@@ -41,16 +41,19 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-from . import assembly as asm
+if TYPE_CHECKING:  # importing a backend imports Numba or JAX
+    from ..backends import Backend
+
+from ..config import Discretization, FlowConditions, SolverOptions
+from ..geometry.contour import NozzleGeometry
+from ..spatial import limiter as lim
+from ..spatial.operators import Operators
 from . import initialize as ini
-from . import limiter as lim
-from .backends import Backend, get_backend
-from .config import Discretization, FlowConditions, SolverOptions
-from .geometry import NozzleGeometry
-from .operators import Operators
+from . import step as ts
 
 
 @dataclass
@@ -244,6 +247,10 @@ def solve_steady(
     say).  Most callers want :func:`src.api.solve_nozzle` instead.
     """
     opts = opts or SolverOptions()
+    # deferred: importing a backend imports Numba or JAX, and `import src`
+    # should cost neither.
+    from ..backends import get_backend
+
     bk = get_backend(backend, ops, flow, opts)
 
     if U0 is None:
@@ -258,7 +265,7 @@ def solve_steady(
             )
     U = bk.asarray(U)
 
-    scale = asm.residual_scale(flow, geom.length)
+    scale = ts.residual_scale(flow, geom.length)
     U, hist, conv, iters, res, res0, msg = march(U, bk, opts, scale, progress=progress)
 
     U_np = np.asarray(bk.to_numpy(U))

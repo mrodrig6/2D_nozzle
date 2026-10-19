@@ -70,14 +70,15 @@ from typing import Any
 
 import numpy as np
 
-from . import assembly as asm
 from . import physics as ph
 from .api import Case
 from .config import Discretization, FlowConditions, SolverOptions
-from .geometry import DESIGN_PARAMETERS, NozzleGeometry
-from .mesh import BoundaryTag, MeshTopology, nozzle_node_coords
-from .operators import ReferenceData, build_operators, reference_data
-from .solver import SolveResult
+from .geometry.contour import DESIGN_PARAMETERS, NozzleGeometry
+from .geometry.mesh import BoundaryTag, MeshTopology, nozzle_node_coords
+from .spatial import assembly as asm
+from .spatial.operators import ReferenceData, build_operators, reference_data
+from .timestepping import step as ts
+from .timestepping.march import SolveResult
 
 #: Design variables accepted in a parameter dict, in addition to the geometric
 #: ones in :data:`src.geometry.DESIGN_PARAMETERS`.
@@ -325,7 +326,7 @@ class DifferentiableCase:
 
         # frozen local time step from the converged state
         _, wave = asm.residual(U, ops, flow, xp=jnp)
-        dt = asm.local_time_step(
+        dt = ts.local_time_step(
             wave,
             ops,
             self.discretization.order,

@@ -27,7 +27,7 @@ from collections.abc import Callable
 import numpy as np
 
 from ..config import FlowConditions, SolverOptions
-from ..operators import Operators
+from ..spatial.operators import Operators
 
 
 def component_weights(flow: FlowConditions) -> np.ndarray:

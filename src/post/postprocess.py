@@ -36,12 +36,12 @@ from typing import NamedTuple
 
 import numpy as np
 
-from . import physics as ph
-from .config import FlowConditions
-from .mesh import BoundaryTag
-from .operators import Operators
-from .quasi1d import Quasi1DSolution, solve_quasi1d
-from .solver import SolveResult
+from .. import physics as ph
+from ..config import FlowConditions
+from ..geometry.mesh import BoundaryTag
+from ..physics.quasi1d import Quasi1DSolution, solve_quasi1d
+from ..spatial.operators import Operators
+from ..timestepping.march import SolveResult
 
 
 class BoundaryTrace(NamedTuple):
@@ -266,7 +266,7 @@ def sample_boundary(
     at low order there are only two or three of them per face, which is far too
     coarse to plot.
     """
-    from . import elements as el
+    from ..reference import elements as el
 
     ops = result.operators
     topo = ops.topology
@@ -375,7 +375,7 @@ def sample_field(
     visible -- plotting only the vertices would throw away most of what ``p = 2``
     buys.
     """
-    from . import elements as el
+    from ..reference import elements as el
 
     ops = result.operators
     topo = ops.topology
@@ -429,7 +429,7 @@ def _node_coords(result: SolveResult) -> np.ndarray:
     geometry and the logical grids -- which is exact, since that is how it was
     made in the first place.
     """
-    from .mesh import nozzle_node_coords, nozzle_x_distribution
+    from ..geometry.mesh import nozzle_node_coords, nozzle_x_distribution
 
     topo = result.operators.topology
     disc = result.discretization

@@ -169,7 +169,7 @@ r = solve_nozzle(
 )
 print(r.converged, r.message)
 import matplotlib.pyplot as plt
-from src.plotting import plot_convergence
+from src.post.plotting import plot_convergence
 
 plot_convergence(r)  # the residual falls, then parks
 plt.show()

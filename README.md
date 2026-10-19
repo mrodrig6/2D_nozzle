@@ -116,6 +116,7 @@ backend, and JAX for gradients. → [`docs/performance.md`](docs/performance.md)
 | Do something with it — sweeps, sensitivity, optimisation, external flow | [`docs/workflows.md`](docs/workflows.md) |
 | Understand the formulation — equations, DG weak form, fluxes, limiters, adjoint | [`docs/theory.md`](docs/theory.md) |
 | Set exercises for students | [`docs/lab_guide.md`](docs/lab_guide.md) |
+| Find your way around the source, or add to it | [`src/hierarchy.md`](src/hierarchy.md) |
 | Know how fast it is and why | [`docs/performance.md`](docs/performance.md) |
 | Check it is right, or fix a misbehaving run | [`docs/verification.md`](docs/verification.md) |
 | Rebuild the figures | [`docs/README.md`](docs/README.md) |

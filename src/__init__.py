@@ -26,27 +26,38 @@ Take an exact shape derivative:
 
 Layout
 ------
-=========================  ==================================================
-:mod:`~src.geometry`  nozzle contour families (the only nozzle-aware part
-                           of the discretisation)
-:mod:`~src.mesh`      topology and node coordinates, triangles or quads
-:mod:`~src.operators` metrics, mass matrices, normals
-:mod:`~src.physics`   Euler fluxes, Roe solver, boundary conditions
-:mod:`~src.assembly`  the vectorised DG residual
-:mod:`~src.backends`  ``numba`` / ``numpy`` / ``jax`` execution
-:mod:`~src.limiter`   positivity and slope limiting
-:mod:`~src.solver`    the pseudo-time march
-:mod:`~src.quasi1d`   exact quasi-1D theory, for reference and for the
-                           initial condition
-:mod:`~src.postprocess` thrust, entropy error, line-outs
-:mod:`~src.sweep`     parameter sweeps with warm starting
-:mod:`~src.sensitivity` discrete-adjoint design gradients
-:mod:`~src.plotting`  matplotlib figures
-=========================  ==================================================
+``src/hierarchy.md`` draws the dependency tree; the subpackages are
+
+=============================  ==============================================
+:mod:`~src.config`             the stagnation state, the gas, the mesh
+                               resolution; the non-dimensionalisation is
+                               documented here
+:mod:`~src.reference`          the reference element: Lagrange bases on the
+                               unit triangle and square, and the quadrature
+                               rules that integrate them exactly
+:mod:`~src.geometry`           the nozzle contour families, and the mesh
+                               built inside them -- triangles or quads
+:mod:`~src.physics`            the equations: thermodynamics, the Roe, HLLC
+                               and AUSM+-up approximate Riemann solvers, the
+                               boundary fluxes, and the exact quasi-1D theory
+:mod:`~src.spatial`            the right-hand side: DG operators, the
+                               vectorised residual, and the limiter
+:mod:`~src.timestepping`       how big a step to take, where the march
+                               starts, and the march itself
+:mod:`~src.backends`           how the residual gets evaluated: vectorised
+                               NumPy, compiled Numba, or traceable JAX
+:mod:`~src.post`               thrust, entropy error, line-outs, and
+                               matplotlib figures
+:mod:`~src.external`           the plume and jet just downstream of the exit
+                               plane, in closed form
+:mod:`~src.api`                :func:`~src.api.solve_nozzle`, the one call
+:mod:`~src.sweep`              parameter sweeps with warm starting
+:mod:`~src.sensitivity`        discrete-adjoint design gradients
+=============================  ==============================================
 
 The solver core is geometry-agnostic: it takes any conforming mesh of triangles
-or quadrilaterals with tagged boundaries.  Only :mod:`~src.geometry` and the
-mesh generator in :mod:`~src.mesh` know that the domain is a nozzle.
+or quadrilaterals with tagged boundaries.  Only :mod:`~src.geometry` and
+:mod:`~src.physics.quasi1d` know that the domain is a nozzle.
 
 See ``docs/theory.md`` for the formulation and the geometry definition, and
 ``README.md`` for how to run everything.
@@ -63,9 +74,18 @@ from .config import (
     FlowConditions,
     SolverOptions,
 )
-from .geometry import CONTOURS, DESIGN_PARAMETERS, NozzleGeometry, check_contour
-from .mesh import BoundaryTag, build_nozzle_mesh
-from .postprocess import (
+from .geometry.contour import CONTOURS, DESIGN_PARAMETERS, NozzleGeometry, check_contour
+from .geometry.mesh import BoundaryTag, build_nozzle_mesh
+from .physics.quasi1d import (
+    Quasi1DSolution,
+    Regime,
+    critical_ratios,
+    is_shock_free,
+    operating_regime,
+    shock_free_range,
+    solve_quasi1d,
+)
+from .post.postprocess import (
     Performance,
     centreline_profile,
     exit_profile,
@@ -75,17 +95,8 @@ from .postprocess import (
     sample_field,
     wall_profile,
 )
-from .quasi1d import (
-    Quasi1DSolution,
-    Regime,
-    critical_ratios,
-    is_shock_free,
-    operating_regime,
-    shock_free_range,
-    solve_quasi1d,
-)
-from .solver import SolveResult, solve_steady
 from .sweep import METRICS, SweepResult, sweep
+from .timestepping.march import SolveResult, solve_steady
 
 __all__ = [
     "__version__",
@@ -150,7 +161,7 @@ def __getattr__(name: str):
 
         return getattr(sensitivity, name)
     if name == "plotting":
-        from . import plotting
+        from .post import plotting
 
         return plotting
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
