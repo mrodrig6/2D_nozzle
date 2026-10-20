@@ -310,14 +310,23 @@ class DifferentiableCase:
         _, vjp_U = jax.vjp(R_of_U, U)
         seed = jnp.asarray(seed)
 
-        # frozen local time step from the converged state
+        # Frozen local time step from the converged state.
+        #
+        # Sized by ``ssprk3``'s calibration deliberately, not by
+        # ``self.options.scheme``.  The lambda march below is RK4, which is no
+        # longer a shipped flow scheme and so no longer has a measured limit of
+        # its own; ssprk3's is the conservative stand-in, since RK4's true
+        # limit is the larger of the two.  Reading the forward scheme here
+        # would be wrong twice over: it would shrink the adjoint step whenever
+        # someone solved the flow with ``euler``, and it would break outright
+        # if a scheme were ever added whose limit exceeds RK4's.
         _, wave = asm.residual(U, ops, flow, xp=jnp)
         dt = ts.local_time_step(
             wave,
             ops,
             self.discretization.order,
             self.options.cfl,
-            self.options.scheme,
+            "ssprk3",
             xp=jnp,
         )[:, None, None]
         inv_mass = ops.inv_mass
