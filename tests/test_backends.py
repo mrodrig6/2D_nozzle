@@ -7,7 +7,7 @@ import pytest
 
 from src import NozzleGeometry, build_case
 from src.backends import available_backends, get_backend
-from src.config import FlowConditions, SolverOptions
+from src.config import SCHEMES, FlowConditions, SolverOptions
 from src.spatial import assembly as asm
 
 
@@ -55,7 +55,7 @@ def test_inverse_mass_matches(setup, backend):
 
 
 @pytest.mark.parametrize("backend", ["numba", "jax"])
-@pytest.mark.parametrize("scheme", ["rk4", "ssprk3"])
+@pytest.mark.parametrize("scheme", SCHEMES)
 def test_one_step_matches_the_reference(setup, backend, scheme):
     if backend not in available_backends():
         pytest.skip(f"{backend} not installed")
@@ -79,7 +79,7 @@ def test_unknown_backend_is_rejected(setup):
 
 
 @pytest.mark.numba
-@pytest.mark.parametrize("scheme", ["rk4", "ssprk3"])
+@pytest.mark.parametrize("scheme", SCHEMES)
 @pytest.mark.parametrize("limiter", ["none", "positivity"])
 def test_the_fused_numba_step_matches_the_shared_one(setup, scheme, limiter):
     """The Numba backend reimplements both schemes; they must not drift.
@@ -115,15 +115,15 @@ def test_reusing_the_buffers_does_not_leak_between_runs(setup):
     opts = SolverOptions(limiter="positivity")
     bk = get_backend("numba", ops, flow, opts)
 
-    once, _ = bk.run(U.copy(), 6, "rk4")
+    once, _ = bk.run(U.copy(), 6, "ssprk3")
     # the same march in two chunks must land in the same place
-    half, _ = bk.run(U.copy(), 3, "rk4")
-    twice, _ = bk.run(half, 3, "rk4")
+    half, _ = bk.run(U.copy(), 3, "ssprk3")
+    twice, _ = bk.run(half, 3, "ssprk3")
     assert np.abs(np.asarray(twice) - np.asarray(once)).max() < 1e-13
 
     # and the returned array must not alias a buffer the next run overwrites
     kept = np.asarray(once).copy()
-    bk.run(U.copy(), 4, "rk4")
+    bk.run(U.copy(), 4, "ssprk3")
     assert np.abs(np.asarray(once) - kept).max() == 0.0
 
 

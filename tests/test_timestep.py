@@ -11,12 +11,12 @@ import numpy as np
 import pytest
 
 from src import NozzleGeometry
-from src.config import SolverOptions
+from src.config import SCHEMES, SolverOptions
 
 pytestmark = pytest.mark.numba
 
 
-@pytest.mark.parametrize("scheme", ["rk4", "ssprk3"])
+@pytest.mark.parametrize("scheme", SCHEMES)
 @pytest.mark.parametrize("order", [0, 1, 2])
 def test_a_step_at_the_measured_limit_stays_finite(order, scheme):
     """:data:`~src.timestepping.step.STABILITY_LIMIT` must still be the limit.
@@ -41,7 +41,7 @@ def test_a_step_at_the_measured_limit_stays_finite(order, scheme):
     assert np.isfinite(res)
 
 
-@pytest.mark.parametrize("scheme", ["rk4", "ssprk3"])
+@pytest.mark.parametrize("scheme", SCHEMES)
 def test_the_default_keeps_a_real_margin_at_every_order(scheme):
     """The default must be a genuine margin, not a rounding of the limit."""
     from src.timestepping import step as ts
@@ -73,10 +73,14 @@ def test_the_default_holds_the_margin_constant_instead_of_the_number():
     """
     from src.timestepping import step as ts
 
-    margins = [ts.recommended_cfl(p, "rk4") / ts.stability_limit(p, "rk4") for p in range(4)]
+    margins = [
+        ts.recommended_cfl(p, s) / ts.stability_limit(p, s)
+        for s in ("euler", "ssprk3")
+        for p in range(4)
+    ]
     assert all(abs(m - ts.CFL_MARGIN) < 1e-12 for m in margins)
     # and it is genuinely order-dependent, not a constant in disguise
-    assert ts.recommended_cfl(1, "rk4") > 1.5 * ts.recommended_cfl(0, "rk4")
+    assert ts.recommended_cfl(1, "ssprk3") > 1.5 * ts.recommended_cfl(0, "ssprk3")
 
 
 def test_an_unknown_scheme_has_no_calibration():

@@ -18,6 +18,7 @@ from src import (
     solve_quasi1d,
 )
 from src.api import build_case
+from src.config import SCHEMES
 from src.timestepping.initialize import change_order
 
 pytestmark = pytest.mark.slow
@@ -93,11 +94,11 @@ def test_element_kinds_and_orders_bracket_the_same_thrust():
 def test_schemes_reach_the_same_steady_state():
     """RK4 and SSP-RK3 are different paths to the same fixed point."""
     results = {}
-    for scheme in ("rk4", "ssprk3"):
+    for scheme in SCHEMES:
         res = solve_nozzle(order=1, scheme=scheme, **BASE)
         assert res.converged, f"{scheme}: {res.message}"
         results[scheme] = performance(res).thrust
-    assert results["rk4"] == pytest.approx(results["ssprk3"], rel=1e-4), results
+    assert results["euler"] == pytest.approx(results["ssprk3"], rel=1e-4), results
 
 
 def test_initial_condition_does_not_change_the_answer():

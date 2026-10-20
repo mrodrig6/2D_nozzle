@@ -133,6 +133,14 @@ def test_a_sweep_across_the_band_records_it_instead_of_aborting():
     Aborting the whole sweep over one refused point would make the refusal
     worse than the non-convergence it replaced, so the point is recorded as a
     failure with the reason and the sweep carries on.
+
+    ``max_iterations`` is a budget, not part of the claim: it only has to be
+    large enough that the two shock-free points converge, so that the single
+    recorded failure is the *physics* refusal at 0.70 and not a point that ran
+    out of road.  It is sized against the default scheme's step, so a change
+    of default scheme moves it -- 200 sufficed under ``rk4`` and leaves 0.15
+    and 0.30 just short at 1.17e-3 under ``ssprk3``'s smaller default ``cfl``.
+    300 is enough; 400 is what is used, for headroom.
     """
     from src import sweep
 
@@ -140,7 +148,7 @@ def test_a_sweep_across_the_band_records_it_instead_of_aborting():
         back_pressure_ratio=[0.15, 0.70, 0.30],
         area_ratio=AREA_RATIO,
         order=0,
-        options=SolverOptions(max_iterations=200, tolerance=1e-3),
+        options=SolverOptions(max_iterations=400, tolerance=1e-3),
     )
     failures = table.failures()
     assert len(failures) == 1, "expected the 0.70 point to be the only failure"

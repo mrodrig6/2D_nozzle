@@ -7,16 +7,22 @@ makes cross-backend agreement testable to round-off.
 
 Schemes
 -------
-``rk4``
-    The classical four-stage method.  The local time step is frozen at the first
-    stage, which is standard for a pseudo-time march to steady state -- the
-    intermediate stages are not meant to be time-accurate.
-
 ``ssprk3``
-    Three-stage strong-stability-preserving. Each stage is a convex combination
-    of forward-Euler updates, which is exactly the structure the Zhang-Shu
-    positivity limiter assumes, so ``ssprk3`` + ``positivity`` has a genuine
-    positivity guarantee that ``rk4`` does not.  Prefer it for shocked cases.
+    Three-stage strong-stability-preserving, and the default.  Each stage is a
+    convex combination of forward-Euler updates, which is exactly the structure
+    the Zhang-Shu positivity limiter assumes, so ``ssprk3`` + ``positivity``
+    has a genuine positivity guarantee.  Three residual evaluations per step.
+
+``euler``
+    Forward Euler: one residual evaluation per step, and the cheapest route to
+    a steady state when the limiter is off.  At ``p = 0`` this is exactly the
+    scheme the companion finite-volume airfoil code marches with.  It is a
+    single forward-Euler stage, so the Zhang-Shu argument still applies to it;
+    what it lacks is ssprk3's larger stable step.
+
+Classical ``rk4`` was removed.  It cost a fourth residual per step, bought no
+time accuracy in a march whose step is already element-local, and had no
+strong-stability property to justify the expense.
 """
 
 from __future__ import annotations
@@ -26,7 +32,7 @@ from collections.abc import Callable
 
 import numpy as np
 
-from ..config import FlowConditions, SolverOptions
+from ..config import SCHEMES, FlowConditions, SolverOptions
 from ..spatial.operators import Operators
 
 
@@ -144,18 +150,12 @@ class Backend(ABC):
         R, wave = self.residual(U)
         return -self.inverse_mass(R), wave
 
-    def rk4_step(self, U):
-        """One classical RK4 pseudo-time step.  Returns ``(U_new, residual_norm)``."""
+    def euler_step(self, U):
+        """One forward-Euler step.  Returns ``(U_new, residual_norm)``."""
         F0, wave = self.rate(U)
         dt = self.time_step(wave)
         res = self.norm(F0)
-
-        F1, _ = self.rate(self.limit(U + 0.5 * dt * F0))
-        F2, _ = self.rate(self.limit(U + 0.5 * dt * F1))
-        F3, _ = self.rate(self.limit(U + dt * F2))
-
-        U = U + dt / 6.0 * (F0 + 2.0 * F1 + 2.0 * F2 + F3)
-        return self.limit(U), res
+        return self.limit(U + dt * F0), res
 
     def ssprk3_step(self, U):
         """One three-stage SSP-RK3 pseudo-time step."""
@@ -171,11 +171,11 @@ class Backend(ABC):
         return self.limit(U3), res
 
     def make_step(self, scheme: str) -> Callable:
-        if scheme == "rk4":
-            return self.rk4_step
+        if scheme == "euler":
+            return self.euler_step
         if scheme == "ssprk3":
             return self.ssprk3_step
-        raise ValueError(f"unknown scheme {scheme!r}")
+        raise ValueError(f"unknown scheme {scheme!r}; choose from {SCHEMES}")
 
     def run(self, U, n_steps: int, scheme: str):
         """Advance ``n_steps`` steps.  Returns ``(U, residual_norm_of_last_step)``.

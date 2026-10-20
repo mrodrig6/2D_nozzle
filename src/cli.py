@@ -16,7 +16,7 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from .config import FLUXES
+from .config import FLUXES, SCHEMES, SolverOptions
 
 
 def _geometry_args(p: argparse.ArgumentParser) -> None:
@@ -66,7 +66,7 @@ def _solver_args(p: argparse.ArgumentParser) -> None:
     )
     g.add_argument("--tolerance", type=float, default=1e-6)
     g.add_argument("--max-iterations", type=int, default=200_000)
-    g.add_argument("--scheme", default="rk4", choices=("rk4", "ssprk3"))
+    g.add_argument("--scheme", default=SolverOptions.scheme, choices=SCHEMES)
     g.add_argument("--limiter", default="positivity", choices=("none", "positivity", "superbee"))
     g.add_argument(
         "--positivity-cfl",

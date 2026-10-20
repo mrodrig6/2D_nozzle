@@ -29,6 +29,16 @@ FLUXES = ("roe", "hllc", "ausmup")
 
 BACKENDS = ("numba", "numpy", "jax")
 
+#: Pseudo-time integrators, implemented once in :mod:`src.backends.base` and
+#: inherited by every backend.  ``ssprk3`` is the default: its stages are
+#: convex combinations of forward-Euler updates, which is the hypothesis the
+#: Zhang-Shu positivity limiter rests on.  ``euler`` is the single-stage
+#: method, and at ``p = 0`` it is exactly what the companion finite-volume
+#: airfoil code marches with.  Classical ``rk4`` was removed: a fourth
+#: residual per step, no time accuracy to gain in a march whose step is
+#: already element-local, and no strong-stability property.
+SCHEMES = ("euler", "ssprk3")
+
 
 @dataclass(frozen=True)
 class FlowConditions:
@@ -343,7 +353,7 @@ class SolverOptions:
     cfl: float | None = None
     tolerance: float = 1e-6
     max_iterations: int = 200_000
-    scheme: str = "rk4"
+    scheme: str = "ssprk3"
     limiter: str = "positivity"
     tvb_constant: float = 50.0
     positivity_cfl: float = 0.0
@@ -368,8 +378,8 @@ class SolverOptions:
             raise ValueError("stall_window must be at least 2")
         if not 0.0 < self.stall_ratio < 1.0:
             raise ValueError(f"stall_ratio must lie in (0, 1), got {self.stall_ratio}")
-        if self.scheme not in ("rk4", "ssprk3"):
-            raise ValueError(f"scheme must be 'rk4' or 'ssprk3', got {self.scheme!r}")
+        if self.scheme not in SCHEMES:
+            raise ValueError(f"unknown scheme {self.scheme!r}; choose from {SCHEMES}")
         if not 0.0 <= self.positivity_cfl <= 1.0:
             raise ValueError(f"positivity_cfl must lie in [0, 1], got {self.positivity_cfl}")
         if self.tvb_constant < 0.0:

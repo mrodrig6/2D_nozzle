@@ -840,19 +840,6 @@ def stage(U, F, coef, dt, out):
 
 
 @njit(parallel=True, **_JIT)
-def combine_rk4(U, F0, F1, F2, F3, dt, out):
-    """``out = U + dt / 6 * (F0 + 2 F1 + 2 F2 + F3)``."""
-    nelem, nbf, ns = U.shape
-    for e in prange(nelem):
-        c = dt[e] / 6.0
-        for i in range(nbf):
-            for s in range(ns):
-                out[e, i, s] = U[e, i, s] + c * (
-                    F0[e, i, s] + 2.0 * F1[e, i, s] + 2.0 * F2[e, i, s] + F3[e, i, s]
-                )
-
-
-@njit(parallel=True, **_JIT)
 def combine_ssp(U, V, F, dt, a, b, out):
     """``out = a * U + b * (V + dt * F)`` -- both non-trivial SSP-RK3 stages."""
     nelem, nbf, ns = U.shape

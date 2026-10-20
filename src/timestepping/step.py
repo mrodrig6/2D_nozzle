@@ -32,8 +32,8 @@ from ..spatial.operators import Operators
 #: ``p = 2``, so the same ``cfl`` means a different safety margin at every order.
 #: :data:`RECOMMENDED_CFL` is what the solver actually defaults to.
 STABILITY_LIMIT: dict[str, tuple[float, ...]] = {
-    "rk4": (1.625, 2.625, 2.500),
     "ssprk3": (1.437, 2.337, 2.240),
+    "euler": (1.169, 1.337, 0.775),
 }
 
 #: Beyond the measured orders, fall back to ``K (2p+1)/(p+1)``.  In terms of the
@@ -47,7 +47,34 @@ STABILITY_LIMIT: dict[str, tuple[float, ...]] = {
 #: orders -- near enough constant that the two schemes differ by a scheme factor
 #: and not by their order dependence, which is a useful sanity check on both
 #: columns.
-STABILITY_FALLBACK: dict[str, float] = {"rk4": 1.5, "ssprk3": 1.32}
+#: Beyond the measured orders.  ``ssprk3`` grows as ``K (2p+1)/(p+1)``; see
+#: below for why that fits.  ``euler`` is held **flat**, below the smallest
+#: value measured for it, because its limit does not grow with order and
+#: extrapolating it upward would be unsafe in exactly the regime where it is
+#: already weakest.
+STABILITY_FALLBACK: dict[str, tuple[str, float]] = {
+    "ssprk3": ("grow", 1.32),
+    "euler": ("flat", 0.70),
+}
+
+#: The ``euler`` row was measured the same way -- bisection on "the march
+#: converged" -- but over one contour (``smooth``) at refinement 0 rather than
+#: the four combinations behind the ``ssprk3`` row.  :data:`CFL_MARGIN` carries
+#: the difference: across the ``ssprk3`` cases the most permissive contour sat
+#: 6-10% above the tightest, which is well inside the 30% the margin holds back.
+#:
+#: **Euler's limit falls with order**, which ``ssprk3``'s does not: 1.169,
+#: 1.337, then 0.775 at ``p = 2``, below where it started.  That is worth
+#: knowing before reaching for ``euler`` at high order -- it is the cheap
+#: scheme per step and the expensive one per unit of pseudo-time there.
+#:
+#: This row is also a caution about measuring stability cheaply.  Bisecting on
+#: "still finite after 400 steps" instead gave (1.254, 1.963, 2.766) on this
+#: contour -- 7% high at ``p = 0``, 47% high at ``p = 1``, and 3.6 times too
+#: high at ``p = 2``, where the march stays finite for hundreds of steps and
+#: then diverges.  A default built on those numbers diverged on its first run.
+#: The cheap criterion is not a conservative approximation of the real one; it
+#: is not an approximation of it at all.
 
 #: Fraction of the measured stability limit that :func:`recommended_cfl` takes.
 #: A scan over two contours at one back pressure is a measurement, not a
@@ -55,7 +82,7 @@ STABILITY_FALLBACK: dict[str, float] = {"rk4": 1.5, "ssprk3": 1.32}
 CFL_MARGIN = 0.7
 
 
-def stability_limit(order: int, scheme: str = "rk4") -> float:
+def stability_limit(order: int, scheme: str = "ssprk3") -> float:
     """The largest ``cfl`` measured to converge at this order and scheme."""
     try:
         table = STABILITY_LIMIT[scheme]
@@ -65,10 +92,11 @@ def stability_limit(order: int, scheme: str = "rk4") -> float:
         ) from None
     if order < len(table):
         return table[order]
-    return STABILITY_FALLBACK[scheme] * (2 * order + 1) / (order + 1)
+    rule, k = STABILITY_FALLBACK[scheme]
+    return k if rule == "flat" else k * (2 * order + 1) / (order + 1)
 
 
-def recommended_cfl(order: int, scheme: str = "rk4") -> float:
+def recommended_cfl(order: int, scheme: str = "ssprk3") -> float:
     """The ``cfl`` the solver uses when none is given.
 
     Order-dependent *because* ``cfl`` keeps its traditional meaning: one number
@@ -81,7 +109,7 @@ def recommended_cfl(order: int, scheme: str = "rk4") -> float:
     return CFL_MARGIN * stability_limit(order, scheme)
 
 
-def step_coefficient(order: int, cfl: float | None, scheme: str = "rk4") -> float:
+def step_coefficient(order: int, cfl: float | None, scheme: str = "ssprk3") -> float:
     r"""The scalar in :math:`\Delta t_e = c\,2 A_e / \sum_f s_f l_f`.
 
     ``cfl`` has its traditional meaning -- a multiplier on the order-dependent
@@ -102,7 +130,9 @@ def step_coefficient(order: int, cfl: float | None, scheme: str = "rk4") -> floa
     return cfl / (2 * order + 1)
 
 
-def local_time_step(wave_sum, ops: Operators, order: int, cfl: float, scheme: str = "rk4", xp=np):
+def local_time_step(
+    wave_sum, ops: Operators, order: int, cfl: float, scheme: str = "ssprk3", xp=np
+):
     r"""Element-local pseudo-time step.
 
     .. math::

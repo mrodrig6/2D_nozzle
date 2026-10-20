@@ -726,10 +726,11 @@ differ by a scheme factor, not by their order dependence.
 > moves the real limit fails the suite instead of silently invalidating the
 > table.
 
-Two schemes are available. `'rk4'` is the classical four-stage method, with the
-local step frozen at the first stage (the intermediate stages are not meant to
-be time-accurate). `'ssprk3'` is the three-stage
-strong-stability-preserving method,
+Two schemes are available. `'ssprk3'`, the default, is the three-stage
+strong-stability-preserving method, with the local step frozen at the first
+stage — standard for a pseudo-time march, since the intermediate stages are
+not meant to be time-accurate, and also what makes every stage a convex
+combination of forward-Euler steps with the *same* $\Delta t$:
 
 ```math
 \begin{aligned}
@@ -748,7 +749,18 @@ strong-stability-preserving method,
 
 Each SSP stage is a convex combination of forward-Euler updates, which is
 exactly the structure the positivity limiter assumes — so `'ssprk3'` plus
-`'positivity'` carries a genuine positivity guarantee that `'rk4'` does not.
+`'positivity'` carries a genuine positivity guarantee.
+
+`'euler'` is the single-stage method, $\mathbf{U}^{n+1} = \mathbf{U}^{n} +
+\Delta t\,\mathbf{L}(\mathbf{U}^{n})$: one residual evaluation per step
+instead of three, a smaller stable step, and — being one forward-Euler stage —
+the same positivity argument applies to it. At $p = 0$ it is exactly the
+scheme the companion finite-volume airfoil code marches with, which is what
+makes the two codes comparable at the bottom of the order range.
+
+Classical `'rk4'` was removed. It cost a fourth residual evaluation per step,
+bought no time accuracy in a march whose step is already element-local, and
+had no strong-stability property to justify the expense.
 
 ### Convergence measure
 

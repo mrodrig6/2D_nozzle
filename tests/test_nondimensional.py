@@ -144,7 +144,7 @@ def test_every_step_path_uses_the_weighted_norm():
     invariant, and simply never called.
 
     Comparing a fused backend against the reference one catches that: NumPy
-    steps through ``Backend.rk4_step`` and so can only use ``norm``, while Numba
+    steps through ``Backend.ssprk3_step`` and so can only use ``norm``, while Numba
     runs its fused path.  If a fused path grows its own norm again, these two
     stop agreeing.
     """
