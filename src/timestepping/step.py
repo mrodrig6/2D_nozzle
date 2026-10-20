@@ -36,22 +36,19 @@ STABILITY_LIMIT: dict[str, tuple[float, ...]] = {
     "euler": (1.169, 1.337, 0.775),
 }
 
-#: Beyond the measured orders, fall back to ``K (2p+1)/(p+1)``.  In terms of the
-#: *step* rather than the ``cfl`` number, the stable coefficient falls as
-#: 1 : 0.54 : 0.31 across ``p = 0, 1, 2``, which ``1/(p+1)`` (1 : 0.5 : 0.33)
-#: fits far better than ``1/(2p+1)`` (1 : 0.33 : 0.2) -- so in ``cfl`` units the
-#: limit *grows* with order by ``(2p+1)/(p+1)``.  ``K`` is the smallest the
-#: measurements support, so the fallback is conservative where it is used.
+#: Beyond the measured orders, and the two schemes extrapolate differently.
 #:
-#: SSP-RK3 comes out at 0.885, 0.890 and 0.897 times RK4 at the three measured
-#: orders -- near enough constant that the two schemes differ by a scheme factor
-#: and not by their order dependence, which is a useful sanity check on both
-#: columns.
-#: Beyond the measured orders.  ``ssprk3`` grows as ``K (2p+1)/(p+1)``; see
-#: below for why that fits.  ``euler`` is held **flat**, below the smallest
-#: value measured for it, because its limit does not grow with order and
-#: extrapolating it upward would be unsafe in exactly the regime where it is
-#: already weakest.
+#: ``ssprk3`` grows as ``K (2p+1)/(p+1)``.  In terms of the *step* rather than
+#: the ``cfl`` number its stable coefficient falls as 1 : 0.54 : 0.31 across
+#: ``p = 0, 1, 2``, which ``1/(p+1)`` (1 : 0.5 : 0.33) fits far better than
+#: ``1/(2p+1)`` (1 : 0.33 : 0.2) -- so in ``cfl`` units the limit grows with
+#: order by ``(2p+1)/(p+1)``.  ``K`` is the smallest the measurements support,
+#: so the fallback is conservative where it is used.
+#:
+#: ``euler`` is held **flat** instead, below the smallest value measured for
+#: it.  Its limit does not grow with order -- it *falls*, to 0.775 at
+#: ``p = 2`` -- so the growth rule above would extrapolate it upward in
+#: exactly the regime where it is already weakest.
 STABILITY_FALLBACK: dict[str, tuple[str, float]] = {
     "ssprk3": ("grow", 1.32),
     "euler": ("flat", 0.70),

@@ -1,7 +1,7 @@
 r"""JAX backend: differentiable, and the one students take gradients through.
 
 The residual is the *same* vectorised code as the NumPy backend -- only the array
-module differs.  That is the payoff of writing :mod:`src.assembly` and
+module differs.  That is the payoff of writing :mod:`src.spatial.assembly` and
 :mod:`src.physics` against an injected ``xp``: there is no second
 implementation of the physics to keep in sync, so a gradient taken here is a
 gradient of the scheme that actually ran.

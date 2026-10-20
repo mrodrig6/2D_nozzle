@@ -260,7 +260,7 @@ def solve_steady(
         if U.shape != (ops.n_elem, ops.ref.n_basis, 4):
             raise ValueError(
                 f"U0 has shape {U.shape}, expected "
-                f"{(ops.n_elem, ops.ref.n_basis, 4)}; use src.initialize."
+                f"{(ops.n_elem, ops.ref.n_basis, 4)}; use src.timestepping.initialize."
                 "change_order or rebuild the mesh to match"
             )
     U = bk.asarray(U)

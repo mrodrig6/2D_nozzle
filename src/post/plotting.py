@@ -4,7 +4,7 @@ Every function takes an optional ``ax`` and returns the axes it drew on, so
 figures compose.  Nothing calls ``plt.show()`` -- the caller decides.
 
 Field plots sample *inside* each element (see
-:func:`src.postprocess.sample_field`).  Plotting element vertices alone
+:func:`src.post.postprocess.sample_field`).  Plotting element vertices alone
 would show a piecewise-linear picture no matter the polynomial order, hiding
 exactly what ``p = 2`` is for.
 """
@@ -92,7 +92,7 @@ def plot_mesh(
 ):
     """Draw element edges, optionally colouring the tagged boundaries.
 
-    Accepts a :class:`~src.solver.SolveResult` or a
+    Accepts a :class:`~src.timestepping.march.SolveResult` or a
     ``(topology, node_coords)`` pair.
     """
     from ..reference import elements as el

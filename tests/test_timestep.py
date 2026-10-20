@@ -26,6 +26,14 @@ def test_a_step_at_the_measured_limit_stays_finite(order, scheme):
     the default ``cfl`` would then be chasing it.  A few hundred steps right at
     the tabulated value is enough to catch one that has become optimistic: an
     unstable explicit march does not decay slowly, it overflows.
+
+    For ``ssprk3`` that is the whole guard.  For ``euler`` it is only a smoke
+    test, and deliberately labelled as one: ``step.py`` records that this same
+    400-step criterion reads up to 3.6 times too permissive for ``euler`` at
+    ``p = 2``, where the march stays finite for hundreds of steps and then
+    diverges.  So staying finite here does *not* establish that the ``euler``
+    row is still right.  The test below is what guards that row, by requiring
+    the recommended ``cfl`` to actually converge.
     """
     from src import build_case
     from src.backends import get_backend
@@ -39,6 +47,31 @@ def test_a_step_at_the_measured_limit_stays_finite(order, scheme):
     U, res = bk.run(bk.asarray(U), 400, scheme)
     assert np.isfinite(np.asarray(U)).all()
     assert np.isfinite(res)
+
+
+@pytest.mark.parametrize("scheme", SCHEMES)
+def test_the_recommended_cfl_actually_converges(scheme):
+    """The guard the 400-step check cannot be, at the one order it is cheap at.
+
+    ``p = 0`` only: that is where a converging solve costs a couple of
+    thousand iterations rather than tens of thousands, and it is the order a
+    student meets first.  A row that drifts optimistic at ``p = 0`` fails
+    here; the higher orders rest on the measurement recorded in ``step.py``,
+    because bisecting them on convergence costs more than a test suite should.
+    """
+    from src import build_case
+    from src.timestepping.march import solve_steady
+
+    case = build_case(NozzleGeometry(contour="smooth"), order=0)
+    result = solve_steady(
+        case.operators,
+        case.flow,
+        case.geometry,
+        case.discretization,
+        SolverOptions(scheme=scheme, tolerance=1e-6, max_iterations=20_000, print_interval=0),
+        backend="numba",
+    )
+    assert result.converged, f"{scheme} at its recommended cfl: {result.message}"
 
 
 @pytest.mark.parametrize("scheme", SCHEMES)

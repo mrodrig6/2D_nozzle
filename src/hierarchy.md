@@ -211,7 +211,7 @@ root = pathlib.Path("src")
 for p in sorted(root.rglob("*.py")):
     rel = p.relative_to(root); pkg = list(rel.parts[:-1])
     name = str(rel.with_suffix("")).replace("/", ".").replace(".__init__", "")
-    tree = ast.parse(p.read_text()); top = {id(n) for n in tree.body}
+    tree = ast.parse(p.read_text(encoding="utf-8")); top = {id(n) for n in tree.body}
     eager, lazy = set(), set()
     for parent in ast.walk(tree):
         for n in ast.iter_child_nodes(parent):
@@ -240,7 +240,7 @@ root = pathlib.Path("src")
 for p in sorted(root.rglob("*.py")):
     rel = p.relative_to(root); pkg = list(rel.parts[:-1])
     name = str(rel.with_suffix("")).replace("/", ".").replace(".__init__", "")
-    for n in ast.parse(p.read_text()).body:
+    for n in ast.parse(p.read_text(encoding="utf-8")).body:
         if isinstance(n, ast.ImportFrom) and n.level:
             base = pkg[: len(pkg) - (n.level - 1)] if n.level > 1 else pkg
             mods = ([".".join(base + (n.module or "").split("."))] if n.module

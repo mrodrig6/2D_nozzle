@@ -1,7 +1,7 @@
 """Reading the answer: performance integrals, derived fields, and figures.
 
 ``plotting`` is not re-exported, because matplotlib is an optional dependency
-and importing this package should not require it.  ``src.plotting`` is a lazy
+and importing this package should not require it.  ``src.post.plotting`` is a lazy
 attribute on the top-level package for the same reason.
 """
 

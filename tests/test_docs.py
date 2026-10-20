@@ -128,10 +128,16 @@ def test_every_text_file_is_read_as_utf_8():
     ``read_text()`` raises ``UnicodeDecodeError`` on Windows and nowhere else --
     a failure mode invisible to anyone developing on Linux or macOS, which is
     exactly why it is worth a test rather than a habit.
+
+    Markdown is scanned as well as Python.  ``src/hierarchy.md`` carries
+    runnable snippets that a reader is invited to paste, and those escaped
+    this check while it looked only at ``*.py`` -- they shipped with a bare
+    ``read_text()`` telling the reader to do the one thing this test exists
+    to forbid.
     """
     offenders = []
     pattern = re.compile(r"\.(?:read_text|write_text)\(\s*\)|\.(?:read_text|write_text)\(\s*[^)e]")
-    for path in sorted(ROOT.rglob("*.py")):
+    for path in sorted([*ROOT.rglob("*.py"), *ROOT.rglob("*.md")]):
         if any(part in {".git", ".venv", "build", "dist"} for part in path.parts):
             continue
         for i, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1):

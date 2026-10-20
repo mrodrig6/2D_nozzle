@@ -58,7 +58,7 @@ class FlowConditions:
         operating point: large values keep the nozzle subsonic, small values
         produce a shock in the diverging section, and at the design value the
         nozzle runs shock-free.  See
-        :func:`src.quasi1d.operating_regime`.
+        :func:`src.physics.quasi1d.operating_regime`.
     inflow_angle
         Inflow direction in radians, measured from the ``+x`` axis.
     entropy_fix
@@ -253,12 +253,12 @@ class SolverOptions:
         with ``1/(2p+1)`` the standard restriction for explicit DG.
 
         ``None``, the default, means
-        :func:`src.assembly.recommended_cfl` -- 70% of the largest ``cfl``
+        :func:`src.spatial.assembly.recommended_cfl` -- 70% of the largest ``cfl``
         measured to converge at this order and scheme, so the *margin* is 30%
         whatever ``p`` is.  That matters because the textbook restriction is
         over-conservative above ``p = 0``: a fixed ``cfl = 1`` sits at 62% of the
         stable step at ``p = 0`` but only 38% at ``p = 1``, which left most of a
-        factor of two unused.  :data:`src.assembly.STABILITY_LIMIT` has the
+        factor of two unused.  :data:`src.spatial.assembly.STABILITY_LIMIT` has the
         measured limits.
     tolerance
         Convergence threshold on the residual norm, measured against the
@@ -270,8 +270,14 @@ class SolverOptions:
     max_iterations
         Hard cap.  Reaching it is reported, never silently ignored.
     scheme
-        ``'rk4'`` (classical four-stage) or ``'ssprk3'`` (three-stage
-        strong-stability-preserving, better behaved with limiters).
+        ``ssprk3``, the default, is the three-stage strong-stability-preserving
+        method: three residual evaluations per step, and the scheme the
+        ``positivity`` limiter's guarantee is built on, since each of its
+        stages is a convex combination of forward-Euler updates.  ``euler`` is
+        the single-stage method -- one residual per step, a smaller stable
+        step, and at ``p = 0`` exactly what the companion finite-volume airfoil
+        code marches with.  Classical ``rk4`` was removed; see
+        :data:`SCHEMES`.
     limiter
         ``'none'``, ``'positivity'`` (Zhang-Shu scaling, cheap and enough to
         keep the march alive) or ``'superbee'`` (Roe's TVD slope limiter with

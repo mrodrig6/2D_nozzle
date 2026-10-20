@@ -220,7 +220,7 @@ def build_operators(
     Parameters
     ----------
     topology
-        Integer connectivity from :mod:`src.mesh`.
+        Integer connectivity from :mod:`src.geometry.mesh`.
     node_coords
         ``(n_nodes, 2)`` coordinates; may be a traced JAX array.
     order

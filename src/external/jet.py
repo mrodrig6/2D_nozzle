@@ -191,7 +191,7 @@ def jet_wave_cells(
     Parameters
     ----------
     result
-        A converged :class:`~src.solver.SolveResult` with a supersonic exit.
+        A converged :class:`~src.timestepping.march.SolveResult` with a supersonic exit.
     ambient_pressure_ratio
         ``p_amb / p_t``; defaults to the solve's own back pressure.
     cells

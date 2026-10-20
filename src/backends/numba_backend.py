@@ -129,7 +129,8 @@ class NumbaBackend(Backend):
         self._wave = np.zeros(nelem)
         self._dt = np.zeros(nelem)
         self._R = np.zeros((nelem, nbf, 4))
-        self._F = [np.zeros((nelem, nbf, 4)) for _ in range(4)]
+        # three rate buffers: the most any surviving scheme needs is SSP-RK3's
+        self._F = [np.zeros((nelem, nbf, 4)) for _ in range(3)]
         self._S = [np.zeros((nelem, nbf, 4)) for _ in range(3)]
 
     # -- the four primitives, unfused -------------------------------------
