@@ -71,7 +71,7 @@ def _solver_args(p: argparse.ArgumentParser) -> None:
         "--scheme",
         default=None,
         choices=SCHEMES,
-        help="time scheme; omit for the recommended one (euler below p=3, ssprk3 above)",
+        help="time scheme; omit for the recommended one (euler at p=0, ssprk3 above)",
     )
     g.add_argument("--limiter", default="positivity", choices=("none", "positivity", "superbee"))
     g.add_argument(

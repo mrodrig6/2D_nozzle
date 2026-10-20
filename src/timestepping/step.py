@@ -80,28 +80,42 @@ CFL_MARGIN = 0.7
 
 
 #: Order at which :func:`recommended_scheme` switches from ``euler`` to
-#: ``ssprk3``.  Divide each scheme's measured limit by its residual
-#: evaluations per step to get what the step is worth per unit of work:
+#: ``ssprk3``.  Set by **robustness**, not by speed, and the two disagree.
+#:
+#: On speed alone the crossover would be ``p = 3``.  Dividing each scheme's
+#: stability limit by its residual evaluations per step gives what the step is
+#: worth per unit of work, and euler leads comfortably at low order:
 #:
 #:     p = 0   euler 1.169   ssprk3 0.479   euler 2.4x better
 #:     p = 1   euler 1.337   ssprk3 0.779   euler 1.7x better
 #:     p = 2   euler 0.775   ssprk3 0.747   level
 #:     p = 3   euler 0.700   ssprk3 0.770   ssprk3 ahead
 #:
-#: Euler's advantage decays with order and has gone by ``p = 2``, because its
-#: limit *falls* with order while SSP-RK3's grows.  From ``p = 3`` the euler
-#: figure is also an unmeasured flat extrapolation, where SSP-RK3's is
-#: calibrated -- so the switch buys accuracy of the default as well as speed.
-SSP_FROM_ORDER = 3
+#: But those limits were bisected at one back pressure, and the stability
+#: limit is not the same across the operating envelope.  On the unchoked
+#: branch -- ``back_pressure_ratio = 0.98``, where the flow is nearly
+#: stagnant and the limiter is active on about a third of the elements --
+#: forward Euler **diverges at every order above zero, at every cfl tried
+#: down to 0.25**.  That is not a step too large; it is a scheme that cannot
+#: solve that case, while SSP-RK3 converges there in 8601 iterations.
+#:
+#: At ``p = 0`` euler converges across the whole shock-free set
+#: (``tests/test_shock_free.py``), and is 2.4 times cheaper, so it is the
+#: default there.  From ``p = 1`` the correct default is the one that works.
+#:
+#: This was caught by the slow test set after a first attempt put the
+#: crossover at ``p = 3`` on the efficiency numbers alone -- which is the
+#: argument for that set existing, since nothing in the fast suite solves the
+#: unchoked branch.
+SSP_FROM_ORDER = 1
 
 
 def recommended_scheme(order: int) -> str:
     """The scheme the solver uses when none is given.
 
-    Order-dependent for the same reason :func:`recommended_cfl` is: one
-    answer cannot be right across the range.  ``euler`` is the cheaper route
-    to a steady state at the orders a student spends most time at, and
-    ``ssprk3`` takes over once that stops being true.
+    ``euler`` at ``p = 0``, where it is both the cheaper route to a steady
+    state and reliable across the operating envelope; ``ssprk3`` above, where
+    euler is not reliable at all.  See :data:`SSP_FROM_ORDER`.
     """
     return "euler" if order < SSP_FROM_ORDER else "ssprk3"
 

@@ -272,15 +272,14 @@ class SolverOptions:
     scheme
         ``None``, the default, takes
         :func:`~src.timestepping.step.recommended_scheme` for the polynomial
-        order: ``euler`` below ``p = 3`` and ``ssprk3`` from there up.  Euler
-        is one residual evaluation per step against SSP-RK3's three, and at
-        low order that outweighs its smaller stable step by a factor of two;
-        by ``p = 2`` the two are level, and above it SSP-RK3 wins because
-        Euler's limit falls with order while SSP-RK3's grows.
+        order: ``euler`` at ``p = 0`` and ``ssprk3`` above it.  Euler is one
+        residual evaluation per step against SSP-RK3's three, which at
+        ``p = 0`` makes it about 2.4 times cheaper for the same progress; from
+        ``p = 1`` it is not merely slower but unreliable, diverging on the
+        unchoked branch at every step size tried.  :data:`SSP_FROM_ORDER`
+        records the measurement.
 
-        Name one explicitly to override.  ``ssprk3`` is the scheme the
-        ``positivity`` limiter's guarantee is usually stated for, though
-        ``euler`` is itself a single SSP stage and carries the same guarantee.
+        Name one explicitly to override, at any order.
     limiter
         ``'none'``, ``'positivity'`` (Zhang-Shu scaling, cheap and enough to
         keep the march alive) or ``'superbee'`` (Roe's TVD slope limiter with
