@@ -19,7 +19,7 @@ Same equations, three execution strategies:
 ```
 
 They agree to a relative 1e-10, which the test suite enforces. Measured on one
-RK4 step, `p=1`:
+SSP-RK3 stage, `p=1`:
 
 | elements | `numba` | `numpy` | ratio |
 |---|---|---|---|
@@ -32,7 +32,7 @@ Only the Numba path carries the fused stages and the preallocated working set;
 
 ### Where the time goes
 
-One RK4 step at `p=1, refine=1` (560 elements, 1680 DOF), by component. The step
+One SSP-RK3 stage at `p=1, refine=1` (560 elements, 1680 DOF), by component. The step
 measured 0.34 ms in this run; repeat runs on the same machine spread about ±10%,
 so read the shares rather than the absolute times:
 
@@ -103,22 +103,25 @@ tighter than it needs to be above `p=0`. Bisecting the largest `cfl` at which
 the march still converges, over the `bell` and `smooth` contours at refinement
 levels 0 and 1 (the two agreeing to within a bisection step at every order):
 
-| `p` | RK4 | SSP-RK3 | `cfl=1` as a fraction of the RK4 limit |
+| `p` | SSP-RK3 | Euler | `cfl=1` as a fraction of the SSP-RK3 limit |
 |---|---|---|---|
-| 0 | 1.625 | 1.437 | 62% |
-| 1 | 2.625 | 2.337 | 38% |
-| 2 | 2.500 | 2.240 | 40% |
+| 0 | 1.437 | 1.169 | 70% |
+| 1 | 2.337 | 1.337 | 43% |
+| 2 | 2.240 | 0.775 | 45% |
 
 So one fixed `cfl` carries a different safety margin at every order, and the old
 default of `1.0` left most of a factor of two unused above `p=0`. **The default
 is now order-dependent** — 70% of the measured limit, so the *margin* is a
 constant 30% while the definition stays conventional:
 
-| `p` | default `cfl`, RK4 | default `cfl`, SSP-RK3 |
+| `p` | default `cfl`, SSP-RK3 | default `cfl`, Euler |
 |---|---|---|
-| 0 | 1.14 | 1.01 |
-| 1 | 1.84 | 1.64 |
-| 2 | 1.75 | 1.57 |
+| 0 | 1.01 | 0.82 |
+| 1 | 1.64 | 0.94 |
+| 2 | 1.57 | 0.54 |
+
+Euler's limit falls with order where SSP-RK3's grows, so beyond `p=2` it is
+held flat rather than extrapolated upward.
 
 Pass `cfl` explicitly and it means exactly what the formula says — nothing
 rescales it:

@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 from src import physics as ph
+from src.physics import fluxes
 
 GAMMA = 1.4
 
@@ -175,8 +176,8 @@ def test_ausm_splittings_satisfy_their_identities():
     of ``alpha`` and ``beta``; a transcription error in either breaks one.
     """
     m = np.linspace(-3.0, 3.0, 2001)
-    m4 = ph._m4_plus(m, ph.AUSM_BETA, np) + ph._m4_minus(m, ph.AUSM_BETA, np)
-    p5 = ph._p5_plus(m, ph.AUSM_ALPHA, np) + ph._p5_minus(m, ph.AUSM_ALPHA, np)
+    m4 = fluxes._m4_plus(m, ph.AUSM_BETA, np) + fluxes._m4_minus(m, ph.AUSM_BETA, np)
+    p5 = fluxes._p5_plus(m, ph.AUSM_ALPHA, np) + fluxes._p5_minus(m, ph.AUSM_ALPHA, np)
     assert np.allclose(m4, m, atol=1e-13)
     assert np.allclose(p5, 1.0, atol=1e-13)
 

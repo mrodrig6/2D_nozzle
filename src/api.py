@@ -25,7 +25,7 @@ way, the quasi-1D initial condition having already removed the transient the
 ``p = 0`` stage exists to remove.  Its value is as a fallback for a high-order
 solve that will not start at all.
 
-When it is on, the returned :class:`~src.solver.SolveResult` reports the
+When it is on, the returned :class:`~src.timestepping.march.SolveResult` reports the
 **total** cost across all stages -- iterations, wall time and a concatenated
 residual history.  Reporting only the final stage, as an earlier version did,
 makes a continuation run look cheaper than a direct solve, which is exactly
@@ -40,14 +40,14 @@ from typing import Any
 
 import numpy as np
 
-from . import initialize as ini
-from . import quasi1d as q1d_mod
 from .config import Discretization, FlowConditions, SolverOptions
-from .geometry import NozzleGeometry, check_contour
-from .mesh import MeshTopology, build_nozzle_mesh
-from .operators import Operators, build_operators
-from .quasi1d import Quasi1DSolution, solve_quasi1d
-from .solver import SolveHistory, SolveResult, solve_steady
+from .geometry.contour import NozzleGeometry, check_contour
+from .geometry.mesh import MeshTopology, build_nozzle_mesh
+from .physics import quasi1d as q1d_mod
+from .physics.quasi1d import Quasi1DSolution, solve_quasi1d
+from .spatial.operators import Operators, build_operators
+from .timestepping import initialize as ini
+from .timestepping.march import SolveHistory, SolveResult, solve_steady
 
 #: Keyword shortcuts accepted by :func:`solve_nozzle`, grouped by target object.
 _GEOMETRY_KEYS = (
@@ -229,7 +229,7 @@ def case_from_grids(
     makes the adjoint gradient agree with a finite difference of the same
     discrete objective.
     """
-    from .mesh import nozzle_node_coords
+    from .geometry.mesh import nozzle_node_coords
 
     coords = np.asarray(nozzle_node_coords(x_frac, r_frac, geometry.params(), geometry.contour))
     ops = build_operators(topology, coords, discretization.order)
@@ -274,7 +274,7 @@ def solve_nozzle(
         (differentiable).
     U0
         Warm start.  Must match the target order's shape; use
-        :func:`src.initialize.change_order` to convert.  Warm-starting from
+        :func:`src.timestepping.initialize.change_order` to convert.  Warm-starting from
         a neighbouring sweep point typically saves most of the iterations.
     verbose
         Print progress and a summary line.
@@ -283,8 +283,8 @@ def solve_nozzle(
     -------
     SolveResult
         Carries the solution, the operators, and the convergence record.  Check
-        :attr:`~src.solver.SolveResult.converged` before trusting the
-        numbers; :attr:`~src.solver.SolveResult.message` says what went
+        :attr:`~src.timestepping.march.SolveResult.converged` before trusting the
+        numbers; :attr:`~src.timestepping.march.SolveResult.message` says what went
         wrong when it is ``False``.
     """
     geo_kw, flow_kw, disc_kw, opt_kw = _split_overrides(overrides)

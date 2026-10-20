@@ -16,7 +16,7 @@ import pytest
 
 from src import NozzleGeometry
 from src.api import solve_nozzle
-from src.postprocess import performance
+from src.post.postprocess import performance
 
 #: Tight, because the point is to separate a real inconsistency from the
 #: tolerance-level wobble of stopping the march at slightly different places.
@@ -144,7 +144,7 @@ def test_every_step_path_uses_the_weighted_norm():
     invariant, and simply never called.
 
     Comparing a fused backend against the reference one catches that: NumPy
-    steps through ``Backend.rk4_step`` and so can only use ``norm``, while Numba
+    steps through ``Backend.ssprk3_step`` and so can only use ``norm``, while Numba
     runs its fused path.  If a fused path grows its own norm again, these two
     stop agreeing.
     """

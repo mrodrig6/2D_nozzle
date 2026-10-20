@@ -32,10 +32,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from .config import FlowConditions
-from .geometry import NozzleGeometry
-from .operators import Operators
-from .quasi1d import Quasi1DSolution, solve_quasi1d
+from ..config import FlowConditions
+from ..geometry.contour import NozzleGeometry
+from ..physics.quasi1d import Quasi1DSolution, solve_quasi1d
+from ..spatial.operators import Operators
 
 
 def project(values, ops: Operators, xp=np):
@@ -140,7 +140,7 @@ def change_order(U, ops_from: Operators, ops_to: Operators, xp=np):
     # Evaluate the source solution at the *target* quadrature points, then
     # project.  Going through physical values keeps this correct for any pair of
     # orders in either direction.
-    from . import elements as el
+    from ..reference import elements as el
 
     phi_src, _, _ = el.shape_functions(ops_from.ref.kind, ops_from.ref.order, ops_to.ref.points_vol)
     values = xp.einsum("iq,eis->eqs", xp.asarray(phi_src), U)

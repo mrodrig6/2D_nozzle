@@ -62,7 +62,7 @@ from typing import NamedTuple
 
 import numpy as np
 
-from .config import FlowConditions
+from ..config import FlowConditions
 from .operators import Operators
 
 

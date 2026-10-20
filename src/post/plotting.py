@@ -4,7 +4,7 @@ Every function takes an optional ``ax`` and returns the axes it drew on, so
 figures compose.  Nothing calls ``plt.show()`` -- the caller decides.
 
 Field plots sample *inside* each element (see
-:func:`src.postprocess.sample_field`).  Plotting element vertices alone
+:func:`src.post.postprocess.sample_field`).  Plotting element vertices alone
 would show a piecewise-linear picture no matter the polynomial order, hiding
 exactly what ``p = 2`` is for.
 """
@@ -16,17 +16,17 @@ from typing import Any
 
 import numpy as np
 
-from .geometry import NozzleGeometry
-from .mesh import TAG_NAMES, BoundaryTag, MeshTopology
+from ..geometry.contour import NozzleGeometry
+from ..geometry.mesh import TAG_NAMES, BoundaryTag, MeshTopology
+from ..physics.quasi1d import Quasi1DSolution, solve_quasi1d
+from ..sweep import SweepResult
+from ..timestepping.march import SolveResult
 from .postprocess import (
     centreline_profile,
     exit_profile,
     sample_field,
     wall_profile,
 )
-from .quasi1d import Quasi1DSolution, solve_quasi1d
-from .solver import SolveResult
-from .sweep import SweepResult
 
 
 def _require_matplotlib():
@@ -92,10 +92,10 @@ def plot_mesh(
 ):
     """Draw element edges, optionally colouring the tagged boundaries.
 
-    Accepts a :class:`~src.solver.SolveResult` or a
+    Accepts a :class:`~src.timestepping.march.SolveResult` or a
     ``(topology, node_coords)`` pair.
     """
-    from . import elements as el
+    from ..reference import elements as el
     from .postprocess import _node_coords
 
     ax = _axes(ax)

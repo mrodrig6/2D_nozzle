@@ -269,7 +269,7 @@ def test_an_under_expanded_jet_bulges_and_an_over_expanded_one_pinches(supersoni
 def test_the_design_point_has_no_cells_to_march(supersonic_result):
     """No lip wave means no pattern; say so rather than drawing nothing."""
     from src.external import jet_wave_cells
-    from src.postprocess import performance
+    from src.post.postprocess import performance
 
     # the design point is this nozzle's own computed exit pressure, not the
     # quasi-1D one -- they differ by 4.5%, as src.external.plume records
@@ -487,7 +487,7 @@ def test_the_stitch_is_continuous_at_the_lip_to_the_two_dimensional_offset(
     """
     from src.external import jet_wave_cells
     from src.external.plotting import _exterior_ratio, _interior_ratios
-    from src.quasi1d import solve_quasi1d
+    from src.physics.quasi1d import solve_quasi1d
 
     jc = jet_wave_cells(supersonic_result, ambient_pressure_ratio=0.030, cells=2)
     q = solve_quasi1d(supersonic_result.geometry, supersonic_result.flow)

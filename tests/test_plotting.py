@@ -17,14 +17,14 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 from src.api import solve_nozzle  # noqa: E402
-from src.plotting import (  # noqa: E402
+from src.post.plotting import (  # noqa: E402
     CENTRELINE_QUANTITIES,
     COMPARE_QUANTITIES,
     plot_centreline,
     plot_dg_vs_quasi1d,
     plot_field,
 )
-from src.postprocess import SCALARS, centreline_profile  # noqa: E402
+from src.post.postprocess import SCALARS, centreline_profile  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -86,7 +86,7 @@ def test_stitching_refuses_what_quasi1d_does_not_predict(solved):
 
 def test_stitched_quantities_are_all_real_quasi1d_fields(solved):
     """The table may only name attributes the quasi-1D solution actually has."""
-    from src.quasi1d import solve_quasi1d
+    from src.physics.quasi1d import solve_quasi1d
 
     q = solve_quasi1d(solved.geometry, solved.flow)
     for name, attr in COMPARE_QUANTITIES.items():

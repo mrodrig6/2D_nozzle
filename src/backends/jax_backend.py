@@ -1,7 +1,7 @@
 r"""JAX backend: differentiable, and the one students take gradients through.
 
 The residual is the *same* vectorised code as the NumPy backend -- only the array
-module differs.  That is the payoff of writing :mod:`src.assembly` and
+module differs.  That is the payoff of writing :mod:`src.spatial.assembly` and
 :mod:`src.physics` against an injected ``xp``: there is no second
 implementation of the physics to keep in sync, so a gradient taken here is a
 gradient of the scheme that actually ran.
@@ -27,8 +27,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from .. import assembly as asm
-from .. import limiter as lim
+from ..spatial import assembly as asm
+from ..spatial import limiter as lim
+from ..timestepping import step as ts
 from .base import Backend
 
 _FLOAT64_ENABLED = False
@@ -89,12 +90,12 @@ class JaxBackend(Backend):
         )
 
     def time_step(self, wave_sum):
-        dt = asm.local_time_step(
+        dt = ts.local_time_step(
             wave_sum,
             self.ops,
             self.ops.ref.order,
             self.opts.cfl,
-            self.opts.scheme,
+            self.scheme,
             xp=self.jnp,
         )
         return self.positivity_scale() * dt[:, None, None]

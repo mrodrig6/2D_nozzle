@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from src import sweep
-from src.plotting import plot_sweep
+from src.post.plotting import plot_sweep
 
 
 def main() -> None:

@@ -12,7 +12,7 @@ Three interchangeable execution strategies over one set of equations:
 from __future__ import annotations
 
 from ..config import BACKENDS, FlowConditions, SolverOptions
-from ..operators import Operators
+from ..spatial.operators import Operators
 from .base import Backend
 from .numpy_backend import NumpyBackend
 

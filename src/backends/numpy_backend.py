@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from .. import assembly as asm
-from .. import limiter as lim
+from ..spatial import assembly as asm
+from ..spatial import limiter as lim
+from ..timestepping import step as ts
 from .base import Backend
 
 
@@ -41,12 +42,12 @@ class NumpyBackend(Backend):
         return out
 
     def time_step(self, wave_sum):
-        dt = asm.local_time_step(
+        dt = ts.local_time_step(
             wave_sum,
             self.ops,
             self.ops.ref.order,
             self.opts.cfl,
-            self.opts.scheme,
+            self.scheme,
             xp=np,
         )
         return self.positivity_scale() * dt[:, None, None]

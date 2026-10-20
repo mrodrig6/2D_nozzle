@@ -38,9 +38,9 @@ from typing import Any
 
 import numpy as np
 
-from . import elements as el
-from . import quadrature as qd
-from .mesh import MeshTopology
+from ..geometry.mesh import MeshTopology
+from ..reference import elements as el
+from ..reference import quadrature as qd
 
 
 @dataclass(frozen=True)
@@ -220,7 +220,7 @@ def build_operators(
     Parameters
     ----------
     topology
-        Integer connectivity from :mod:`src.mesh`.
+        Integer connectivity from :mod:`src.geometry.mesh`.
     node_coords
         ``(n_nodes, 2)`` coordinates; may be a traced JAX array.
     order

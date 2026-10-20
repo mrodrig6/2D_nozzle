@@ -24,7 +24,14 @@ from pathlib import Path
 
 import pytest
 
-DOCS = sorted([Path("README.md"), *Path("docs").glob("*.md"), Path("examples/README.md")])
+DOCS = sorted(
+    [
+        Path("README.md"),
+        *Path("docs").glob("*.md"),
+        Path("examples/README.md"),
+        *Path("src").rglob("*.md"),
+    ]
+)
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -100,7 +107,13 @@ def test_every_link_and_anchor_resolves(path):
         if m:
             slug = re.sub(r"[`*_]", "", m.group(1).lower())
             slug = re.sub(r"[^\w\s-]", "", slug)
-            anchors.add(re.sub(r"\s+", "-", slug.strip()))
+            # One hyphen per whitespace character, not per run.  GitHub does
+            # not collapse them, so a heading with an em dash -- which is
+            # removed above and leaves two spaces -- slugs to a double hyphen.
+            # Collapsing here reported every such heading as a dead anchor,
+            # which it did on the airfoil code's lab guide when this module
+            # was ported there.  No heading here has one, so it never fired.
+            anchors.add(re.sub(r"\s", "-", slug.strip()))
     dead = [a for a in re.findall(r"\]\(#([^)]+)\)", text) if a not in anchors]
     assert not dead, f"{path} links to missing anchors {dead}"
 
@@ -121,10 +134,16 @@ def test_every_text_file_is_read_as_utf_8():
     ``read_text()`` raises ``UnicodeDecodeError`` on Windows and nowhere else --
     a failure mode invisible to anyone developing on Linux or macOS, which is
     exactly why it is worth a test rather than a habit.
+
+    Markdown is scanned as well as Python.  ``src/hierarchy.md`` carries
+    runnable snippets that a reader is invited to paste, and those escaped
+    this check while it looked only at ``*.py`` -- they shipped with a bare
+    ``read_text()`` telling the reader to do the one thing this test exists
+    to forbid.
     """
     offenders = []
     pattern = re.compile(r"\.(?:read_text|write_text)\(\s*\)|\.(?:read_text|write_text)\(\s*[^)e]")
-    for path in sorted(ROOT.rglob("*.py")):
+    for path in sorted([*ROOT.rglob("*.py"), *ROOT.rglob("*.md")]):
         if any(part in {".git", ".venv", "build", "dist"} for part in path.parts):
             continue
         for i, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1):

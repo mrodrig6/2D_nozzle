@@ -1,7 +1,7 @@
 r"""Numba nopython kernels for the DG residual.
 
 This is the performance path.  The mathematics is identical to
-:mod:`src.assembly`; only the execution strategy differs.  Where the
+:mod:`src.spatial.assembly`; only the execution strategy differs.  Where the
 vectorised backend expresses each step as an ``einsum`` over big temporaries,
 these kernels fuse everything into two ``prange`` loops and keep intermediates in
 registers:
@@ -27,7 +27,7 @@ from numba import njit, prange
 
 FLOOR = 1e-10
 
-# Boundary tags, mirroring src.mesh.BoundaryTag (Numba cannot see IntEnum).
+# Boundary tags, mirroring src.geometry.mesh.BoundaryTag (Numba cannot see IntEnum).
 _INFLOW = 1
 _OUTFLOW = 2
 _WALL = 3
@@ -603,7 +603,7 @@ def element_rate(
 
     Same arithmetic as :func:`element_pass` with ``apply_mass`` true, except
     that :math:`M^{-1}` has already been folded into the operators at build
-    time (see :class:`~src.operators.Operators`).  That removes an
+    time (see :class:`~src.spatial.operators.Operators`).  That removes an
     ``nbf**2 * 4`` matvec per element per stage -- four per iteration -- and with
     it the ``apply_mass`` branch and the ``face_side`` indirection, since
     ``face_basis_m`` is already resolved per element.
@@ -837,19 +837,6 @@ def stage(U, F, coef, dt, out):
         for i in range(nbf):
             for s in range(ns):
                 out[e, i, s] = U[e, i, s] + c * F[e, i, s]
-
-
-@njit(parallel=True, **_JIT)
-def combine_rk4(U, F0, F1, F2, F3, dt, out):
-    """``out = U + dt / 6 * (F0 + 2 F1 + 2 F2 + F3)``."""
-    nelem, nbf, ns = U.shape
-    for e in prange(nelem):
-        c = dt[e] / 6.0
-        for i in range(nbf):
-            for s in range(ns):
-                out[e, i, s] = U[e, i, s] + c * (
-                    F0[e, i, s] + 2.0 * F1[e, i, s] + 2.0 * F2[e, i, s] + F3[e, i, s]
-                )
 
 
 @njit(parallel=True, **_JIT)

@@ -319,7 +319,7 @@ which is exactly why it is solved this way.
 ```python
 import matplotlib.pyplot as plt
 
-from src.plotting import overview, plot_centreline, plot_field
+from src.post.plotting import overview, plot_centreline, plot_field
 
 overview(result)  # four-panel summary; its top panel is the Mach contour
 plt.show()
@@ -367,7 +367,7 @@ the DG field above the axis and the quasi-1D prediction for the same geometry
 below it, on one shared colour scale:
 
 ```python
-from src.plotting import plot_dg_vs_quasi1d
+from src.post.plotting import plot_dg_vs_quasi1d
 
 plot_dg_vs_quasi1d(result, "mach")
 plot_dg_vs_quasi1d(result, "temperature")
@@ -389,7 +389,7 @@ a large disagreement look like agreement. Quantities quasi-1D does not predict
 each returns a dict of `x`, `y` and every scalar above:
 
 ```python
-from src.postprocess import centreline_profile, exit_profile, wall_profile
+from src.post.postprocess import centreline_profile, exit_profile, wall_profile
 
 cl = centreline_profile(result)
 print(cl["temperature"].min(), cl["mach"].max())

@@ -700,11 +700,16 @@ $\mathrm{CFL}$ at which the march still converges — over the `bell` and
 `smooth` contours at refinement levels 0 and 1, the two agreeing to within a
 bisection step at every order — gives
 
-| $p$ | RK4 | SSP-RK3 | $\mathrm{CFL} = 1$ as a fraction of the RK4 limit |
+| $p$ | SSP-RK3 | Euler | $\mathrm{CFL} = 1$ as a fraction of the SSP-RK3 limit |
 |---|---|---|---|
-| 0 | 1.625 | 1.437 | 62% |
-| 1 | 2.625 | 2.337 | 38% |
-| 2 | 2.500 | 2.240 | 40% |
+| 0 | 1.437 | 1.169 | 70% |
+| 1 | 2.337 | 1.337 | 43% |
+| 2 | 2.240 | 0.775 | 45% |
+
+The two columns were not measured over the same set of cases: SSP-RK3 over
+four contour/refinement combinations, Euler over `smooth` at refinement 0
+only. The 30% margin below covers the difference — across the SSP-RK3 cases
+the most permissive contour sat 6–10% above the tightest.
 
 So a single fixed $\mathrm{CFL}$ carries a different safety margin at every
 order. The solver's default is therefore order-dependent — 70% of the measured
@@ -713,11 +718,16 @@ conventional. Pass $\mathrm{CFL}$ explicitly and it means exactly what the
 formula above says.
 
 Read as a coefficient on the geometric step rather than as a $\mathrm{CFL}$
-number, the stable value falls as $1 : 0.54 : 0.31$ across $p = 0, 1, 2$, which
-$1/(p+1)$ fits ($1 : 0.5 : 0.33$) and $1/(2p+1)$ does not ($1 : 0.33 : 0.2$).
-That is the scaling used beyond the measured orders. SSP-RK3 comes out at a
-near-constant $0.89$ times RK4, a useful check on both columns: the two schemes
-differ by a scheme factor, not by their order dependence.
+number, SSP-RK3's stable value falls as $1 : 0.54 : 0.31$ across
+$p = 0, 1, 2$, which $1/(p+1)$ fits ($1 : 0.5 : 0.33$) and $1/(2p+1)$ does not
+($1 : 0.33 : 0.2$). That is the scaling used beyond the measured orders.
+
+**Euler does not follow that rule**, and the table above is the reason to say
+so explicitly: its limit *falls* with order, to $0.775$ at $p = 2$ — below
+where it started. So beyond $p = 2$ it is held flat rather than extrapolated
+upward, which the growth rule would otherwise do in exactly the regime where
+it is already weakest. Euler is the cheap scheme per step and the expensive
+one per unit of pseudo-time at high order.
 
 > **A measurement, not a proof.** Two contours at one back pressure is a scan,
 > not a stability analysis, which is why the default keeps 30% in hand rather
@@ -726,10 +736,11 @@ differ by a scheme factor, not by their order dependence.
 > moves the real limit fails the suite instead of silently invalidating the
 > table.
 
-Two schemes are available. `'rk4'` is the classical four-stage method, with the
-local step frozen at the first stage (the intermediate stages are not meant to
-be time-accurate). `'ssprk3'` is the three-stage
-strong-stability-preserving method,
+Two schemes are available. `'ssprk3'`, the default, is the three-stage
+strong-stability-preserving method, with the local step frozen at the first
+stage — standard for a pseudo-time march, since the intermediate stages are
+not meant to be time-accurate, and also what makes every stage a convex
+combination of forward-Euler steps with the *same* $\Delta t$:
 
 ```math
 \begin{aligned}
@@ -748,7 +759,18 @@ strong-stability-preserving method,
 
 Each SSP stage is a convex combination of forward-Euler updates, which is
 exactly the structure the positivity limiter assumes — so `'ssprk3'` plus
-`'positivity'` carries a genuine positivity guarantee that `'rk4'` does not.
+`'positivity'` carries a genuine positivity guarantee.
+
+`'euler'` is the single-stage method, $\mathbf{U}^{n+1} = \mathbf{U}^{n} +
+\Delta t\,\mathbf{L}(\mathbf{U}^{n})$: one residual evaluation per step
+instead of three, a smaller stable step, and — being one forward-Euler stage —
+the same positivity argument applies to it. At $p = 0$ it is exactly the
+scheme the companion finite-volume airfoil code marches with, which is what
+makes the two codes comparable at the bottom of the order range.
+
+Classical `'rk4'` was removed. It cost a fourth residual evaluation per step,
+bought no time accuracy in a march whose step is already element-local, and
+had no strong-stability property to justify the expense.
 
 ### Convergence measure
 
@@ -1200,7 +1222,7 @@ the identical code runs under NumPy, Numba and JAX.
   saving in the code: the limiter runs once per Runge–Kutta stage, and in naive
   vectorised form it cost about twenty times a residual evaluation and dominated
   the solve. Moving it into a kernel with a zero-allocation fast path took one
-  RK4 step from 3.92 ms to 0.34 ms.
+  step from 3.92 ms to 0.34 ms (measured on RK4, which the solver carried at the time).
 
 > **On measuring these honestly.** The first two were documented as large
 > speed-ups until they were measured. The iteration counts that appeared to

@@ -12,9 +12,9 @@ import pytest
 
 from src import BoundaryTag, NozzleGeometry, build_nozzle_mesh
 from src import physics as ph
-from src.assembly import face_term, volume_term
 from src.config import FlowConditions
-from src.operators import build_operators
+from src.spatial.assembly import face_term, volume_term
+from src.spatial.operators import build_operators
 
 KINDS = ["tri", "quad"]
 ORDERS = [0, 1, 2]
@@ -170,7 +170,7 @@ def test_inverted_mesh_is_rejected_with_a_useful_message(geom):
 
 
 def test_non_conforming_mesh_is_detected(geom):
-    from src.mesh import build_edges, nozzle_boundary_tagger
+    from src.geometry.mesh import build_edges, nozzle_boundary_tagger
 
     topo, coords, _ = build_nozzle_mesh(geom)
     coords = np.asarray(coords)

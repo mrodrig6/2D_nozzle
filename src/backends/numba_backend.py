@@ -32,8 +32,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from .. import assembly as asm
-from .. import limiter as lim
+from ..config import SCHEMES
+from ..spatial import limiter as lim
+from ..timestepping import step as ts
 from . import _numba_kernels as nk
 from .base import Backend
 
@@ -128,7 +129,8 @@ class NumbaBackend(Backend):
         self._wave = np.zeros(nelem)
         self._dt = np.zeros(nelem)
         self._R = np.zeros((nelem, nbf, 4))
-        self._F = [np.zeros((nelem, nbf, 4)) for _ in range(4)]
+        # three rate buffers: the most any surviving scheme needs is SSP-RK3's
+        self._F = [np.zeros((nelem, nbf, 4)) for _ in range(3)]
         self._S = [np.zeros((nelem, nbf, 4)) for _ in range(3)]
 
     # -- the four primitives, unfused -------------------------------------
@@ -168,8 +170,8 @@ class NumbaBackend(Backend):
         return out
 
     def time_step(self, wave_sum):
-        dt = asm.local_time_step(
-            wave_sum, self.ops, self.ops.ref.order, self.opts.cfl, self.opts.scheme, xp=np
+        dt = ts.local_time_step(
+            wave_sum, self.ops, self.ops.ref.order, self.opts.cfl, self.scheme, xp=np
         )
         return dt[:, None, None]
 
@@ -236,7 +238,7 @@ class NumbaBackend(Backend):
             self._wave,
             self._elem_area,
             self.positivity_scale()
-            * asm.step_coefficient(self.ops.ref.order, self.opts.cfl, self.opts.scheme),
+            * ts.step_coefficient(self.ops.ref.order, self.opts.cfl, self.scheme),
             self._dt,
         )
         return self._dt
@@ -284,9 +286,12 @@ class NumbaBackend(Backend):
         ``U`` is copied in once and out once, so a 50-step chunk pays two array
         copies rather than six per step.
         """
-        step = self._rk4_fused if scheme == "rk4" else self._ssprk3_fused
-        if scheme not in ("rk4", "ssprk3"):
-            raise ValueError(f"unknown scheme {scheme!r}")
+        if scheme == "euler":
+            step = self._euler_fused
+        elif scheme == "ssprk3":
+            step = self._ssprk3_fused
+        else:
+            raise ValueError(f"unknown scheme {scheme!r}; choose from {SCHEMES}")
 
         cur, nxt = self._S[0], self._S[1]
         cur[...] = _c(U)
@@ -297,27 +302,14 @@ class NumbaBackend(Backend):
                 cur, nxt = nxt, cur
         return cur.copy(), res
 
-    def _rk4_fused(self, U, out) -> float:
-        """One classical RK4 step: ``U`` in, ``out`` written, residual returned."""
+    def _euler_fused(self, U, out) -> float:
+        """One forward-Euler step: ``U`` in, ``out`` written, residual returned."""
         F = self._F
         self._rate_into(U, F[0])
         dt = self._dt_into()
         res = float(nk.rms_weighted(F[0], self._weight_flat))
 
-        W = self._S[2]
-        nk.stage(U, F[0], 0.5, dt, W)
-        self._limit_inplace(W)
-        self._rate_into(W, F[1])
-
-        nk.stage(U, F[1], 0.5, dt, W)
-        self._limit_inplace(W)
-        self._rate_into(W, F[2])
-
-        nk.stage(U, F[2], 1.0, dt, W)
-        self._limit_inplace(W)
-        self._rate_into(W, F[3])
-
-        nk.combine_rk4(U, F[0], F[1], F[2], F[3], dt, out)
+        nk.stage(U, F[0], 1.0, dt, out)
         self._limit_inplace(out)
         return res
 

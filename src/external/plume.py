@@ -44,7 +44,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ..postprocess import performance
+from ..post.postprocess import performance
 from . import waves
 
 __all__ = ["ExitWaves", "exit_wave_structure"]
@@ -103,7 +103,7 @@ def exit_wave_structure(
     Parameters
     ----------
     result
-        A converged :class:`~src.solver.SolveResult`.
+        A converged :class:`~src.timestepping.march.SolveResult`.
     ambient_pressure_ratio
         ``p_amb / p_t``.  Defaults to the solve's own ``back_pressure_ratio``,
         which is the ambient the operating point was chosen against.

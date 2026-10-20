@@ -1,6 +1,6 @@
 r"""Draw the external wave structure on top of the nozzle geometry.
 
-Kept with the rest of :mod:`src.external` rather than in :mod:`src.plotting`,
+Kept with the rest of :mod:`src.external` rather than in :mod:`src.post.plotting`,
 so that the external post-processing is one self-contained thing to read, add to
 or remove.
 """
@@ -11,8 +11,8 @@ import functools
 
 import numpy as np
 
-from ..plotting import plot_contour
-from ..quasi1d import solve_quasi1d
+from ..physics.quasi1d import solve_quasi1d
+from ..post.plotting import plot_contour
 from .jet import JetCells, jet_wave_cells
 from .plume import ExitWaves, exit_wave_structure
 
@@ -616,7 +616,7 @@ def plot_nozzle_and_plume(
     is the quasi-1D assumption drawn rather than described.  Outside, each wave
     cell is uniform, which is the wave march's own assumption.  Neither is a
     2D solution -- for that, inside the nozzle, see
-    :func:`src.plotting.plot_dg_vs_quasi1d`.
+    :func:`src.post.plotting.plot_dg_vs_quasi1d`.
     """
     import matplotlib.pyplot as plt
     from matplotlib.colors import LogNorm, Normalize

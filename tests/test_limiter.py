@@ -7,9 +7,9 @@ import numpy as np
 import pytest
 
 from src import NozzleGeometry, build_case
-from src import initialize as ini
-from src import limiter as lim
 from src.config import FlowConditions
+from src.spatial import limiter as lim
+from src.timestepping import initialize as ini
 
 
 @pytest.fixture(scope="module")

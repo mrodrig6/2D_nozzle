@@ -29,6 +29,16 @@ FLUXES = ("roe", "hllc", "ausmup")
 
 BACKENDS = ("numba", "numpy", "jax")
 
+#: Pseudo-time integrators, implemented once in :mod:`src.backends.base` and
+#: inherited by every backend.  ``ssprk3`` is the default: its stages are
+#: convex combinations of forward-Euler updates, which is the hypothesis the
+#: Zhang-Shu positivity limiter rests on.  ``euler`` is the single-stage
+#: method, and at ``p = 0`` it is exactly what the companion finite-volume
+#: airfoil code marches with.  Classical ``rk4`` was removed: a fourth
+#: residual per step, no time accuracy to gain in a march whose step is
+#: already element-local, and no strong-stability property.
+SCHEMES = ("euler", "ssprk3")
+
 
 @dataclass(frozen=True)
 class FlowConditions:
@@ -48,7 +58,7 @@ class FlowConditions:
         operating point: large values keep the nozzle subsonic, small values
         produce a shock in the diverging section, and at the design value the
         nozzle runs shock-free.  See
-        :func:`src.quasi1d.operating_regime`.
+        :func:`src.physics.quasi1d.operating_regime`.
     inflow_angle
         Inflow direction in radians, measured from the ``+x`` axis.
     entropy_fix
@@ -139,6 +149,20 @@ class FlowConditions:
         if self.hllc_low_mach < 0.0:
             raise ValueError("hllc_low_mach must be non-negative")
 
+    def flux_options(self) -> dict:
+        """The keyword arguments this operating point gives its flux.
+
+        Each solver takes a different tunable and the rest take none, so the
+        mapping lives here rather than in the assembly: one place that knows
+        which knob belongs to which flux.  The companion airfoil code carries
+        the same method.
+        """
+        if self.flux == "roe":
+            return {"entropy_fix": self.entropy_fix}
+        if self.flux == "hllc":
+            return {"low_mach": self.hllc_low_mach}
+        return {}
+
     @property
     def back_pressure(self) -> float:
         """Static pressure imposed at a subsonic exit."""
@@ -215,7 +239,7 @@ class Discretization:
 
     @property
     def n_basis(self) -> int:
-        from . import elements as el
+        from .reference import elements as el
 
         return el.n_basis(self.element, self.order)
 
@@ -243,12 +267,12 @@ class SolverOptions:
         with ``1/(2p+1)`` the standard restriction for explicit DG.
 
         ``None``, the default, means
-        :func:`src.assembly.recommended_cfl` -- 70% of the largest ``cfl``
+        :func:`src.spatial.assembly.recommended_cfl` -- 70% of the largest ``cfl``
         measured to converge at this order and scheme, so the *margin* is 30%
         whatever ``p`` is.  That matters because the textbook restriction is
         over-conservative above ``p = 0``: a fixed ``cfl = 1`` sits at 62% of the
         stable step at ``p = 0`` but only 38% at ``p = 1``, which left most of a
-        factor of two unused.  :data:`src.assembly.STABILITY_LIMIT` has the
+        factor of two unused.  :data:`src.spatial.assembly.STABILITY_LIMIT` has the
         measured limits.
     tolerance
         Convergence threshold on the residual norm, measured against the
@@ -260,8 +284,16 @@ class SolverOptions:
     max_iterations
         Hard cap.  Reaching it is reported, never silently ignored.
     scheme
-        ``'rk4'`` (classical four-stage) or ``'ssprk3'`` (three-stage
-        strong-stability-preserving, better behaved with limiters).
+        ``None``, the default, takes
+        :func:`~src.timestepping.step.recommended_scheme` for the polynomial
+        order: ``euler`` at ``p = 0`` and ``ssprk3`` above it.  Euler is one
+        residual evaluation per step against SSP-RK3's three, which at
+        ``p = 0`` makes it about 2.4 times cheaper for the same progress; from
+        ``p = 1`` it is not merely slower but unreliable, diverging on the
+        unchoked branch at every step size tried.  :data:`SSP_FROM_ORDER`
+        records the measurement.
+
+        Name one explicitly to override, at any order.
     limiter
         ``'none'``, ``'positivity'`` (Zhang-Shu scaling, cheap and enough to
         keep the march alive) or ``'superbee'`` (Roe's TVD slope limiter with
@@ -343,7 +375,7 @@ class SolverOptions:
     cfl: float | None = None
     tolerance: float = 1e-6
     max_iterations: int = 200_000
-    scheme: str = "rk4"
+    scheme: str | None = None
     limiter: str = "positivity"
     tvb_constant: float = 50.0
     positivity_cfl: float = 0.0
@@ -368,8 +400,8 @@ class SolverOptions:
             raise ValueError("stall_window must be at least 2")
         if not 0.0 < self.stall_ratio < 1.0:
             raise ValueError(f"stall_ratio must lie in (0, 1), got {self.stall_ratio}")
-        if self.scheme not in ("rk4", "ssprk3"):
-            raise ValueError(f"scheme must be 'rk4' or 'ssprk3', got {self.scheme!r}")
+        if self.scheme is not None and self.scheme not in SCHEMES:
+            raise ValueError(f"unknown scheme {self.scheme!r}; choose from {SCHEMES}")
         if not 0.0 <= self.positivity_cfl <= 1.0:
             raise ValueError(f"positivity_cfl must lie in [0, 1], got {self.positivity_cfl}")
         if self.tvb_constant < 0.0:
