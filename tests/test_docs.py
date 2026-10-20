@@ -107,7 +107,13 @@ def test_every_link_and_anchor_resolves(path):
         if m:
             slug = re.sub(r"[`*_]", "", m.group(1).lower())
             slug = re.sub(r"[^\w\s-]", "", slug)
-            anchors.add(re.sub(r"\s+", "-", slug.strip()))
+            # One hyphen per whitespace character, not per run.  GitHub does
+            # not collapse them, so a heading with an em dash -- which is
+            # removed above and leaves two spaces -- slugs to a double hyphen.
+            # Collapsing here reported every such heading as a dead anchor,
+            # which it did on the airfoil code's lab guide when this module
+            # was ported there.  No heading here has one, so it never fired.
+            anchors.add(re.sub(r"\s", "-", slug.strip()))
     dead = [a for a in re.findall(r"\]\(#([^)]+)\)", text) if a not in anchors]
     assert not dead, f"{path} links to missing anchors {dead}"
 
