@@ -149,6 +149,20 @@ class FlowConditions:
         if self.hllc_low_mach < 0.0:
             raise ValueError("hllc_low_mach must be non-negative")
 
+    def flux_options(self) -> dict:
+        """The keyword arguments this operating point gives its flux.
+
+        Each solver takes a different tunable and the rest take none, so the
+        mapping lives here rather than in the assembly: one place that knows
+        which knob belongs to which flux.  The companion airfoil code carries
+        the same method.
+        """
+        if self.flux == "roe":
+            return {"entropy_fix": self.entropy_fix}
+        if self.flux == "hllc":
+            return {"low_mach": self.hllc_low_mach}
+        return {}
+
     @property
     def back_pressure(self) -> float:
         """Static pressure imposed at a subsonic exit."""

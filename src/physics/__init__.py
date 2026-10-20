@@ -29,8 +29,10 @@ from .fluxes import (
     AUSM_BETA,
     AUSM_KP,
     AUSM_KU,
+    SOLVERS,
     ausm_up_flux,
     hllc_flux,
+    interface_flux,
     roe_flux,
 )
 from .quasi1d import (
@@ -64,6 +66,7 @@ from .thermo import (
 )
 
 __all__ = [
+    "SOLVERS",
     "AUSM_ALPHA",
     "AUSM_BETA",
     "AUSM_KP",
@@ -79,6 +82,7 @@ __all__ = [
     "density_ratio",
     "euler_flux",
     "hllc_flux",
+    "interface_flux",
     "inflow_flux",
     "is_shock_free",
     "mach_from_area",

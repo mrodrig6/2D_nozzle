@@ -220,6 +220,11 @@ class DifferentiableCase:
             backflow = self.flow.backflow
             allow_shock_in_nozzle = self.flow.allow_shock_in_nozzle
 
+            # Reused rather than reimplemented: it reads only the fields
+            # above, and a second copy of "which knob belongs to which flux"
+            # is exactly the drift this stand-in already warns about.
+            flux_options = FlowConditions.flux_options
+
         return _Flow()
 
     def residual(self, U, params: Mapping[str, Any]):

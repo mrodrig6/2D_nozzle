@@ -443,3 +443,30 @@ def ausm_up_flux(
 
     max_speed = xp.maximum(xp.abs(vnL) + aL, xp.abs(vnR) + aR)
     return FluxResult(flux, max_speed)
+
+
+#: The approximate Riemann solvers, by the name
+#: :class:`~src.config.FlowConditions` uses.  One table, read by the
+#: validator, the vectorised assembly and the CLI, so a flux cannot be
+#: accepted in one place and unknown in another.  The companion airfoil code
+#: carries the same table for the same three solvers.
+SOLVERS = {
+    "roe": roe_flux,
+    "hllc": hllc_flux,
+    "ausmup": ausm_up_flux,
+}
+
+
+def interface_flux(name: str, UL, UR, nx, ny, gamma: float, *, xp=np, **kwargs):
+    """Dispatch to one of :data:`SOLVERS` by name.
+
+    Replaces an ``if``/``elif`` chain in :mod:`src.spatial.assembly`, which
+    had the dispatch in a different file from the solvers it dispatched to --
+    so adding a flux meant editing the assembly, and the compiled kernels'
+    integer codes had no single list to agree with.
+    """
+    try:
+        solver = SOLVERS[name]
+    except KeyError:
+        raise ValueError(f"unknown flux {name!r}; choose from {tuple(SOLVERS)}") from None
+    return solver(UL, UR, nx, ny, gamma, xp=xp, **kwargs)
