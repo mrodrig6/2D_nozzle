@@ -17,6 +17,7 @@ from collections.abc import Sequence
 import numpy as np
 
 from .config import FLUXES, SCHEMES, SolverOptions
+from .timestepping.step import recommended_scheme
 
 
 def _geometry_args(p: argparse.ArgumentParser) -> None:
@@ -66,7 +67,12 @@ def _solver_args(p: argparse.ArgumentParser) -> None:
     )
     g.add_argument("--tolerance", type=float, default=1e-6)
     g.add_argument("--max-iterations", type=int, default=200_000)
-    g.add_argument("--scheme", default=SolverOptions.scheme, choices=SCHEMES)
+    g.add_argument(
+        "--scheme",
+        default=None,
+        choices=SCHEMES,
+        help="time scheme; omit for the recommended one (euler below p=3, ssprk3 above)",
+    )
     g.add_argument("--limiter", default="positivity", choices=("none", "positivity", "superbee"))
     g.add_argument(
         "--positivity-cfl",
@@ -235,7 +241,6 @@ def _cmd_bench(args) -> int:
 
     from .api import build_case
     from .backends import available_backends, get_backend
-    from .config import SolverOptions
     from .timestepping.initialize import initial_state
 
     kw = _collect(args)
@@ -253,16 +258,19 @@ def _cmd_bench(args) -> int:
 
     print(f"{case.topology.summary()}")
     print(f"p={case.discretization.order}, {case.discretization.n_dof} DOF/variable")
-    print(f"timing {args.steps} steps of {args.scheme}\n")
+    # `--scheme` may be unset, in which case the backend resolves it from the
+    # order; ask the backend rather than argparse what is actually running.
+    scheme = args.scheme or recommended_scheme(case.discretization.order)
+    print(f"timing {args.steps} steps of {scheme}\n")
     print(f"{'backend':10s} {'total [s]':>11s} {'per step [ms]':>15s} {'speedup':>9s}")
 
     baseline = None
     for name in available_backends():
         bk = get_backend(name, ops, case.flow, opts)
         U = bk.asarray(U0)
-        bk.run(U, 2, args.scheme)  # warm up / compile
+        bk.run(U, 2, bk.scheme)  # warm up / compile
         t0 = time.perf_counter()
-        bk.run(U, args.steps, args.scheme)
+        bk.run(U, args.steps, bk.scheme)
         dt = time.perf_counter() - t0
         baseline = baseline or dt
         print(f"{name:10s} {dt:11.3f} {dt / args.steps * 1e3:15.4f} {baseline / dt:8.2f}x")

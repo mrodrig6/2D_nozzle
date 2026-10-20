@@ -270,14 +270,17 @@ class SolverOptions:
     max_iterations
         Hard cap.  Reaching it is reported, never silently ignored.
     scheme
-        ``ssprk3``, the default, is the three-stage strong-stability-preserving
-        method: three residual evaluations per step, and the scheme the
-        ``positivity`` limiter's guarantee is built on, since each of its
-        stages is a convex combination of forward-Euler updates.  ``euler`` is
-        the single-stage method -- one residual per step, a smaller stable
-        step, and at ``p = 0`` exactly what the companion finite-volume airfoil
-        code marches with.  Classical ``rk4`` was removed; see
-        :data:`SCHEMES`.
+        ``None``, the default, takes
+        :func:`~src.timestepping.step.recommended_scheme` for the polynomial
+        order: ``euler`` below ``p = 3`` and ``ssprk3`` from there up.  Euler
+        is one residual evaluation per step against SSP-RK3's three, and at
+        low order that outweighs its smaller stable step by a factor of two;
+        by ``p = 2`` the two are level, and above it SSP-RK3 wins because
+        Euler's limit falls with order while SSP-RK3's grows.
+
+        Name one explicitly to override.  ``ssprk3`` is the scheme the
+        ``positivity`` limiter's guarantee is usually stated for, though
+        ``euler`` is itself a single SSP stage and carries the same guarantee.
     limiter
         ``'none'``, ``'positivity'`` (Zhang-Shu scaling, cheap and enough to
         keep the march alive) or ``'superbee'`` (Roe's TVD slope limiter with
@@ -359,7 +362,7 @@ class SolverOptions:
     cfl: float | None = None
     tolerance: float = 1e-6
     max_iterations: int = 200_000
-    scheme: str = "ssprk3"
+    scheme: str | None = None
     limiter: str = "positivity"
     tvb_constant: float = 50.0
     positivity_cfl: float = 0.0
@@ -384,7 +387,7 @@ class SolverOptions:
             raise ValueError("stall_window must be at least 2")
         if not 0.0 < self.stall_ratio < 1.0:
             raise ValueError(f"stall_ratio must lie in (0, 1), got {self.stall_ratio}")
-        if self.scheme not in SCHEMES:
+        if self.scheme is not None and self.scheme not in SCHEMES:
             raise ValueError(f"unknown scheme {self.scheme!r}; choose from {SCHEMES}")
         if not 0.0 <= self.positivity_cfl <= 1.0:
             raise ValueError(f"positivity_cfl must lie in [0, 1], got {self.positivity_cfl}")

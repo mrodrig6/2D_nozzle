@@ -145,7 +145,7 @@ def march(
     window: list[float] = []
 
     # one step alone first, to capture the initial residual
-    U, res0 = backend.run(U, 1, opts.scheme)
+    U, res0 = backend.run(U, 1, backend.scheme)
     res = res0
     done = 1
     history.iterations.append(done)
@@ -163,7 +163,7 @@ def march(
 
     while done < opts.max_iterations:
         n = min(chunk, opts.max_iterations - done)
-        U, res = backend.run(U, n, opts.scheme)
+        U, res = backend.run(U, n, backend.scheme)
         done += n
         history.iterations.append(done)
         history.residual.append(float(res))

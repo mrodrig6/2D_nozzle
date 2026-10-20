@@ -79,6 +79,33 @@ STABILITY_FALLBACK: dict[str, tuple[str, float]] = {
 CFL_MARGIN = 0.7
 
 
+#: Order at which :func:`recommended_scheme` switches from ``euler`` to
+#: ``ssprk3``.  Divide each scheme's measured limit by its residual
+#: evaluations per step to get what the step is worth per unit of work:
+#:
+#:     p = 0   euler 1.169   ssprk3 0.479   euler 2.4x better
+#:     p = 1   euler 1.337   ssprk3 0.779   euler 1.7x better
+#:     p = 2   euler 0.775   ssprk3 0.747   level
+#:     p = 3   euler 0.700   ssprk3 0.770   ssprk3 ahead
+#:
+#: Euler's advantage decays with order and has gone by ``p = 2``, because its
+#: limit *falls* with order while SSP-RK3's grows.  From ``p = 3`` the euler
+#: figure is also an unmeasured flat extrapolation, where SSP-RK3's is
+#: calibrated -- so the switch buys accuracy of the default as well as speed.
+SSP_FROM_ORDER = 3
+
+
+def recommended_scheme(order: int) -> str:
+    """The scheme the solver uses when none is given.
+
+    Order-dependent for the same reason :func:`recommended_cfl` is: one
+    answer cannot be right across the range.  ``euler`` is the cheaper route
+    to a steady state at the orders a student spends most time at, and
+    ``ssprk3`` takes over once that stops being true.
+    """
+    return "euler" if order < SSP_FROM_ORDER else "ssprk3"
+
+
 def stability_limit(order: int, scheme: str = "ssprk3") -> float:
     """The largest ``cfl`` measured to converge at this order and scheme."""
     try:

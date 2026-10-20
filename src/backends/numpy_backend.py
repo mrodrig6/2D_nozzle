@@ -47,7 +47,7 @@ class NumpyBackend(Backend):
             self.ops,
             self.ops.ref.order,
             self.opts.cfl,
-            self.opts.scheme,
+            self.scheme,
             xp=np,
         )
         return self.positivity_scale() * dt[:, None, None]

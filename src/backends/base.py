@@ -34,6 +34,7 @@ import numpy as np
 
 from ..config import SCHEMES, FlowConditions, SolverOptions
 from ..spatial.operators import Operators
+from ..timestepping.step import recommended_scheme
 
 
 def component_weights(flow: FlowConditions) -> np.ndarray:
@@ -92,6 +93,11 @@ class Backend(ABC):
         self.n_mean_repaired = 0
         self.n_limit_calls = 0
         self.component_weight = component_weights(flow)
+        # Resolved once, here, so `scheme=None` means the same thing to every
+        # backend and nothing downstream has to know it can be None.  The
+        # order comes from the operators, which is why this cannot live on
+        # SolverOptions: the options do not know what they will be run on.
+        self.scheme = recommended_scheme(ops.ref.order) if opts.scheme is None else opts.scheme
 
     def limiter_activity(self) -> float:
         """Mean number of elements limited per limiter call; NaN if not tracked."""

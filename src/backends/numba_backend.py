@@ -171,7 +171,7 @@ class NumbaBackend(Backend):
 
     def time_step(self, wave_sum):
         dt = ts.local_time_step(
-            wave_sum, self.ops, self.ops.ref.order, self.opts.cfl, self.opts.scheme, xp=np
+            wave_sum, self.ops, self.ops.ref.order, self.opts.cfl, self.scheme, xp=np
         )
         return dt[:, None, None]
 
@@ -238,7 +238,7 @@ class NumbaBackend(Backend):
             self._wave,
             self._elem_area,
             self.positivity_scale()
-            * ts.step_coefficient(self.ops.ref.order, self.opts.cfl, self.opts.scheme),
+            * ts.step_coefficient(self.ops.ref.order, self.opts.cfl, self.scheme),
             self._dt,
         )
         return self._dt
