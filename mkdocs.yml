@@ -1,6 +1,5 @@
 site_name: "2D DG nozzle"
 site_description: "Planar nozzle design with a Python Euler solver"
-site_url: https://mrodrig6.github.io/2D_nozzle/
 repo_url: https://github.com/mrodrig6/2D_nozzle
 repo_name: mrodrig6/2D_nozzle
 edit_uri: edit/main/docs/
