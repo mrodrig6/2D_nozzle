@@ -316,11 +316,12 @@ def solve_nozzle(
     # take minutes before saying so.  Warning at setup costs nothing and is the
     # difference between a student mis-reading the result and knowing the
     # operating point is outside what the solver can do.
+    area_ratio = cs.geometry.realised_area_ratio()
     if not (
-        q1d_mod.is_shock_free(cs.geometry.area_ratio, flw.back_pressure_ratio, flw.gamma)
+        q1d_mod.is_shock_free(area_ratio, flw.back_pressure_ratio, flw.gamma)
         or flw.allow_shock_in_nozzle
     ):
-        lo, hi = q1d_mod.shock_free_range(cs.geometry.area_ratio, flw.gamma)
+        lo, hi = q1d_mod.shock_free_range(area_ratio, flw.gamma)
         raise ValueError(
             f"back_pressure_ratio={flw.back_pressure_ratio:.4f} stands a normal "
             f"shock inside the diverging section (or exactly on the exit "
