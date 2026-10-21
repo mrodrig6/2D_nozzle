@@ -35,8 +35,8 @@ all = ["numba>=0.58", "jax>=0.4.20", "matplotlib>=3.7"]
 # student changed nothing and the build is red -- so the version moves only
 # when someone moves it.
 dev = ["pytest>=7.4", "pytest-cov", "ruff==0.16.10", "codespell>=2.2"]
-# only for re-rendering the TikZ figures; also needs pdflatex on PATH
-docs = ["pymupdf>=1.23"]
+# Website tools and TikZ rasterization; rebuilding TikZ also needs pdflatex
+docs = ["mkdocs>=1.6,<2", "mkdocs-material>=9.6,<10", "pymdown-extensions>=10,<11", "pymupdf>=1.23"]
 
 [project.scripts]
 dgnozzle = "src.cli:main"

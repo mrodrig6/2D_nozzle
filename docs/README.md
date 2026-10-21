@@ -1,73 +1,68 @@
 # Documentation
 
-| File | Contents |
-|---|---|
-| [`usage.md`](usage.md) | **Driving the code.** Launcher reference, the Python API, every design variable, and how to choose a resolution. |
-| [`workflows.md`](workflows.md) | **What to do with it.** Parameter sweeps, sensitivity analysis, shape optimisation, and the external flow outside the exit. |
-| [`performance.md`](performance.md) | Backends, the time step, and what made it fast. |
-| [`verification.md`](verification.md) | What is checked, and what to do when a run misbehaves. |
-| [`theory.md`](theory.md) | **The formulation and geometry definition.** Governing equations, DG weak form, Roe flux, boundary conditions, limiters, quasi-1D theory, performance metrics, verification evidence, and the adjoint. Markdown with LaTeX equations — it renders on GitHub, so there is nothing to build to read it. |
-| [`lab_guide.md`](lab_guide.md) | Student-facing exercises. |
-| [`tikz/`](tikz/) | TikZ sources for every figure in `theory.md`. |
-| [`render_figures.py`](render_figures.py) | Compiles the TikZ sources and rasterises them into `figures/tikz/`, which is what `theory.md` links to. |
-| [`make_tikz.py`](make_tikz.py) | Regenerates the geometry figure's coordinates from the solver's own contour code. |
-| `figures/` | The PNGs the documents show. `figures/tikz/` is generated from `tikz/`; the rest come from the solver via `plotting`. |
+Choose a section below. The root [README](../README.md) is also the website home.
 
-Also worth reading: [`../src/hierarchy.md`](../src/hierarchy.md) maps the
-source tree — which subpackage owns what, the dependency order to read it
-in, and where a new flux, element kind or time stepper goes.
+## Getting started
 
-## Why the figures are TikZ *and* PNG
+- [Installation](getting-started/installation.md)
+- [Quick start](getting-started/quick-start.md)
+- [Examples](getting-started/examples.md)
 
-The figures are authored in TikZ, because that is the only way to keep the
-nozzle wall in the geometry figure generated from the solver's own contour code
-(`make_tikz.py`) rather than drawn by hand. Markdown cannot typeset TikZ, so
-the committed PNGs in `figures/tikz/` are what `theory.md` actually shows.
-The `.tex` files remain the source of truth; the PNGs are build products that
-happen to be committed, so that reading the documentation needs no TeX at all.
+## Running
 
-## Rebuilding the figures
+- [Command line](running/command-line.md)
+- [Configuration](running/configuration.md)
+- [Solving a case](running/solving.md)
+- [Reading results](running/output.md)
+- [Parameter sweeps](running/sweeps.md)
+- [Sensitivity analysis](running/sensitivity.md)
+- [Shape optimization](running/optimization.md)
+- [Troubleshooting](running/troubleshooting.md)
+- [Nozzle contours](running/contours.md)
+- [Postprocessing](running/postprocessing.md)
+- [External flow](running/external-flow.md)
+- [Nozzle design lab](running/lab-guide.md)
 
-After changing a TikZ source — or the contour families it draws:
+## Python API
 
-```bash
-python docs/make_tikz.py        # only if the contour code changed
-python docs/render_figures.py   # needs pdflatex and pymupdf
-```
+- [Library usage](api/package.md)
+- [Extending the solver](api/extending.md)
 
-`render_figures.py` needs `texlive-latex-base`, `texlive-pictures`,
-`texlive-latex-recommended` and `texlive-latex-extra` (for the `standalone`
-class), plus `pip install pymupdf` for the rasterisation step. Both are
-build-time only.
+## Background / Model
 
-Any single figure as a vector PDF, if you want one for print:
+- [Problem and assumptions](model/problem.md)
+- [Parameters](model/parameters.md)
+- [Units and reference scales](model/units.md)
 
-```bash
-cd docs/tikz && pdflatex nozzle_geometry.tex
-```
+## Method
 
-## The TikZ figures
+- [Spatial discretization](method/discretization.md)
+- [Numerical fluxes](method/fluxes.md)
+- [Boundary conditions](method/boundary-conditions.md)
+- [Backends and performance](method/backends.md)
+- [Time stepping and convergence](method/time-stepping.md)
+- [Limiters](method/limiters.md)
 
-| Source | Shows |
-|---|---|
-| `nozzle_geometry.tex` | the nozzle, every design variable, and all four boundary conditions |
-| `reference_elements.tex` | reference triangle and square, node ordering, edge numbering |
-| `dg_coupling.tex` | how two elements communicate through the numerical flux |
-| `mesh_map.tex` | the fixed logical grid and the design-dependent map onto it |
+## Theory
 
-The wall in `nozzle_geometry.tex` is the **actual** contour the solver
-produces, sampled from `src.geometry` — not a freehand sketch. `make_tikz.py`
-fails loudly rather than silently doing nothing if the figure source changes
-shape.
+- [Euler equations](theory/euler.md)
+- [Discrete adjoint](theory/adjoint.md)
+- [Quasi-one-dimensional nozzle flow](theory/nozzle-flow.md)
+- [External waves](theory/external-waves.md)
 
-This used to be checked on every push. It is not any more — there is no CI, by
-design — so it is a **manual step after changing the contour code**:
+## Validation
 
-```bash
-python docs/make_tikz.py            # regenerate from src.geometry
-git diff docs/tikz/                 # empty means the figure is still in sync
-python docs/render_figures.py       # only if the .tex changed; needs TeX
-```
+- [Test-suite claims](validation/tests.md)
+- [Gradient comparisons](validation/gradients.md)
+- [Quasi-1D and conservation comparisons](validation/quasi-one-dimensional.md)
+- [Accuracy and curved geometry](validation/accuracy.md)
+- [Reference-scale invariance](validation/scaling.md)
 
-Nothing breaks if you forget: the committed PNG simply stops matching the code,
-which is a documentation bug rather than a solver one.
+## Reference
+
+- [Compatibility](reference/compatibility.md)
+- [Code map](reference/code-map.md)
+- [Repository map](reference/repository.md)
+- [Continuous integration](reference/ci.md)
+- [Figures](reference/figures.md)
+- [Bibliography](reference/bibliography.md)

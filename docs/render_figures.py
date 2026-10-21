@@ -29,7 +29,7 @@ import tempfile
 from pathlib import Path
 
 DOCS = Path(__file__).resolve().parent
-TIKZ = DOCS / "tikz"
+TIKZ = DOCS / "figures" / "tikz"
 OUT = DOCS / "figures" / "tikz"
 
 #: Rendering resolution.  The figures are vector line art at roughly 16 cm
