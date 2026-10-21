@@ -16,10 +16,10 @@ measured sixth of a step, spent entirely on the allocator.
 
 The schemes are therefore implemented here as well as in :class:`Backend`, which
 is a real risk of drift -- so ``tests/test_backends.py`` pins this backend's
-``rk4_step`` and ``ssprk3_step`` against the base-class versions step for step.
+``ssprk3_step`` against the base-class versions step for step.
 
 The positivity limiter has its own kernel and runs in place.  It is called once
-per Runge-Kutta stage, so four times per iteration; its cheap sufficient screen
+per Runge-Kutta stage, so three times per SSP-RK3 iteration; its cheap sufficient screen
 (see :func:`._numba_kernels.positivity_limit`) is what keeps the inactive case,
 which is every iteration of a smooth run, from costing a seventh of the step.
 

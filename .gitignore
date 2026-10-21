@@ -21,7 +21,7 @@ venv/
 *.synctex.gz
 *.fls
 *.fdb_latexmk
-docs/tikz/*.pdf
+docs/figures/tikz/*.pdf
 
 # Solver output
 *.npz
@@ -35,3 +35,6 @@ sweep*.csv
 /jet_fields.png
 /stitched.png
 /nozzle_plume.png
+
+# Documentation build
+/site/

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate the wall coordinates embedded in ``docs/tikz/nozzle_geometry.tex``.
+"""Regenerate the wall coordinates embedded in ``docs/figures/tikz/nozzle_geometry.tex``.
 
 The geometry figure draws the *actual* contour the solver uses rather than a
 freehand sketch, so it stays honest when the contour families change.  Run this
@@ -27,7 +27,7 @@ import numpy as np  # noqa: E402
 from src.geometry import NozzleGeometry  # noqa: E402
 
 SCALE = 12.0
-TARGET = ROOT / "docs" / "tikz" / "nozzle_geometry.tex"
+TARGET = ROOT / "docs" / "figures" / "tikz" / "nozzle_geometry.tex"
 
 
 def coordinate_lists(geom: NozzleGeometry, n: int = 61) -> tuple[str, str]:

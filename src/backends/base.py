@@ -8,10 +8,12 @@ makes cross-backend agreement testable to round-off.
 Schemes
 -------
 ``ssprk3``
-    Three-stage strong-stability-preserving, and the default.  Each stage is a
+    Three-stage strong-stability-preserving; the default above p=0.  Each stage is a
     convex combination of forward-Euler updates, which is exactly the structure
     the Zhang-Shu positivity limiter assumes, so ``ssprk3`` + ``positivity``
-    has a genuine positivity guarantee.  Three residual evaluations per step.
+    has the required stage structure. A complete guarantee also requires a
+    positivity-preserving flux and the corresponding CFL condition.
+    Three residual evaluations per step.
 
 ``euler``
     Forward Euler: one residual evaluation per step, and the cheapest route to

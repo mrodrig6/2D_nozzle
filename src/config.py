@@ -267,12 +267,12 @@ class SolverOptions:
         with ``1/(2p+1)`` the standard restriction for explicit DG.
 
         ``None``, the default, means
-        :func:`src.spatial.assembly.recommended_cfl` -- 70% of the largest ``cfl``
+        :func:`src.timestepping.step.recommended_cfl` -- 70% of the largest ``cfl``
         measured to converge at this order and scheme, so the *margin* is 30%
         whatever ``p`` is.  That matters because the textbook restriction is
         over-conservative above ``p = 0``: a fixed ``cfl = 1`` sits at 62% of the
         stable step at ``p = 0`` but only 38% at ``p = 1``, which left most of a
-        factor of two unused.  :data:`src.spatial.assembly.STABILITY_LIMIT` has the
+        factor of two unused.  :data:`src.timestepping.step.STABILITY_LIMIT` has the
         measured limits.
     tolerance
         Convergence threshold on the residual norm, measured against the
