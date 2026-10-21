@@ -14,6 +14,14 @@ Install `[all,dev,docs]` before running every check. `./dg2d.sh verify` remains 
 
 The tests job requires its optional backends to import before pytest. It fails visibly if a compatible numerical dependency is unavailable for the newest Python; it does not silently convert missing backend coverage into a pass. Version-matrix runs on GitHub have not been claimed by a local Python 3.12 run.
 
-The build job has read-only repository access. Only the default-branch deployment job receives Pages and identity-token write permissions. Set the repository's Pages source to **GitHub Actions** before expecting publication. Pull requests build an artifact but never deploy it.
+The build job has read-only repository access. Only the default-branch deployment job receives Pages and identity-token write permissions. Pull requests build an artifact but never deploy it. A manual run also deploys when the selected branch is `main`.
+
+## Enable Pages and recover a failed deployment
+
+A repository administrator must open [Settings → Pages](https://github.com/mrodrig6/2D_nozzle/settings/pages), choose **GitHub Actions** under **Build and deployment → Source**, and save the setting if prompted. Do this once for each repository before publishing.
+
+If the deployment reports `404 Not Found` or “Ensure GitHub Pages has been enabled,” check that setting first. The documentation build and scientific tests can pass while publication fails because Pages is disabled. The deployment now checks the Pages configuration before uploading the site to the Pages service. The workflow's default token cannot enable Pages; no additional token is needed when an administrator enables it in Settings.
+
+After enabling Pages, open **Actions → Documentation** and rerun the failed deployment. After the manual trigger is merged, you can also select **Run workflow**, choose `main`, and run it to rebuild and publish without a new commit. Deployment errors remain failures and must be resolved before publication succeeds.
 
 The configured site is `https://mrodrig6.github.io/2D_nozzle/`. Its badge is marked pending until the first successful deployment. A local build, an open PR and a live Pages site are separate results.
