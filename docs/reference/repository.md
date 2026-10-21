@@ -15,7 +15,7 @@ This table describes the top-level files and folders. Generated study output sho
 | [`LICENSE`](../../LICENSE) | MIT license |
 | [`.gitignore`](../../.gitignore) | Generated-file exclusions |
 | [`mkdocs.yml`](../../mkdocs.yml) | Site navigation and strict validation |
-| [`.github`](../../.github) | Tests, quality checks and documentation deployment workflows |
+| [`.github`](../../.github) | Tests, quality checks and documentation validation workflows |
 
 The [code map](code-map.md) describes individual modules. The [figure inventory](figures.md) gives rebuild commands. `site/`, Python caches and local virtual environments are generated and ignored.
 

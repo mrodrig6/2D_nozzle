@@ -18,24 +18,10 @@ jobs:
       - run: python -m pip install -e ".[docs]"
       - run: python docs/check_links.py
       - run: mkdocs build --strict
-      - uses: actions/upload-pages-artifact@v3
+      - name: Upload documentation preview
+        uses: actions/upload-artifact@v4
         with:
-          path: site
-  deploy:
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Verify GitHub Pages configuration
-        uses: actions/configure-pages@v6
-        with:
-          enablement: false
-      - name: Deploy documentation
-        id: deployment
-        uses: actions/deploy-pages@v4
+          name: documentation-preview
+          path: site/
+          if-no-files-found: error
+          retention-days: 14
