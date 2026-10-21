@@ -304,6 +304,8 @@ class DifferentiableCase:
         spectrum (see the module docstring).  Returns ``(lambda, residual_norm,
         iterations, converged)``.
         """
+        if max_iterations < 1 or check_interval < 1:
+            raise ValueError("max_iterations and check_interval must be at least 1")
         jax, jnp = self._jax, self._jnp
         ops = self.operators(params)
         flow = self._flow_with(params)
@@ -355,8 +357,8 @@ class DifferentiableCase:
             return lam + dt / 6.0 * (f0 + 2.0 * f1 + 2.0 * f2 + f3)
 
         @jax.jit
-        def chunk(lam):
-            return jax.lax.fori_loop(0, check_interval, lambda _, l: rk4(l), lam)
+        def chunk(lam, steps):
+            return jax.lax.fori_loop(0, steps, lambda _, l: rk4(l), lam)
 
         lam = jnp.zeros_like(seed)
         norm0 = float(jnp.sqrt(jnp.mean(seed * seed)))
@@ -367,8 +369,9 @@ class DifferentiableCase:
         it = 0
         converged = False
         while it < max_iterations:
-            lam = chunk(lam)
-            it += check_interval
+            steps = min(check_interval, max_iterations - it)
+            lam = chunk(lam, steps)
+            it += steps
             res = float(jnp.sqrt(jnp.mean(defect(lam) ** 2)))
             if verbose:
                 print(f"    adjoint {it:>7d}   {res:.4e}  ({res / norm0:.2e} relative)")
@@ -490,6 +493,9 @@ def differentiable_case(
     opts = options or SolverOptions()
     if opt_kw:
         opts = opts.replace(**opt_kw)
+    flw = flow or case.flow
+    if flow_kw:
+        flw = flw.replace(**flow_kw)
     disc = case.discretization
     return DifferentiableCase(
         topology=case.topology,
@@ -497,7 +503,7 @@ def differentiable_case(
         x_frac=np.asarray(case.grids["x_frac"]),
         r_frac=np.asarray(case.grids["r_frac"]),
         geometry=case.geometry,
-        flow=flow or case.flow,
+        flow=flw,
         discretization=disc,
         options=opts,
     )
