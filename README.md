@@ -27,15 +27,15 @@ See [installation](docs/getting-started/installation.md) for isolated environmen
 
 ```bash
 # Check installed dependencies and backends.
-./dg2d.sh check
+./nozzle.sh check
 # Inspect a wall before solving it.
-./dg2d.sh geometry contour=smooth
+./nozzle.sh geometry contour=smooth
 # Solve a shock-free operating point and save an overview.
-./dg2d.sh solve @design figure=result.png
+./nozzle.sh solve --deck design figure=result.png
 # Sweep area ratio and save the numerical table.
-./dg2d.sh sweep area_ratio 2.0 4.0 5 contour=smooth order=1 refine=1 csv=sweep.csv
+./nozzle.sh sweep area_ratio 2.0 4.0 5 contour=smooth order=1 refine=1 csv=sweep.csv
 # Compare adjoint gradients with finite differences.
-./dg2d.sh run sensitivity
+./nozzle.sh run sensitivity
 ```
 
 ```python

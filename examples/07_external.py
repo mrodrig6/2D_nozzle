@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Example 7 --- the flow outside the nozzle, where the waves actually are.
 
-Run:  ./dg2d.sh run external
+Run:  ./nozzle.sh run external
 
 The mesh stops at the lip. A nozzle designed the way example 6 argues for --
 shock free inside the diverging section -- therefore has its entire wave system

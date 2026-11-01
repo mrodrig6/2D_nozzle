@@ -1,4 +1,4 @@
-"""The ``dg2d.sh`` launcher.
+"""The ``nozzle.sh`` launcher.
 
 This is the entry point students are told to use.  The package sits at the
 repository root, so ``python -m src`` works when you are standing in a
@@ -19,11 +19,11 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "dg2d.sh"
+SCRIPT = ROOT / "nozzle.sh"
 
 pytestmark = pytest.mark.skipif(
     sys.platform == "win32" or shutil.which("bash") is None,
-    reason="dg2d.sh needs bash",
+    reason="nozzle.sh needs bash",
 )
 
 CASES = ("solve", "sweep", "sensitivity", "optimise", "convergence", "shock", "external")
@@ -47,7 +47,7 @@ def run(*args, cwd=None, timeout=300):
 
 def test_the_script_is_executable():
     assert SCRIPT.exists()
-    assert os.access(SCRIPT, os.X_OK), "dg2d.sh must be committed with its +x bit"
+    assert os.access(SCRIPT, os.X_OK), "nozzle.sh must be committed with its +x bit"
 
 
 def test_bash_parses_it():
@@ -126,7 +126,7 @@ def test_a_bad_interpreter_is_reported_not_ignored():
     """``die`` runs inside a command substitution, so its exit must propagate."""
     env = dict(os.environ)
     env.pop("PYTHONPATH", None)
-    env["DG2D_PYTHON"] = "definitely-not-an-interpreter"
+    env["NOZZLE_PYTHON"] = "definitely-not-an-interpreter"
     out = subprocess.run(
         ["bash", str(SCRIPT), "check"],
         cwd=str(ROOT),
@@ -136,7 +136,7 @@ def test_a_bad_interpreter_is_reported_not_ignored():
         timeout=60,
     )
     assert out.returncode != 0
-    assert "DG2D_PYTHON" in out.stderr
+    assert "NOZZLE_PYTHON" in out.stderr
 
 
 def test_test_passes_a_path_filter_through(tmp_path):
@@ -309,7 +309,7 @@ def test_a_pytest_node_id_is_not_mistaken_for_a_deck(tmp_path):
     """``test tests/x.py::name`` must not try to expand anything."""
     out = run(
         "test",
-        "tests/test_dg2d.py::test_the_shipped_decks_are_listed",
+        "tests/test_nozzle.py::test_the_shipped_decks_are_listed",
         "--collect-only",
         "-q",
         cwd=tmp_path,

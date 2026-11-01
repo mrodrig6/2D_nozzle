@@ -70,6 +70,6 @@ Defaults below are parser defaults, which can differ from dataclass defaults or 
 
 Underscores in `name=value` become hyphens in Python flags. Aliases are `p=order`, `Q=geometry_order`, `ref=refine`, `ar=area_ratio`, `pb=back_pressure_ratio`, and `tvb=tvb_constant`. `M` is not an alias.
 
-Boolean flags without value-taking parser actions should be passed as literal flags. For example: `./dg2d.sh solve @shocked --allow-shock-in-nozzle`; `allow_shock_in_nozzle=True` is a Python keyword, not a supported launcher boolean translation.
+Boolean flags without value-taking parser actions should be passed as literal flags. For example: `./nozzle.sh solve @shocked --allow-shock-in-nozzle`; `allow_shock_in_nozzle=True` is a Python keyword, not a supported launcher boolean translation.
 
-`DG2D_PYTHON` selects the launcher's interpreter. Otherwise it looks for `python3`, then `python`. The installed `dgnozzle` command and `python -m src` use the Python subcommands above; launcher-only commands are not interchangeable with them.
+`NOZZLE_PYTHON` selects the launcher's interpreter. Otherwise it looks for `python3`, then `python`. The installed `dgnozzle` command and `python -m src` use the Python subcommands above; launcher-only commands are not interchangeable with them.
