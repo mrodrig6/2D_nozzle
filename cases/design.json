@@ -1,0 +1,8 @@
+{
+  "description": "the design point: shock-free, fully expanded, the case to start from",
+  "area_ratio": 2.5,
+  "back_pressure_ratio": 0.064,
+  "order": 1,
+  "geometry_order": 2,
+  "refine": 0
+}

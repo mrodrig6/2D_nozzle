@@ -1,0 +1,6 @@
+{
+  "description": "geometry only: a bell contour to inspect with 'geometry', no flow solve",
+  "contour": "bell",
+  "area_ratio": 2.5,
+  "theta_initial_deg": 30
+}
