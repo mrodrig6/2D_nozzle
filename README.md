@@ -21,7 +21,7 @@ From this checkout with Python **3.10 or newer**:
 python -m pip install -e ".[all]"
 ```
 
-See [installation](docs/getting-started/installation.md) for isolated environments, developer tools and documentation extras.
+Full instructions, including isolated environments and developer tools: [installation](docs/getting-started/installation.md).
 
 ## Quick start
 
@@ -30,7 +30,7 @@ See [installation](docs/getting-started/installation.md) for isolated environmen
 ./nozzle.sh check
 # Inspect a wall before solving it.
 ./nozzle.sh geometry contour=smooth
-# Solve a shock-free operating point and save an overview.
+# Solve a shock-free design point and save an overview.
 ./nozzle.sh run cases/design.json figure=result.png
 # Sweep area ratio and save the numerical table.
 ./nozzle.sh sweep area_ratio 2.0 4.0 5 contour=smooth order=1 refine=1 csv=sweep.csv
@@ -46,7 +46,7 @@ assert result.converged, result.message
 print(performance(result).summary())
 ```
 
-See the [complete quick start](docs/getting-started/quick-start.md) for captured output and its interpretation.
+Full walkthrough with captured output: [quick start](docs/getting-started/quick-start.md).
 
 ## Documentation
 
@@ -61,7 +61,7 @@ See the [complete quick start](docs/getting-started/quick-start.md) for captured
 | Validation | [Test-suite claims](docs/validation/tests.md) · [Gradient comparisons](docs/validation/gradients.md) · [Quasi-1D and conservation comparisons](docs/validation/quasi-one-dimensional.md) · [Accuracy and curved geometry](docs/validation/accuracy.md) · [Reference-scale invariance](docs/validation/scaling.md) |
 | Reference | [Compatibility](docs/reference/compatibility.md) · [Code map](docs/reference/code-map.md) · [Repository map](docs/reference/repository.md) · [Continuous integration](docs/reference/ci.md) · [Figures](docs/reference/figures.md) · [Bibliography](docs/reference/bibliography.md) |
 
-Written for ENGN1700 — High Reynolds Number Flows at Brown University by Mauro Rodriguez. For attribution and scientific references, see the [bibliography](docs/reference/bibliography.md); no formal project citation is specified.
+Written by Mauro Rodriguez for ENGN1700, High Reynolds Number Flows, at Brown University. The methods are referenced in the [bibliography](docs/reference/bibliography.md); a citation for the project itself is not yet specified.
 
 ## License
 
