@@ -454,11 +454,12 @@ PYEOF
 
 cmd_run() {
     (( $# >= 1 )) || die "run needs a config path or case name.  Try: ./$SELF list"
-    local config_path=$1
+    local arg=$1
     shift
 
-    # Try to resolve as a config file first
-    if config_path=$(resolve_config "$config_path" 2>/dev/null); then
+    # Try to resolve as a config file first; keep arg intact for the case fallback
+    local config_path
+    if config_path=$(resolve_config "$arg" 2>/dev/null); then
         # Load config and merge with command-line args
         local config_args=()
         while IFS= read -r line; do
@@ -472,8 +473,7 @@ cmd_run() {
 
     # Fall back to running an example case script
     local case_path
-    case_path=$(resolve_case "$config_path") || exit 2
-    shift 2>/dev/null || true
+    case_path=$(resolve_case "$arg") || exit 2
     printf '%s: running %s\n\n' "$SELF" "${case_path#"$ROOT"/}"
     exec "$PY" "$case_path" "$@"
 }
