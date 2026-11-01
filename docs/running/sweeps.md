@@ -5,13 +5,13 @@ Solve a sequence of design or operating points and record failures as well as co
 ## 1. Parameter sweeps
 
 ```bash
-./dg2d.sh run sweep          # examples/02_sweep.py
+./nozzle.sh run sweep          # examples/02_sweep.py
 ```
 
 Or from the command line, with no script at all:
 
 ```bash
-./dg2d.sh sweep area_ratio 2.0 4.0 9 order=1 refine=1 contour=smooth csv=sweep.csv
+./nozzle.sh sweep area_ratio 2.0 4.0 9 order=1 refine=1 contour=smooth csv=sweep.csv
 ```
 
 In Python:

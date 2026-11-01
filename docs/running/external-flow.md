@@ -12,7 +12,7 @@ calls it, so post-processing that can legitimately have no answer fails where yo
 asked for it rather than inside a march.
 
 ```bash
-./dg2d.sh run external       # examples/07_external.py
+./nozzle.sh run external       # examples/07_external.py
 ```
 
 ```python

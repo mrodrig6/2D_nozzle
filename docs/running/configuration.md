@@ -4,14 +4,14 @@ Store repeatable CLI arguments in a case deck. Later arguments override earlier 
 
 ## Case files you pass as an argument
 
-A case you run often does not have to live in your shell history. A `@name`
+A case you run often does not have to live in your shell history. A `--deck name`
 argument is replaced by the lines of [`cases/name.dg`](../../cases), so:
 
 ```bash
-./dg2d.sh solve @design              # exactly the lines in cases/design.dg
-./dg2d.sh solve @design pb=0.12      # the same deck, with one value changed
-./dg2d.sh sweep back_pressure_ratio 0.05 0.3 12 @design
-./dg2d.sh bench @converged
+./nozzle.sh solve --deck design              # exactly the lines in cases/design.dg
+./nozzle.sh solve --deck design pb=0.12      # the same deck, with one value changed
+./nozzle.sh sweep back_pressure_ratio 0.05 0.3 12 --deck design
+./nozzle.sh bench --deck converged
 ```
 
 A deck is the same `name=value` lines you would have typed — there is no second
@@ -31,21 +31,21 @@ deck** to build on it, which is all `cases/overexpanded.dg` is:
 
 ```
 # over-expanded: the exit plane sits below ambient, still shock-free
-@design
+--deck design
 pb=0.15
 ```
 
-**Later arguments win.** That is what makes `@design pb=0.12` an override rather
+**Later arguments win.** That is what makes `--deck design pb=0.12` an override rather
 than a conflict, and it is a property of the underlying parser rather than
 something the launcher arranges, so it holds for every key.
 
 | Deck | What it is |
 |---|---|
-| `@design` | the design point: shock-free, fully expanded |
-| `@overexpanded` | exit plane below ambient, still shock-free |
-| `@converged` | the design point at `p=2`, `refine=1` — quote numbers from this |
-| `@shocked` | a shock in the diverging section, at `p=0` because `p>=1` diverges |
-| `@contour` | geometry only, for `geometry` |
+| `--deck design` | the design point: shock-free, fully expanded |
+| `--deck overexpanded` | exit plane below ambient, still shock-free |
+| `--deck converged` | the design point at `p=2`, `refine=1` — quote numbers from this |
+| `--deck shocked` | a shock in the diverging section, at `p=0` because `p>=1` diverges |
+| `--deck contour` | geometry only, for `geometry` |
 
 Because this is argument expansion and nothing more, a deck works with any
 subcommand that accepts the keys it holds: `solve`, `sweep` and `bench` take the
@@ -60,11 +60,11 @@ nothing has to be unlearned when you outgrow a deck.
 
 ## Refused shock deck
 
-The shipped `@shocked` deck does not opt into the internal-shock band. To study the failure deliberately, use a literal Boolean flag:
+The shipped `--deck shocked` deck does not opt into the internal-shock band. To study the failure deliberately, use a literal Boolean flag:
 
 ```bash
 # Intentionally returns nonzero if the experiment does not converge.
-./dg2d.sh solve @shocked --allow-shock-in-nozzle
+./nozzle.sh solve --deck shocked --allow-shock-in-nozzle
 ```
 
 The Python spelling is `allow_shock_in_nozzle=True`. Use `solve_quasi1d` for the shock reference; this opt-in is not a convergence remedy.

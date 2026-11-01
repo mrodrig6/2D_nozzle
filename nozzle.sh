@@ -208,7 +208,7 @@ PYEOF
     sed -n '1{/^[[:space:]]*#/{s/^[[:space:]]*#[[:space:]]*//;p;};q;}' "$1"
 }
 
-# Replace every `--deck name` token with that config's lines, recursively.
+# Replace every `@name` token (or `--deck name`) with that config's lines, recursively.
 # EXPANDED is set as a side effect; bash functions cannot return arrays.
 expand_decks() {
     local depth=$1; shift
@@ -217,8 +217,19 @@ expand_decks() {
     local out=() lines=() i token path line
     for (( i=0; i<$#; i++ )); do
         token=${@:i+1:1}
-        # Look for --deck followed by a name
-        if [[ $token == --deck ]]; then
+        # Look for @name (old syntax) or --deck name (new syntax)
+        if [[ $token == @* && $token != *::* ]]; then
+            path=$(resolve_config "${token#@}") || exit 2
+            lines=()
+            while IFS= read -r line || [[ -n $line ]]; do
+                line=${line%%#*}                        # drop comments
+                line=${line#"${line%%[![:space:]]*}"}   # trim left
+                line=${line%"${line##*[![:space:]]}"}   # trim right
+                [[ -n $line ]] && lines+=("$line")
+            done < <(load_config "$path")
+            expand_decks $((depth + 1)) ${lines[@]+"${lines[@]}"}
+            out+=(${EXPANDED[@]+"${EXPANDED[@]}"})
+        elif [[ $token == --deck ]]; then
             (( ++i < $# )) || die "--deck requires an argument"
             token=${@:i+1:1}
             path=$(resolve_config "$token") || exit 2

@@ -7,12 +7,12 @@ These seven exercises use the solver to investigate design and numerical error. 
 Run this and make sure it works:
 
 ```bash
-./dg2d.sh check              # what is installed and which backends work
-./dg2d.sh run solve          # one design point, start to finish
+./nozzle.sh check              # what is installed and which backends work
+./nozzle.sh run solve          # one design point, start to finish
 ```
 
-Nothing has to be installed first; `./dg2d.sh help` lists every command, and
-`./dg2d.sh list` names every case you can run.
+Nothing has to be installed first; `./nozzle.sh help` lists every command, and
+`./nozzle.sh list` names every case you can run.
 
 Then get comfortable with the one function you need:
 
@@ -221,7 +221,7 @@ divergence loss, and you can see it directly.
 limits it?
 
 ```bash
-./dg2d.sh run convergence
+./nozzle.sh run convergence
 ```
 
 **What to report.** Observed rates for `p=1` and `p=2` with `contour='smooth'`,
@@ -271,7 +271,7 @@ this operating point. Why? (Hint: look at the exit Mach number.)
 ## Exercise 7 — Optimise a shape
 
 ```bash
-./dg2d.sh run optimise
+./nozzle.sh run optimise
 ```
 
 **What to report.** The optimised wall against the initial one, the thrust

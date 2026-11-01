@@ -10,7 +10,7 @@ Five workflows check changes on pull requests and pushes to `main`. The document
 | [Spelling](../../.github/workflows/spelling.yml) | codespell | `python -m codespell_lib src tests docs README.md examples` |
 | [Documentation](../../.github/workflows/docs.yml) | Recursive GitHub links, strict MkDocs build and preview artifact | `python docs/check_links.py` then `mkdocs build --strict` |
 
-Install `[all,dev,docs]` before running every check. `./dg2d.sh verify` remains a local convenience; it skips missing tools, while individual CI jobs install their tools explicitly.
+Install `[all,dev,docs]` before running every check. `./nozzle.sh verify` remains a local convenience; it skips missing tools, while individual CI jobs install their tools explicitly.
 
 The tests job requires its optional backends to import before pytest. It fails visibly if a compatible numerical dependency is unavailable for the newest Python; it does not silently convert missing backend coverage into a pass. Version-matrix runs on GitHub have not been claimed by a local Python 3.12 run.
 

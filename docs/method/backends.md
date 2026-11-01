@@ -13,7 +13,7 @@ Same equations, three execution strategies:
 | `'jax'` | the same vectorised source under `jax.numpy`; **differentiable** |
 
 ```bash
-./dg2d.sh bench p=1 refine=1
+./nozzle.sh bench p=1 refine=1
 ```
 
 They agree to a relative 1e-10, which the test suite enforces. Measured on one

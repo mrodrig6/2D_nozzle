@@ -5,7 +5,7 @@ Use a constrained SciPy optimizer with the discrete-adjoint gradient. The worked
 ## 3. Shape optimisation
 
 ```bash
-./dg2d.sh run optimise       # examples/04_optimise.py
+./nozzle.sh run optimise       # examples/04_optimise.py
 ```
 
 The gradient plugs straight into SciPy:
@@ -32,4 +32,4 @@ best = minimize(
 ```
 
 All three live in [`examples/`](../../examples), alongside a first solve, a
-convergence study and a back-pressure sweep. `./dg2d.sh list` names them.
+convergence study and a back-pressure sweep. `./nozzle.sh list` names them.

@@ -6,9 +6,9 @@ Use the error or convergence message to identify the failing condition. The tabl
 
 | Symptom | What it means |
 |---|---|
-| `No module named src` | You ran `python -m src` from somewhere other than the clone. Either `cd` into it, use `./dg2d.sh`, which works from anywhere, or `./dg2d.sh install`. |
-| `dg2d.sh: Permission denied` | `chmod +x dg2d.sh`, or run it as `bash dg2d.sh ...`. |
-| `dg2d.sh: no python3 on PATH` | Load your Python environment first, or set `DG2D_PYTHON` to the interpreter you want. |
+| `No module named src` | You ran `python -m src` from somewhere other than the clone. Either `cd` into it, use `./nozzle.sh`, which works from anywhere, or `./nozzle.sh install`. |
+| `nozzle.sh: Permission denied` | `chmod +x nozzle.sh`, or run it as `bash nozzle.sh ...`. |
+| `nozzle.sh: no python3 on PATH` | Load your Python environment first, or set `NOZZLE_PYTHON` to the interpreter you want. |
 | *"the residual has stalled … That is a limit cycle"* | The mesh cannot resolve a shock or strong expansion. **`refine=+1`** usually fixes it. |
 | *"residual converged but the solution is not physical"* | Residual convergence to negative pressure. Enable a limiter, or refine. |
 | *"residual became non-finite"* | Reduce `cfl` (try `0.5`), or `scheme='ssprk3'`. |

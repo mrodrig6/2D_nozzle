@@ -4,7 +4,7 @@ Run this from the checkout root after installation. The displayed output was cap
 
 ```bash
 # Solve one operating point and check the command's exit status.
-./dg2d.sh solve contour=smooth ar=2.5 pb=0.15 p=1 Q=2 --quiet
+./nozzle.sh solve contour=smooth ar=2.5 pb=0.15 p=1 Q=2 --quiet
 ```
 
 ```text
