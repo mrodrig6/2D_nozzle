@@ -1,0 +1,9 @@
+{
+  "description": "Default operating point",
+  "area_ratio": 3.0,
+  "back_pressure_ratio": 0.3,
+  "order": 2,
+  "refine": 1,
+  "flux": "ausmup",
+  "scheme": "ssprk3"
+}
