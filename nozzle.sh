@@ -178,7 +178,7 @@ list_configs() {
         [[ -e $path ]] || continue
         found=1
         stem=$(basename "$path" .json)
-        printf '  %-13s %s\n' "$stem" "$(config_summary "$path")"
+        printf '  @%-12s %s\n' "$stem" "$(config_summary "$path")"
     done
     # List .dg files (skip if .json exists with same name)
     for path in "$DECK_DIR"/*.dg; do
@@ -186,7 +186,7 @@ list_configs() {
         stem=$(basename "$path" .dg)
         [[ -f "$DECK_DIR/$stem.json" ]] && continue  # skip if JSON version exists
         found=1
-        printf '  %-13s %s\n' "$stem" "$(config_summary "$path")"
+        printf '  @%-12s %s\n' "$stem" "$(config_summary "$path")"
     done
     (( found )) || printf '  (none in %s)\n' "${DECK_DIR#"$ROOT"/}"
 }
