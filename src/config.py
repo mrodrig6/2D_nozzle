@@ -113,7 +113,7 @@ class FlowConditions:
             separate pressure part.  Converges on the default design point, in
             fewer iterations than Roe, within 0.6-0.8% of it on ``c_F``.  Its
             sibling SLAU2 did *not* converge here, which is why this one was
-            measured rather than assumed; see ``docs/theory.md``.
+            measured rather than assumed; see ``docs/theory/euler.md``.
 
         All three agree to discretisation error on a smooth solution, so
         switching is a way to ask how much of an answer is the flux rather than

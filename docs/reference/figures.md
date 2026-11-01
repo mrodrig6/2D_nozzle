@@ -6,7 +6,7 @@ This inventory records image sources and rebuild commands. Run commands from the
 
 The figures are authored in TikZ, because that is the only way to keep the
 nozzle wall in the geometry figure generated from the solver's own contour code
-(`make_tikz.py`) rather than drawn by hand. Markdown cannot typeset TikZ, so
+(`tikz.py coordinates`) rather than drawn by hand. Markdown cannot typeset TikZ, so
 the committed PNGs in `figures/tikz/` are what `theory.md` actually shows.
 The `.tex` files remain the source of truth; the PNGs are build products that
 happen to be committed, so that reading the documentation needs no TeX at all.
@@ -16,11 +16,11 @@ happen to be committed, so that reading the documentation needs no TeX at all.
 After changing a TikZ source — or the contour families it draws:
 
 ```bash
-python docs/make_tikz.py        # only if the contour code changed
-python docs/render_figures.py   # needs pdflatex and pymupdf
+python docs/figures/tikz.py coordinates        # only if the contour code changed
+python docs/figures/tikz.py render   # needs pdflatex and pymupdf
 ```
 
-`render_figures.py` needs `texlive-latex-base`, `texlive-pictures`,
+`tikz.py render` needs `texlive-latex-base`, `texlive-pictures`,
 `texlive-latex-recommended` and `texlive-latex-extra` (for the `standalone`
 class), plus `pip install pymupdf` for the rasterisation step. Both are
 build-time only.
@@ -41,7 +41,7 @@ cd docs/figures/tikz && pdflatex nozzle_geometry.tex
 | `mesh_map.tex` | the fixed logical grid and the design-dependent map onto it |
 
 The wall in `nozzle_geometry.tex` is the **actual** contour the solver
-produces, sampled from `src.geometry` — not a freehand sketch. `make_tikz.py`
+produces, sampled from `src.geometry` — not a freehand sketch. `tikz.py coordinates`
 fails loudly rather than silently doing nothing if the figure source changes
 shape.
 
@@ -63,6 +63,6 @@ python docs/figures/rebuild.py --output /tmp/nozzle-figures
 | `area_ratio_sweep.png`, `area_ratio_sweep.csv` | Smooth AR=2–4 at refine=1; every point must converge |
 | `choked_mass_flow.png` | Smooth AR=2.5, back pressure 0.05–0.4 |
 | `jet_cells.png`, `jet_fields.png`, `nozzle_plume.png` | p=2 nozzle at back pressure 0.064, external ambient ratio 0.03 |
-| `tikz/*.png` | Adjacent `.tex` sources, rebuilt by `docs/render_figures.py` |
+| `tikz/*.png` | Adjacent `.tex` sources, rebuilt by `docs/figures/tikz.py render` |
 
 The recipe generates current illustrations, not byte-identical historical exports. The worked sweep extends to AR=4.5 and records stalled points at AR=4.25 and 4.5 on its refine=1 grid; the illustration recipe uses the verified range and asserts convergence.
