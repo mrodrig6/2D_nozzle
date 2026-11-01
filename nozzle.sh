@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 #
-# dg2d.sh -- one entry point for the 2D DG nozzle code.
+# nozzle.sh -- one entry point for the 2D DG nozzle code.
 #
 # The point of this script is that nothing has to be set up first.  It finds a
 # Python, puts the repository on the import path if the package is not installed,
 # and runs what you asked for from wherever you happen to be:
 #
-#     ./dg2d.sh run sweep
-#     ./dg2d.sh solve area_ratio=3.0 back_pressure_ratio=0.12 order=1
+#     ./nozzle.sh run cases/design.json
+#     ./nozzle.sh solve area_ratio=3.0 back_pressure_ratio=0.12 order=1
 #
-# `./dg2d.sh help` lists everything.  `./dg2d.sh install` is optional.
+# `./nozzle.sh help` lists everything.  `./nozzle.sh install` is optional.
 
 set -euo pipefail
 
@@ -19,13 +19,13 @@ SELF="$(basename -- "${BASH_SOURCE[0]}")"
 # --------------------------------------------------------------------------
 # Python
 # --------------------------------------------------------------------------
-# Whatever environment you have loaded is the one used.  Set DG2D_PYTHON to
-# override, e.g. DG2D_PYTHON=python3.12 ./dg2d.sh solve
+# Whatever environment you have loaded is the one used.  Set NOZZLE_PYTHON to
+# override, e.g. NOZZLE_PYTHON=python3.12 ./nozzle.sh solve
 find_python() {
-    if [[ -n ${DG2D_PYTHON:-} ]]; then
-        command -v "$DG2D_PYTHON" >/dev/null 2>&1 || die \
-            "DG2D_PYTHON=$DG2D_PYTHON is not an executable on PATH"
-        printf '%s\n' "$DG2D_PYTHON"
+    if [[ -n ${NOZZLE_PYTHON:-} ]]; then
+        command -v "$NOZZLE_PYTHON" >/dev/null 2>&1 || die \
+            "NOZZLE_PYTHON=$NOZZLE_PYTHON is not an executable on PATH"
+        printf '%s\n' "$NOZZLE_PYTHON"
         return
     fi
     local candidate
@@ -35,7 +35,7 @@ find_python() {
             return
         fi
     done
-    die "no python3 on PATH.  Load your environment first, or set DG2D_PYTHON."
+    die "no python3 on PATH.  Load your environment first, or set NOZZLE_PYTHON."
 }
 
 die() { printf '%s: %s\n' "$SELF" "$*" >&2; exit 2; }
@@ -59,81 +59,181 @@ setup_import_path() {
 }
 
 # --------------------------------------------------------------------------
-# Argument decks
+# Config Loading (JSON and DG deck files)
 # --------------------------------------------------------------------------
-# `@name` is replaced by the `name=value` lines in that file, so a case you run
-# often lives in a file instead of in your shell history:
+# Configs specify parameter values. Supported formats:
+#   - cases/design.json: JSON object with key-value pairs
+#   - cases/design.dg: text file with 'key=value' lines (one per line)
 #
-#     ./dg2d.sh solve @design              # cases/design.dg
-#     ./dg2d.sh solve @design pb=0.12      # the same deck, one value overridden
-#     ./dg2d.sh sweep back_pressure_ratio 0.05 0.3 12 @design
+# A directory is resolved by looking for config.json, then the first *.json,
+# then the first *.dg file in it.
+
+resolve_config() {
+    local want=$1 candidate
+
+    # Try as-is if it's a file
+    if [[ -f $want ]]; then
+        printf '%s\n' "$want"
+        return 0
+    fi
+
+    # Try as a directory
+    if [[ -d $want ]]; then
+        if [[ -f "$want/config.json" ]]; then
+            printf '%s\n' "$want/config.json"
+            return 0
+        fi
+        local first_json
+        first_json=$(find "$want" -maxdepth 1 -name "*.json" -print -quit 2>/dev/null)
+        if [[ -f $first_json ]]; then
+            printf '%s\n' "$first_json"
+            return 0
+        fi
+        local first_dg
+        first_dg=$(find "$want" -maxdepth 1 -name "*.dg" -print -quit 2>/dev/null)
+        if [[ -f $first_dg ]]; then
+            printf '%s\n' "$first_dg"
+            return 0
+        fi
+    fi
+
+    # Try in cases/ directory (with extensions)
+    for candidate in \
+        "$want" "$want.json" "$want.dg" \
+        "cases/$want" "cases/$want.json" "cases/$want.dg"
+    do
+        if [[ -f $candidate ]]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+
+    printf '%s: no config found for %s\n' "$SELF" "$want" >&2
+    return 1
+}
+
+# Load a JSON config file and output as 'key=value' lines
+load_json_config() {
+    local path=$1
+    "$PY" - "$path" <<'PYEOF'
+import json
+import sys
+path = sys.argv[1]
+with open(path) as f:
+    data = json.load(f)
+for key, value in data.items():
+    print(f"{key}={value}")
+PYEOF
+}
+
+# Load a .dg deck file (text format with key=value lines)
+load_dg_config() {
+    local path=$1
+    local line
+    while IFS= read -r line || [[ -n $line ]]; do
+        # Drop comments
+        line=${line%%#*}
+        # Trim left and right
+        line=${line#"${line%%[![:space:]]*}"}
+        line=${line%"${line##*[![:space:]]}"}
+        [[ -n $line ]] && printf '%s\n' "$line"
+    done < "$path"
+}
+
+# Load a config file (JSON or .dg) and output as 'key=value' lines
+load_config() {
+    local path=$1
+    case "$path" in
+        *.json)
+            load_json_config "$path"
+            ;;
+        *.dg|*)
+            load_dg_config "$path"
+            ;;
+    esac
+}
+
+# --------------------------------------------------------------------------
+# Argument decks (with --deck flag)
+# --------------------------------------------------------------------------
+# `--deck name` loads parameter defaults from a config file:
+#
+#     ./nozzle.sh solve --deck design              # cases/design.json or .dg
+#     ./nozzle.sh solve --deck design pb=0.12      # the deck, one value overridden
+#     ./nozzle.sh sweep back_pressure_ratio 0.05 0.3 12 --deck design
 #
 # A deck holds exactly what you would have typed, so there is no second
-# vocabulary to learn and no schema to keep in step with the code: `#` starts a
-# comment, blank lines are ignored, and a deck may name another deck to include
-# it.  Later arguments win, which is what makes the override above work.
+# vocabulary to learn and no schema to keep in step with the code: '#' starts a
+# comment, blank lines are ignored, and decks may nest (one deck may include
+# another via `--deck name` on a line).
 #
-# Because this is argument expansion and nothing more, a deck works with any
-# subcommand that accepts the keys in it: `solve`, `sweep` and `bench` take the
-# full set, while `geometry` takes only the geometry keys and will say
-# `unrecognized arguments` if handed a deck carrying solver options.  That is
-# the intended behaviour -- it names the keys it rejected rather than ignoring
-# them, which is what a typo needs too.
+# Supported formats: JSON (.json) or text (.dg). JSON takes precedence if both exist.
 DECK_DIR="$ROOT/cases"
-DECK_EXT=".dg"
 DECK_MAX_DEPTH=8
 
-list_decks() {
+list_configs() {
     local path stem found=0
-    for path in "$DECK_DIR"/*"$DECK_EXT"; do
+    # List JSON files
+    for path in "$DECK_DIR"/*.json; do
         [[ -e $path ]] || continue
         found=1
-        stem=$(basename "$path" "$DECK_EXT")
-        printf '  @%-13s %s\n' "$stem" "$(deck_summary "$path")"
+        stem=$(basename "$path" .json)
+        printf '  %-13s %s\n' "$stem" "$(config_summary "$path")"
+    done
+    # List .dg files (skip if .json exists with same name)
+    for path in "$DECK_DIR"/*.dg; do
+        [[ -e $path ]] || continue
+        stem=$(basename "$path" .dg)
+        [[ -f "$DECK_DIR/$stem.json" ]] && continue  # skip if JSON version exists
+        found=1
+        printf '  %-13s %s\n' "$stem" "$(config_summary "$path")"
     done
     (( found )) || printf '  (none in %s)\n' "${DECK_DIR#"$ROOT"/}"
 }
 
-deck_summary() {
-    # the summary is the first comment line, which is why decks start with one
+config_summary() {
+    # For JSON: look for a "description" or "comment" field
+    if [[ $1 == *.json ]]; then
+        "$PY" - "$1" <<'PYEOF' 2>/dev/null || echo ""
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        d = json.load(f)
+    print(d.get("description", d.get("comment", "")))
+except: pass
+PYEOF
+        return
+    fi
+    # For .dg: the summary is the first comment line
     sed -n '1{/^[[:space:]]*#/{s/^[[:space:]]*#[[:space:]]*//;p;};q;}' "$1"
 }
 
-resolve_deck() {
-    local want=$1 candidate
-    for candidate in \
-        "$want" "$want$DECK_EXT" \
-        "$DECK_DIR/$want" "$DECK_DIR/$want$DECK_EXT"
-    do
-        if [[ -f $candidate ]]; then printf '%s\n' "$candidate"; return 0; fi
-    done
-    printf '%s: no deck named %s.  Available:\n' "$SELF" "$want" >&2
-    list_decks >&2
-    return 1
-}
-
-# Replace every `@deck` token with that deck's lines, recursively.
+# Replace every `--deck name` token with that config's lines, recursively.
 # EXPANDED is set as a side effect; bash functions cannot return arrays.
 expand_decks() {
     local depth=$1; shift
     (( depth <= DECK_MAX_DEPTH )) || die \
         "decks nested more than $DECK_MAX_DEPTH deep -- does a deck include itself?"
-    local out=() lines=() token path line
-    for token in ${@+"$@"}; do
-        if [[ $token != @* || $token == *::* ]]; then
+    local out=() lines=() i token path line
+    for (( i=0; i<$#; i++ )); do
+        token=${@:i+1:1}
+        # Look for --deck followed by a name
+        if [[ $token == --deck ]]; then
+            (( ++i < $# )) || die "--deck requires an argument"
+            token=${@:i+1:1}
+            path=$(resolve_config "$token") || exit 2
+            lines=()
+            while IFS= read -r line || [[ -n $line ]]; do
+                line=${line%%#*}                        # drop comments
+                line=${line#"${line%%[![:space:]]*}"}   # trim left
+                line=${line%"${line##*[![:space:]]}"}   # trim right
+                [[ -n $line ]] && lines+=("$line")
+            done < <(load_config "$path")
+            expand_decks $((depth + 1)) ${lines[@]+"${lines[@]}"}
+            out+=(${EXPANDED[@]+"${EXPANDED[@]}"})
+        else
             out+=("$token")
-            continue
         fi
-        path=$(resolve_deck "${token#@}") || exit 2
-        lines=()
-        while IFS= read -r line || [[ -n $line ]]; do
-            line=${line%%#*}                        # drop comments
-            line=${line#"${line%%[![:space:]]*}"}   # trim left
-            line=${line%"${line##*[![:space:]]}"}   # trim right
-            [[ -n $line ]] && lines+=("$line")
-        done < "$path"
-        expand_decks $((depth + 1)) ${lines[@]+"${lines[@]}"}
-        out+=(${EXPANDED[@]+"${EXPANDED[@]}"})
     done
     EXPANDED=(${out[@]+"${out[@]}"})
 }
@@ -248,10 +348,10 @@ Usage: ./$SELF <command> [arguments]
 Getting started
   install            install the package and its optional extras with pip
   check              report the Python, the version, and which backends work
-  list               list the cases 'run' can execute and the decks '@' expands
+  list               list the cases 'run' can execute and available configs
 
 Running
-  run <case> [...]   run one of the case scripts in examples/
+  run <config>       run with parameters from a config file or directory
   solve [...]        solve one operating point
   sweep <var> <lo> <hi> <n> [...]
                      sweep one design variable
@@ -268,36 +368,34 @@ Arguments are 'name=value', using the same names as the Python API:
   ./$SELF solve ar=3.0 pb=0.12 p=1 figure=result.png     # short aliases
   ./$SELF sweep area_ratio 2.0 4.0 9 order=1 csv=sweep.csv
   ./$SELF geometry contour=bezier bezier_w1=0.7
-  ./$SELF run sensitivity
+  ./$SELF run examples/01_sweep.py
 
-A '@name' argument is replaced by the lines of cases/name.dg, so a case you run
+A '--deck name' argument loads defaults from a config file, so a case you run
 often lives in a file rather than in your shell history.  Later arguments win,
 so a deck is a starting point you can override:
 
-  ./$SELF solve @design                 # exactly the lines in cases/design.dg
-  ./$SELF solve @design pb=0.12         # the deck, with one value changed
-  ./$SELF sweep back_pressure_ratio 0.05 0.3 12 @design
-  ./$SELF bench @converged
-  ./$SELF geometry @contour              # a geometry-only deck
+  ./$SELF run cases/design.json              # run with design.json config
+  ./$SELF run cases/design                   # find design.json or design.dg
+  ./$SELF solve --deck design pb=0.12        # deck, with one value changed
+  ./$SELF sweep area_ratio 2.0 4.0 9 --deck design
 
-Decks are the same 'name=value' lines you would have typed, '#' starts a
-comment, and a deck may name another deck to build on it.  A deck works with
-any subcommand that accepts the keys it holds -- 'solve', 'sweep' and 'bench'
-take the full set, 'geometry' only the geometry ones.
+Config formats:
+  JSON:   cases/design.json with key-value pairs
+  DG:     cases/design.dg with 'key=value' lines, '#' for comments
 
 Aliases: p=order, Q=geometry_order, ref=refine, ar=area_ratio,
 pb=back_pressure_ratio, tvb=tvb_constant.  Ordinary --flags work too, so
 anything 'python -m src --help' documents is still available.
 'M' is deliberately NOT an alias: in this code M always means Mach number.
 
-Cases ('run <name>'):
+Configs:
+$(list_configs)
+
+Cases ('run <case>'):
 $(list_cases)
 
-Decks ('@name'):
-$(list_decks)
-
 Environment
-  DG2D_PYTHON        the interpreter to use (default: python3, then python)
+  NOZZLE_PYTHON      the interpreter to use (default: python3, then python)
 
 No install is required: if the solver package is not importable, the repository root is
 put on PYTHONPATH automatically.  Documentation is in docs/ -- start with
@@ -343,10 +441,27 @@ PYEOF
 }
 
 cmd_run() {
-    (( $# >= 1 )) || die "run needs a case name.  Try: ./$SELF list"
-    local case_path
-    case_path=$(resolve_case "$1") || exit 2
+    (( $# >= 1 )) || die "run needs a config path or case name.  Try: ./$SELF list"
+    local config_path=$1
     shift
+
+    # Try to resolve as a config file first
+    if config_path=$(resolve_config "$config_path" 2>/dev/null); then
+        # Load config and merge with command-line args
+        local config_args=()
+        while IFS= read -r line; do
+            [[ -n $line ]] && config_args+=("$line")
+        done < <(load_config "$config_path")
+
+        printf '%s: running with config %s\n\n' "$SELF" "${config_path#"$ROOT"/}"
+        translate ${config_args[@]+"${config_args[@]}"} "$@"
+        exec "$PY" -m src solve ${TRANSLATED[@]+"${TRANSLATED[@]}"}
+    fi
+
+    # Fall back to running an example case script
+    local case_path
+    case_path=$(resolve_case "$config_path") || exit 2
+    shift 2>/dev/null || true
     printf '%s: running %s\n\n' "$SELF" "${case_path#"$ROOT"/}"
     exec "$PY" "$case_path" "$@"
 }
@@ -354,7 +469,7 @@ cmd_run() {
 cmd_test() {
     translate "$@"
     # Only default to the whole tree when no path was given -- appending $ROOT
-    # unconditionally made `dg2d.sh test tests/test_docs.py` run everything,
+    # unconditionally made `nozzle.sh test tests/test_docs.py` run everything,
     # which looks like the filter being ignored because it is.
     local target=("$ROOT")
     local arg
@@ -448,8 +563,8 @@ main() {
     case $command in
         install)   cmd_install ${1+"$1"} ;;
         check)     setup_import_path; cmd_check ;;
-        list)      printf "Cases ('run <name>'):\n"; list_cases
-                   printf "\nDecks ('@name'):\n"; list_decks ;;
+        list)      printf "Configs:\n"; list_configs
+                   printf "\nCases ('run <name>'):\n"; list_cases ;;
         docs)      cmd_docs ;;
         run)       setup_import_path; cmd_run "$@" ;;
         test)      setup_import_path; cmd_test "$@" ;;
