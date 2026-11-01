@@ -100,7 +100,7 @@ resolve_config() {
     # Try in cases/ directory (with extensions)
     for candidate in \
         "$want" "$want.json" "$want.dg" \
-        "cases/$want" "cases/$want.json" "cases/$want.dg"
+        "$DECK_DIR/$want" "$DECK_DIR/$want.json" "$DECK_DIR/$want.dg"
     do
         if [[ -f $candidate ]]; then
             printf '%s\n' "$candidate"
