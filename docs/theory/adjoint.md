@@ -43,7 +43,9 @@ definite,
 $\mathbf{M}^{-1}(\partial\mathbf{R}/\partial\mathbf{U})^{T}$ is similar to
 $\mathbf{M}^{-1}\partial\mathbf{R}/\partial\mathbf{U}$ and has the same
 spectrum, so the forward solver's time step and CFL limit carry over unchanged
-and no preconditioner is needed. Both Jacobian actions come from automatic
+and no preconditioner is needed. The march uses the forward solver's SSP-RK3
+stages without its limiter, which is nonlinear and is not linearised here
+(`adjoint_solve` in `src/sensitivity.py`). Both Jacobian actions come from automatic
 differentiation of the residual; no matrix is ever assembled.
 
 **Mesh consistency.** The gradient is taken on a *fixed logical grid*. This

@@ -317,16 +317,11 @@ class DifferentiableCase:
         _, vjp_U = jax.vjp(R_of_U, U)
         seed = jnp.asarray(seed)
 
-        # Frozen local time step from the converged state.
-        #
-        # Sized by ``ssprk3``'s calibration deliberately, not by
-        # ``self.options.scheme``.  The lambda march below is RK4, which is no
-        # longer a shipped flow scheme and so no longer has a measured limit of
-        # its own; ssprk3's is the conservative stand-in, since RK4's true
-        # limit is the larger of the two.  Reading the forward scheme here
-        # would be wrong twice over: it would shrink the adjoint step whenever
-        # someone solved the flow with ``euler``, and it would break outright
-        # if a scheme were ever added whose limit exceeds RK4's.
+        # Frozen local time step from the converged state.  The lambda march
+        # below is SSP-RK3, the same scheme the flow is solved with, so the
+        # step is sized by its calibration.  It is not read from
+        # ``self.options.scheme``: a flow solved with ``euler`` must not shrink
+        # the adjoint step.
         _, wave = asm.residual(U, ops, flow, xp=jnp)
         dt = ts.local_time_step(
             wave,
@@ -344,21 +339,20 @@ class DifferentiableCase:
         def rate(lam):
             return -jnp.einsum("eij,ejs->eis", inv_mass, defect(lam))
 
-        # The adjoint's own integrator, not the flow solver's time scheme:
-        # lambda has its own pseudo-time march, and classical RK4 is a fine
-        # choice for it because there is no limiter and no positivity
-        # argument in play here.
+        # The same three stages as the forward ``ssprk3_step``, applied to the
+        # transposed operator.  There is no limiter here: the forward limiter
+        # is nonlinear, so the adjoint marches the linearised operator as it
+        # is, and the stages are the convex combinations alone.
         @jax.jit
-        def rk4(lam):
+        def ssprk3(lam):
             f0 = rate(lam)
-            f1 = rate(lam + 0.5 * dt * f0)
-            f2 = rate(lam + 0.5 * dt * f1)
-            f3 = rate(lam + dt * f2)
-            return lam + dt / 6.0 * (f0 + 2.0 * f1 + 2.0 * f2 + f3)
+            l1 = lam + dt * f0
+            l2 = 0.75 * lam + 0.25 * (l1 + dt * rate(l1))
+            return (1.0 / 3.0) * lam + (2.0 / 3.0) * (l2 + dt * rate(l2))
 
         @jax.jit
         def chunk(lam, steps):
-            return jax.lax.fori_loop(0, steps, lambda _, l: rk4(l), lam)
+            return jax.lax.fori_loop(0, steps, lambda _, l: ssprk3(l), lam)
 
         lam = jnp.zeros_like(seed)
         norm0 = float(jnp.sqrt(jnp.mean(seed * seed)))
