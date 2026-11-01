@@ -102,7 +102,7 @@ __main__                 -> cli
 `backends/_numba_kernels.py` importing nothing is the one deliberate
 duplication in the tree: Numba's `nopython` mode cannot call the `xp`-injected
 physics, so those kernels restate it. `tests/test_backends.py` is what holds
-the two copies in step — see [`docs/performance.md`](../method/backends.md).
+the two copies in step — see [`docs/method/backends.md`](../method/backends.md).
 
 ## Within each subpackage
 

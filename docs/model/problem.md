@@ -83,8 +83,8 @@ of it. Sizing a nozzle means avoiding a shock in the diverging section, and the
 interesting waves form outside the exit plane, which is what `src/external/`
 draws.
 
-→ `docs/theory.md` and
-`docs/usage.md`
+→ `docs/theory/euler.md` and
+`docs/running/command-line.md`
 
 ---
 

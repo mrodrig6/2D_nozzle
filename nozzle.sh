@@ -411,7 +411,7 @@ Environment
 
 No install is required: if the solver package is not importable, the repository root is
 put on PYTHONPATH automatically.  Documentation is in docs/ -- start with
-docs/theory.md for the formulation and docs/lab_guide.md for the exercises.
+docs/theory/euler.md for the formulation and docs/running/lab-guide.md for the exercises.
 EOF
 }
 
@@ -552,10 +552,10 @@ cmd_verify() {
 
 cmd_docs() {
     cat <<EOF
-docs/theory.md      the formulation, the geometry definition and the
+docs/theory/euler.md      the formulation, the geometry definition and the
                     verification evidence -- equations in LaTeX, renders on
                     GitHub with nothing to build
-docs/lab_guide.md   the exercises, and what to report
+docs/running/lab-guide.md   the exercises, and what to report
 docs/tikz/          TikZ sources for every figure
 README.md           the quick start and the API tour
 EOF
