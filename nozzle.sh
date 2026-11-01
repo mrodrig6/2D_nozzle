@@ -108,7 +108,8 @@ resolve_config() {
         fi
     done
 
-    printf '%s: no config found for %s\n' "$SELF" "$want" >&2
+    printf '%s: no config found for %s.  Available:\n' "$SELF" "$want" >&2
+    list_configs >&2
     return 1
 }
 
