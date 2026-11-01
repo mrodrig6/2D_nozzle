@@ -9,7 +9,7 @@ This table describes the top-level files and folders. Generated study output sho
 | [`docs`](../../docs) | Topic pages, site hook, figures and figure helpers |
 | [`examples`](../../examples) | Worked study scripts |
 | [`cases`](../../cases) | Launcher argument decks |
-| [`dg2d.sh`](../../dg2d.sh) | Bash launcher |
+| [`nozzle.sh`](../../nozzle.sh) | Bash launcher |
 | [`pyproject.toml`](../../pyproject.toml) | Package metadata and dependency extras |
 | [`README.md`](../../README.md) | Short front door and source of the website home |
 | [`LICENSE`](../../LICENSE) | MIT license |

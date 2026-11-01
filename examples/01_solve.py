@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Example 1 --- a single design point, start to finish.
 
-Run:  ./dg2d.sh run solve
+Run:  ./nozzle.sh run solve
 
 What to notice
 --------------

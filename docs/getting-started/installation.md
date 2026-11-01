@@ -8,7 +8,7 @@ Install the solver from its checkout in an isolated Python environment. Python 3
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e ".[all]"
-./dg2d.sh check
+./nozzle.sh check
 ```
 
 Run these commands from this repository's root. On Windows, activate with `.venv\Scripts\Activate.ps1` and run launcher commands through Bash, or use `dgnozzle` for its Python subcommands. Windows execution has not been validated in this change.
@@ -31,11 +31,11 @@ For contributions and site work:
 
 ```bash
 python -m pip install -e ".[all,dev,docs]"
-./dg2d.sh verify --fast
+./nozzle.sh verify --fast
 mkdocs build --strict
 ```
 
-`./dg2d.sh install` installs `[all]`, not the developer tools. `verify` reports a skipped tool if it is absent; the CI jobs install their required extras explicitly.
+`./nozzle.sh install` installs `[all]`, not the developer tools. `verify` reports a skipped tool if it is absent; the CI jobs install their required extras explicitly.
 
 ## Runtime and optional tools
 

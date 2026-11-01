@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Example 2 --- sweeping the design space.
 
-Run:  ./dg2d.sh run sweep
+Run:  ./nozzle.sh run sweep
 
 Sweeps the area ratio at a fixed back pressure and finds the thrust optimum.
 

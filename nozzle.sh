@@ -100,7 +100,7 @@ resolve_config() {
     # Try in cases/ directory (with extensions)
     for candidate in \
         "$want" "$want.json" "$want.dg" \
-        "cases/$want" "cases/$want.json" "cases/$want.dg"
+        "$DECK_DIR/$want" "$DECK_DIR/$want.json" "$DECK_DIR/$want.dg"
     do
         if [[ -f $candidate ]]; then
             printf '%s\n' "$candidate"
@@ -108,7 +108,8 @@ resolve_config() {
         fi
     done
 
-    printf '%s: no config found for %s\n' "$SELF" "$want" >&2
+    printf '%s: no deck named %s.  Available:\n' "$SELF" "$want" >&2
+    list_configs >&2
     return 1
 }
 
@@ -178,7 +179,7 @@ list_configs() {
         [[ -e $path ]] || continue
         found=1
         stem=$(basename "$path" .json)
-        printf '  %-13s %s\n' "$stem" "$(config_summary "$path")"
+        printf '  @%-12s %s\n' "$stem" "$(config_summary "$path")"
     done
     # List .dg files (skip if .json exists with same name)
     for path in "$DECK_DIR"/*.dg; do
@@ -186,7 +187,7 @@ list_configs() {
         stem=$(basename "$path" .dg)
         [[ -f "$DECK_DIR/$stem.json" ]] && continue  # skip if JSON version exists
         found=1
-        printf '  %-13s %s\n' "$stem" "$(config_summary "$path")"
+        printf '  @%-12s %s\n' "$stem" "$(config_summary "$path")"
     done
     (( found )) || printf '  (none in %s)\n' "${DECK_DIR#"$ROOT"/}"
 }
@@ -208,7 +209,7 @@ PYEOF
     sed -n '1{/^[[:space:]]*#/{s/^[[:space:]]*#[[:space:]]*//;p;};q;}' "$1"
 }
 
-# Replace every `--deck name` token with that config's lines, recursively.
+# Replace every `@name` token (or `--deck name`) with that config's lines, recursively.
 # EXPANDED is set as a side effect; bash functions cannot return arrays.
 expand_decks() {
     local depth=$1; shift
@@ -217,8 +218,19 @@ expand_decks() {
     local out=() lines=() i token path line
     for (( i=0; i<$#; i++ )); do
         token=${@:i+1:1}
-        # Look for --deck followed by a name
-        if [[ $token == --deck ]]; then
+        # Look for @name (old syntax) or --deck name (new syntax)
+        if [[ $token == @* && $token != *::* ]]; then
+            path=$(resolve_config "${token#@}") || exit 2
+            lines=()
+            while IFS= read -r line || [[ -n $line ]]; do
+                line=${line%%#*}                        # drop comments
+                line=${line#"${line%%[![:space:]]*}"}   # trim left
+                line=${line%"${line##*[![:space:]]}"}   # trim right
+                [[ -n $line ]] && lines+=("$line")
+            done < <(load_config "$path")
+            expand_decks $((depth + 1)) ${lines[@]+"${lines[@]}"}
+            out+=(${EXPANDED[@]+"${EXPANDED[@]}"})
+        elif [[ $token == --deck ]]; then
             (( ++i < $# )) || die "--deck requires an argument"
             token=${@:i+1:1}
             path=$(resolve_config "$token") || exit 2
@@ -442,11 +454,12 @@ PYEOF
 
 cmd_run() {
     (( $# >= 1 )) || die "run needs a config path or case name.  Try: ./$SELF list"
-    local config_path=$1
+    local arg=$1
     shift
 
-    # Try to resolve as a config file first
-    if config_path=$(resolve_config "$config_path" 2>/dev/null); then
+    # Try to resolve as a config file first; keep arg intact for the case fallback
+    local config_path
+    if config_path=$(resolve_config "$arg" 2>/dev/null); then
         # Load config and merge with command-line args
         local config_args=()
         while IFS= read -r line; do
@@ -460,8 +473,7 @@ cmd_run() {
 
     # Fall back to running an example case script
     local case_path
-    case_path=$(resolve_case "$config_path") || exit 2
-    shift 2>/dev/null || true
+    case_path=$(resolve_case "$arg") || exit 2
     printf '%s: running %s\n\n' "$SELF" "${case_path#"$ROOT"/}"
     exec "$PY" "$case_path" "$@"
 }

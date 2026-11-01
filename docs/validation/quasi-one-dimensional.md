@@ -16,7 +16,7 @@ solver was never tuned to pass, and a good one to have students reproduce.
 
 ```bash
 # Run converged solves, conservation checks and quasi-1D comparisons.
-./dg2d.sh test tests/test_solver.py
+./nozzle.sh test tests/test_solver.py
 ```
 
 The [quick start](../getting-started/quick-start.md) gives a captured operating point. The [nozzle-flow derivation](../theory/nozzle-flow.md) defines the reference relations.

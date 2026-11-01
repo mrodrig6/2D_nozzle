@@ -172,7 +172,7 @@ are the ones that matter.
 
 | in | imports | why |
 |---|---|---|
-| `timestepping/march.py`, `cli.py` | `backends` | importing a backend imports Numba or JAX. Deferring it means `import src` costs neither, and `dg2d.sh --help` does not pay for a JIT compiler. It is also what keeps the march below the backends in the layer order. |
+| `timestepping/march.py`, `cli.py` | `backends` | importing a backend imports Numba or JAX. Deferring it means `import src` costs neither, and `nozzle.sh --help` does not pay for a JIT compiler. It is also what keeps the march below the backends in the layer order. |
 | `config.py` | `reference` | the default quadrature degree depends on the element and the order, which only `reference/elements.py` knows. Layer 1 cannot eagerly reach layer 2. |
 | `post/postprocess.py`, `post/plotting.py`, `timestepping/initialize.py` | `reference` | node coordinates for sampling and for plotting, needed in a handful of functions rather than throughout. |
 | `sensitivity.py` | `backends.jax_backend` | the adjoint needs JAX; nothing else does. |

@@ -27,11 +27,11 @@ The following hold to machine precision and are asserted in the test suite:
 
 ```bash
 # Run all scientific and interface assertions.
-./dg2d.sh test
+./nozzle.sh test
 # Run fast tests only.
-./dg2d.sh test --fast
+./nozzle.sh test --fast
 # Run slow solves and gradient checks only.
-./dg2d.sh test --slow
+./nozzle.sh test --slow
 ```
 
 Install `[all,dev]` to include Numba and JAX coverage. A missing optional backend produces skips; `--fast` deselects slow tests. Neither outcome is a pass for the omitted checks. CI requires numerical backends to import before the full run.
@@ -40,7 +40,7 @@ Install `[all,dev]` to include Numba and JAX coverage. A missing optional backen
 
 - All three backends must compute the same residual. [test_backends.py](../../tests/test_backends.py).
 - Command-line interface. [test_cli.py](../../tests/test_cli.py).
-- The ``dg2d.sh`` launcher. [test_dg2d.py](../../tests/test_dg2d.py).
+- The ``nozzle.sh`` launcher. [test_nozzle.py](../../tests/test_nozzle.py).
 - The documentation's maths has to survive GitHub's Markdown, not just LaTeX. [test_docs.py](../../tests/test_docs.py).
 - Lagrange bases must interpolate, reproduce constants, and order edges consistently. [test_elements.py](../../tests/test_elements.py).
 - Closed-form external wave structure at the nozzle lip. [test_external.py](../../tests/test_external.py).
