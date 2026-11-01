@@ -1,15 +1,15 @@
-% Rebuild from repository root: python docs/render_figures.py
+% Rebuild from repository root: python docs/figures/tikz.py render
 %% ==========================================================================
 %%  dgnozzle -- nozzle geometry and boundary conditions
 %%
 %%  Standalone TikZ figure.  Compile on its own with
 %%      pdflatex nozzle_geometry.tex
-%%  or render it to the PNG that docs/theory.md shows with
-%%      python docs/render_figures.py
+%%  or render it to the PNG that docs/theory/euler.md shows with
+%%      python docs/figures/tikz.py render
 %%
 %%  The wall coordinates are the actual 'bell' contour at AR = 2.5019 and
 %%  throat_x = 0.1388, sampled from dgnozzle.geometry and scaled by 12.
-%%  Regenerate with:  python docs/make_tikz.py
+%%  Regenerate with:  python docs/figures/tikz.py coordinates
 %% ==========================================================================
 \documentclass[tikz,border=6pt]{standalone}
 \usepackage{amsmath}

@@ -154,8 +154,8 @@ def test_test_passes_a_path_filter_through(tmp_path):
 def test_docs_points_at_the_formulation():
     out = run("docs")
     assert out.returncode == 0
-    assert "docs/theory.md" in out.stdout
-    assert "docs/lab_guide.md" in out.stdout
+    assert "docs/theory/euler.md" in out.stdout
+    assert "docs/running/lab-guide.md" in out.stdout
 
 
 def test_check_works_from_an_unrelated_directory(tmp_path):
