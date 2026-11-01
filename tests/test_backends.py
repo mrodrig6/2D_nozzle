@@ -85,7 +85,7 @@ def test_the_fused_numba_step_matches_the_shared_one(setup, scheme, limiter):
     """The Numba backend reimplements both schemes; they must not drift.
 
     It overrides ``run`` to keep every stage inside preallocated buffers, which
-    means the arithmetic of ``rk4_step`` and ``ssprk3_step`` exists twice --
+    means the arithmetic of ``ssprk3_step`` exists twice --
     once in :class:`~src.backends.base.Backend` for NumPy and JAX, once in
     kernels here.  Ten steps is long enough that a wrong coefficient or a stale
     buffer shows up; `fastmath` reassociation keeps it from being exact.

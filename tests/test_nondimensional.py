@@ -138,7 +138,7 @@ def test_every_step_path_uses_the_weighted_norm():
     """The fused steppers must not carry their own copy of the norm.
 
     This is the bug that hid the problem for a whole round.  ``Backend.norm``
-    was the one definition, but the Numba backend's fused RK4 and SSP-RK3 called
+    was the one definition, but the Numba backend's fused SSP-RK3 called
     the unweighted reduction kernel directly, so fixing ``norm`` changed nothing
     that a solve could see -- the weighted version was correct, exactly
     invariant, and simply never called.

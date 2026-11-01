@@ -34,9 +34,7 @@ BACKENDS = ("numba", "numpy", "jax")
 #: convex combinations of forward-Euler updates, which is the hypothesis the
 #: Zhang-Shu positivity limiter rests on.  ``euler`` is the single-stage
 #: method, and at ``p = 0`` it is exactly what the companion finite-volume
-#: airfoil code marches with.  Classical ``rk4`` was removed: a fourth
-#: residual per step, no time accuracy to gain in a march whose step is
-#: already element-local, and no strong-stability property.
+#: airfoil code marches with.
 SCHEMES = ("euler", "ssprk3")
 
 

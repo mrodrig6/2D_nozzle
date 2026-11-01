@@ -93,10 +93,6 @@ the same positivity argument applies to it. At $p = 0$ it is exactly the
 scheme the companion finite-volume airfoil code marches with, which is what
 makes the two codes comparable at the bottom of the order range.
 
-Classical `'rk4'` was removed. It cost a fourth residual evaluation per step,
-bought no time accuracy in a march whose step is already element-local, and
-had no strong-stability property to justify the expense.
-
 ### Convergence measure
 
 The march stops when

@@ -21,10 +21,6 @@ Schemes
     scheme the companion finite-volume airfoil code marches with.  It is a
     single forward-Euler stage, so the Zhang-Shu argument still applies to it;
     what it lacks is ssprk3's larger stable step.
-
-Classical ``rk4`` was removed.  It cost a fourth residual per step, bought no
-time accuracy in a march whose step is already element-local, and had no
-strong-stability property to justify the expense.
 """
 
 from __future__ import annotations

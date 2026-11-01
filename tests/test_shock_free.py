@@ -138,8 +138,8 @@ def test_a_sweep_across_the_band_records_it_instead_of_aborting():
     large enough that the two shock-free points converge, so that the single
     recorded failure is the *physics* refusal at 0.70 and not a point that ran
     out of road.  It is sized against the default scheme's step, so a change
-    of default scheme moves it -- 200 sufficed under ``rk4`` and leaves 0.15
-    and 0.30 just short at 1.17e-3 under ``ssprk3``'s smaller default ``cfl``.
+    of default scheme moves it -- 200 leaves 0.15 and 0.30 just short at
+    1.17e-3 under ``ssprk3``'s smaller default ``cfl``.
     300 is enough; 400 is what is used, for headroom.
     """
     from src import sweep

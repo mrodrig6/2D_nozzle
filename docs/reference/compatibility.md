@@ -10,7 +10,6 @@ Use this matrix to distinguish an implemented feature from a measured or unteste
 | Triangles and quadrilaterals | ✓ |
 | Curved geometry | ✓; use `geometry_order=2` for accuracy studies |
 | Euler / SSP-RK3 | ✓; default is order-dependent |
-| RK4 | ✗; removed |
 | Internal normal shock | ✗ by default; explicit opt-in only for a nonconverged experiment |
 | `analytic` shape design | Restricted: fixed contour ignores selected geometric parameters |
 | External plume | Restricted: idealized regular reflections; no Mach-disc solution or dissipative plume march |

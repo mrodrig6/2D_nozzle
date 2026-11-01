@@ -92,7 +92,7 @@ def test_element_kinds_and_orders_bracket_the_same_thrust():
 
 
 def test_schemes_reach_the_same_steady_state():
-    """RK4 and SSP-RK3 are different paths to the same fixed point."""
+    """Euler and SSP-RK3 are different paths to the same fixed point."""
     results = {}
     for scheme in SCHEMES:
         res = solve_nozzle(order=1, scheme=scheme, **BASE)
