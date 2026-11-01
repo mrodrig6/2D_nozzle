@@ -1,0 +1,8 @@
+{
+  "description": "over-expanded: the exit plane sits below ambient, still shock-free",
+  "area_ratio": 2.5,
+  "back_pressure_ratio": 0.15,
+  "order": 1,
+  "geometry_order": 2,
+  "refine": 0
+}

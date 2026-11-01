@@ -220,7 +220,7 @@ def test_run_executes_a_case(tmp_path):
 # names the keys it rejected, which makes it a readout of exactly what the
 # launcher passed through.
 
-DECKS = ("design", "overexpanded", "shocked", "converged", "contour")
+DECKS = ("default", "design", "overexpanded", "shocked", "converged", "contour")
 
 
 def test_the_shipped_decks_are_listed(tmp_path):
@@ -231,7 +231,7 @@ def test_the_shipped_decks_are_listed(tmp_path):
 
 
 def test_every_shipped_deck_has_a_summary_line(tmp_path):
-    """The summary is the deck's first comment, so a deck without one is silent."""
+    """The summary is the config's ``description``, so a config without one is silent."""
     out = run("list", cwd=tmp_path)
     for line in out.stdout.splitlines():
         if line.strip().startswith("@"):
@@ -267,7 +267,7 @@ def test_a_deck_can_include_another_deck(tmp_path):
 
 def test_a_deck_resolves_by_name_or_by_path(tmp_path):
     by_name = run("geometry", "@contour", cwd=tmp_path)
-    by_path = run("geometry", f"@{ROOT / 'cases' / 'contour.dg'}", cwd=tmp_path)
+    by_path = run("geometry", f"@{ROOT / 'cases' / 'contour.json'}", cwd=tmp_path)
     assert by_name.stdout == by_path.stdout
     assert by_name.returncode == 0, by_name.stderr
 
@@ -275,34 +275,21 @@ def test_a_deck_resolves_by_name_or_by_path(tmp_path):
 def test_an_unknown_deck_names_the_ones_that_exist(tmp_path):
     out = run("geometry", "@nosuchdeck", cwd=tmp_path)
     assert out.returncode == 2
-    assert "no deck named nosuchdeck" in out.stderr
+    assert "no config named nosuchdeck" in out.stderr
     assert "@design" in out.stderr, "the error should list what is available"
 
 
-def test_comments_and_blank_lines_are_ignored(tmp_path, monkeypatch):
-    deck = tmp_path / "noisy.dg"
-    deck.write_text(
-        "# a summary\n"
-        "\n"
-        "contour=bell   # trailing comment\n"
-        "   \n"
-        "# a whole-line comment\n"
-        "  ar=2.5  \n",
+def test_the_description_is_not_passed_on(tmp_path):
+    """A config's ``description`` is for people; it must not reach the solver as an option."""
+    config = tmp_path / "noisy.json"
+    config.write_text(
+        '{"description": "a summary for people", "contour": "bell", "area_ratio": 2.5}\n',
         encoding="utf-8",
     )
-    noisy = run("geometry", f"@{deck}", cwd=tmp_path)
+    noisy = run("geometry", f"@{config}", cwd=tmp_path)
     plain = run("geometry", "contour=bell", "ar=2.5", cwd=tmp_path)
     assert noisy.returncode == 0, noisy.stderr
     assert noisy.stdout == plain.stdout
-
-
-def test_a_self_including_deck_fails_instead_of_hanging(tmp_path):
-    """A deck that includes itself must hit the depth limit, not spin forever."""
-    deck = tmp_path / "loop.dg"
-    deck.write_text(f"# recursive\n@{deck}\n", encoding="utf-8")
-    out = run("geometry", f"@{deck}", cwd=tmp_path, timeout=60)
-    assert out.returncode == 2
-    assert "nested more than" in out.stderr, out.stderr
 
 
 def test_a_pytest_node_id_is_not_mistaken_for_a_deck(tmp_path):

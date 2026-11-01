@@ -59,195 +59,108 @@ setup_import_path() {
 }
 
 # --------------------------------------------------------------------------
-# Config Loading (JSON and DG deck files)
+# Config files (cases/*.json)
 # --------------------------------------------------------------------------
-# Configs specify parameter values. Supported formats:
-#   - cases/design.json: JSON object with key-value pairs
-#   - cases/design.dg: text file with 'key=value' lines (one per line)
+# A config is a JSON object of name: value pairs, using the names the Python API
+# uses.  `--deck name` (or `@name`) loads one as defaults, and any name=value
+# argument after it overrides that value.  The key "description" is for people
+# and is not passed on.
 #
-# A directory is resolved by looking for config.json, then the first *.json,
-# then the first *.dg file in it.
+# A config does not include another config, so expansion is one level deep and
+# cannot loop.  Resolution accepts a name, a file path, or a directory holding
+# config.json or the first *.json in it.
+DECK_DIR="$ROOT/cases"
 
 resolve_config() {
-    local want=$1 candidate
+    local want=$1 candidate first_json
 
-    # Try as-is if it's a file
     if [[ -f $want ]]; then
         printf '%s\n' "$want"
         return 0
     fi
 
-    # Try as a directory
     if [[ -d $want ]]; then
         if [[ -f "$want/config.json" ]]; then
             printf '%s\n' "$want/config.json"
             return 0
         fi
-        local first_json
         first_json=$(find "$want" -maxdepth 1 -name "*.json" -print -quit 2>/dev/null)
         if [[ -f $first_json ]]; then
             printf '%s\n' "$first_json"
             return 0
         fi
-        local first_dg
-        first_dg=$(find "$want" -maxdepth 1 -name "*.dg" -print -quit 2>/dev/null)
-        if [[ -f $first_dg ]]; then
-            printf '%s\n' "$first_dg"
-            return 0
-        fi
     fi
 
-    # Try in cases/ directory (with extensions)
-    for candidate in \
-        "$want" "$want.json" "$want.dg" \
-        "$DECK_DIR/$want" "$DECK_DIR/$want.json" "$DECK_DIR/$want.dg"
-    do
+    for candidate in "$want" "$want.json" "$DECK_DIR/$want" "$DECK_DIR/$want.json"; do
         if [[ -f $candidate ]]; then
             printf '%s\n' "$candidate"
             return 0
         fi
     done
-
-    printf '%s: no deck named %s.  Available:\n' "$SELF" "$want" >&2
+    printf '%s: no config named %s.  Available:\n' "$SELF" "$want" >&2
     list_configs >&2
     return 1
 }
 
-# Load a JSON config file and output as 'key=value' lines
-load_json_config() {
-    local path=$1
-    "$PY" - "$path" <<'PYEOF'
+# Output a config as 'name=value' lines, without "description".
+load_config() {
+    "$PY" - "$1" <<'PYEOF'
 import json
 import sys
-path = sys.argv[1]
-with open(path) as f:
-    data = json.load(f)
-for key, value in data.items():
+
+with open(sys.argv[1]) as f:
+    config = json.load(f)
+if not isinstance(config, dict):
+    sys.exit("a config file holds one JSON object of name: value pairs")
+for key, value in config.items():
+    if key == "description":
+        continue
+    if isinstance(value, bool):
+        value = "yes" if value else "no"
+    elif isinstance(value, list):
+        value = ",".join(str(item) for item in value)
     print(f"{key}={value}")
 PYEOF
 }
 
-# Load a .dg deck file (text format with key=value lines)
-load_dg_config() {
-    local path=$1
-    local line
-    while IFS= read -r line || [[ -n $line ]]; do
-        # Drop comments
-        line=${line%%#*}
-        # Trim left and right
-        line=${line#"${line%%[![:space:]]*}"}
-        line=${line%"${line##*[![:space:]]}"}
-        [[ -n $line ]] && printf '%s\n' "$line"
-    done < "$path"
-}
-
-# Load a config file (JSON or .dg) and output as 'key=value' lines
-load_config() {
-    local path=$1
-    case "$path" in
-        *.json)
-            load_json_config "$path"
-            ;;
-        *.dg|*)
-            load_dg_config "$path"
-            ;;
-    esac
-}
-
-# --------------------------------------------------------------------------
-# Argument decks (with --deck flag)
-# --------------------------------------------------------------------------
-# `--deck name` loads parameter defaults from a config file:
-#
-#     ./nozzle.sh solve --deck design              # cases/design.json or .dg
-#     ./nozzle.sh solve --deck design pb=0.12      # the deck, one value overridden
-#     ./nozzle.sh sweep back_pressure_ratio 0.05 0.3 12 --deck design
-#
-# A deck holds exactly what you would have typed, so there is no second
-# vocabulary to learn and no schema to keep in step with the code: '#' starts a
-# comment, blank lines are ignored, and decks may nest (one deck may include
-# another via `--deck name` on a line).
-#
-# Supported formats: JSON (.json) or text (.dg). JSON takes precedence if both exist.
-DECK_DIR="$ROOT/cases"
-DECK_MAX_DEPTH=8
-
 list_configs() {
-    local path stem found=0
-    # List JSON files
+    local path found=0
     for path in "$DECK_DIR"/*.json; do
         [[ -e $path ]] || continue
         found=1
-        stem=$(basename "$path" .json)
-        printf '  @%-12s %s\n' "$stem" "$(config_summary "$path")"
-    done
-    # List .dg files (skip if .json exists with same name)
-    for path in "$DECK_DIR"/*.dg; do
-        [[ -e $path ]] || continue
-        stem=$(basename "$path" .dg)
-        [[ -f "$DECK_DIR/$stem.json" ]] && continue  # skip if JSON version exists
-        found=1
-        printf '  @%-12s %s\n' "$stem" "$(config_summary "$path")"
+        printf '  @%-12s %s\n' "$(basename "$path" .json)" "$(config_summary "$path")"
     done
     (( found )) || printf '  (none in %s)\n' "${DECK_DIR#"$ROOT"/}"
 }
 
 config_summary() {
-    # For JSON: look for a "description" or "comment" field
-    if [[ $1 == *.json ]]; then
-        "$PY" - "$1" <<'PYEOF' 2>/dev/null || echo ""
-import json, sys
-try:
-    with open(sys.argv[1]) as f:
-        d = json.load(f)
-    print(d.get("description", d.get("comment", "")))
-except: pass
-PYEOF
-        return
-    fi
-    # For .dg: the summary is the first comment line
-    sed -n '1{/^[[:space:]]*#/{s/^[[:space:]]*#[[:space:]]*//;p;};q;}' "$1"
+    local py=${PY:-$(find_python)}
+    "$py" -c 'import json, sys; print(json.load(open(sys.argv[1])).get("description", ""))' "$1" \
+        2>/dev/null || echo ""
 }
 
-# Replace every `@name` token (or `--deck name`) with that config's lines, recursively.
-# EXPANDED is set as a side effect; bash functions cannot return arrays.
+# Replace every `@name` token and every `--deck name` pair with that config's
+# lines.  EXPANDED is set as a side effect; bash functions cannot return arrays.
 expand_decks() {
-    local depth=$1; shift
-    (( depth <= DECK_MAX_DEPTH )) || die \
-        "decks nested more than $DECK_MAX_DEPTH deep -- does a deck include itself?"
-    local out=() lines=() i token path line
-    for (( i=0; i<$#; i++ )); do
-        token=${@:i+1:1}
-        # Look for @name (old syntax) or --deck name (new syntax)
-        if [[ $token == @* && $token != *::* ]]; then
-            path=$(resolve_config "${token#@}") || exit 2
-            lines=()
-            while IFS= read -r line || [[ -n $line ]]; do
-                line=${line%%#*}                        # drop comments
-                line=${line#"${line%%[![:space:]]*}"}   # trim left
-                line=${line%"${line##*[![:space:]]}"}   # trim right
-                [[ -n $line ]] && lines+=("$line")
-            done < <(load_config "$path")
-            expand_decks $((depth + 1)) ${lines[@]+"${lines[@]}"}
-            out+=(${EXPANDED[@]+"${EXPANDED[@]}"})
-        elif [[ $token == --deck ]]; then
-            (( ++i < $# )) || die "--deck requires an argument"
-            token=${@:i+1:1}
+    EXPANDED=()
+    local token text line path
+    local next_is_deck=0
+    for token in ${@+"$@"}; do
+        if (( next_is_deck )); then
+            next_is_deck=0
             path=$(resolve_config "$token") || exit 2
-            lines=()
-            while IFS= read -r line || [[ -n $line ]]; do
-                line=${line%%#*}                        # drop comments
-                line=${line#"${line%%[![:space:]]*}"}   # trim left
-                line=${line%"${line##*[![:space:]]}"}   # trim right
-                [[ -n $line ]] && lines+=("$line")
-            done < <(load_config "$path")
-            expand_decks $((depth + 1)) ${lines[@]+"${lines[@]}"}
-            out+=(${EXPANDED[@]+"${EXPANDED[@]}"})
+        elif [[ $token == --deck ]]; then
+            next_is_deck=1
+            continue
+        elif [[ $token == @* && $token != *::* ]]; then
+            path=$(resolve_config "${token#@}") || exit 2
         else
-            out+=("$token")
+            EXPANDED+=("$token")
+            continue
         fi
+        text=$(load_config "$path") || die "$path is not a readable config file"
+        while IFS= read -r line; do EXPANDED+=("$line"); done <<< "$text"
     done
-    EXPANDED=(${out[@]+"${out[@]}"})
 }
 
 # --------------------------------------------------------------------------
@@ -260,7 +173,7 @@ expand_decks() {
 #
 # TRANSLATED is set as a side effect; bash functions cannot return arrays.
 translate() {
-    expand_decks 1 ${@+"$@"}
+    expand_decks ${@+"$@"}
     set -- ${EXPANDED[@]+"${EXPANDED[@]}"}
     local out=() token key value
     for token in ${@+"$@"}; do
@@ -387,13 +300,11 @@ often lives in a file rather than in your shell history.  Later arguments win,
 so a deck is a starting point you can override:
 
   ./$SELF run cases/design.json              # run with design.json config
-  ./$SELF run cases/design                   # find design.json or design.dg
+  ./$SELF run cases/design                   # find design.json
   ./$SELF solve --deck design pb=0.12        # deck, with one value changed
   ./$SELF sweep area_ratio 2.0 4.0 9 --deck design
 
-Config formats:
-  JSON:   cases/design.json with key-value pairs
-  DG:     cases/design.dg with 'key=value' lines, '#' for comments
+A config is a JSON object of name: value pairs, such as cases/design.json.
 
 Aliases: p=order, Q=geometry_order, ref=refine, ar=area_ratio,
 pb=back_pressure_ratio, tvb=tvb_constant.  Ordinary --flags work too, so
