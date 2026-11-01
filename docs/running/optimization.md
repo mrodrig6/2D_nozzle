@@ -5,7 +5,7 @@ Use a constrained SciPy optimizer with the discrete-adjoint gradient. The worked
 ## 3. Shape optimisation
 
 ```bash
-./nozzle.sh run optimise       # examples/04_optimise.py
+./nozzle.sh example optimise       # examples/04_optimise.py
 ```
 
 The gradient plugs straight into SciPy:

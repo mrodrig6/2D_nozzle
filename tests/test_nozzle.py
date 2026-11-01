@@ -63,7 +63,7 @@ def test_help_lists_every_command(flag):
         "check",
         "list",
         "run",
-        "solve",
+        "example",
         "sweep",
         "geometry",
         "bench",
@@ -87,15 +87,13 @@ def test_unknown_command_fails_and_explains():
 
 
 def test_list_names_every_case():
-    """``list`` prints two sections; the cases are the entries without an ``@``."""
+    """``list`` shows the case files, and ``example`` names every script."""
     out = run("list")
     assert out.returncode == 0
-    listed = [
-        line.split()[0]
-        for line in out.stdout.splitlines()
-        if line.startswith("  ") and line.strip() and not line.strip().startswith("@")
-    ]
-    assert listed == list(CASES)
+    for name in CASE_FILES:
+        assert f"cases/{name}.json" in out.stdout, f"{name} missing from `list`"
+    for name in CASES:
+        assert name in out.stdout, f"{name} missing from `list`"
 
 
 @pytest.mark.parametrize("name", CASES)
@@ -109,17 +107,12 @@ def test_every_listed_case_resolves_to_exactly_one_file(name):
     assert len(matches) == 1, matches
 
 
-def test_unknown_case_fails_and_lists_the_real_ones():
-    out = run("run", "nonsense")
+def test_unknown_example_fails_and_lists_the_real_ones():
+    out = run("example", "nonsense")
     assert out.returncode != 0
-    assert "no case named nonsense" in out.stderr
+    assert "no example named nonsense" in out.stderr
     for name in CASES:
         assert name in out.stderr
-
-
-def test_run_needs_a_case_name():
-    out = run("run")
-    assert out.returncode != 0
 
 
 def test_a_bad_interpreter_is_reported_not_ignored():
@@ -162,7 +155,7 @@ def test_check_works_from_an_unrelated_directory(tmp_path):
     """The whole point: no install, no clone to stand in, any working directory."""
     out = run("check", cwd=tmp_path)
     assert out.returncode == 0, out.stderr
-    assert "dgnozzle" in out.stdout
+    assert "nozzle" in out.stdout
     assert "backends" in out.stdout
 
 
@@ -196,7 +189,7 @@ def test_a_zero_valued_option_is_not_mistaken_for_a_flag(tmp_path):
 
 @pytest.mark.slow
 def test_solve_runs_end_to_end(tmp_path):
-    out = run("solve", "p=0", "contour=smooth", "quiet=yes", cwd=tmp_path, timeout=900)
+    out = run("run", "p=0", "contour=smooth", "quiet=yes", cwd=tmp_path, timeout=900)
     assert out.returncode == 0, out.stderr
     assert "thrust" in out.stdout
     assert "mass flow" in out.stdout
@@ -206,13 +199,13 @@ def test_solve_runs_end_to_end(tmp_path):
 def test_run_executes_a_case(tmp_path):
     """The shortest case, to prove ``run`` actually runs one."""
     pytest.importorskip("matplotlib")
-    out = run("run", "solve", cwd=tmp_path, timeout=900)
+    out = run("example", "solve", cwd=tmp_path, timeout=900)
     assert out.returncode == 0, out.stderr
     assert "running examples/01_solve.py" in out.stdout
 
 
 # --------------------------------------------------------------------------
-# Argument decks
+# Case files
 # --------------------------------------------------------------------------
 # These check expansion, not the solver, so they lean on `geometry` -- which
 # does no flow solve and echoes the contour it was given -- and on the error
@@ -220,63 +213,62 @@ def test_run_executes_a_case(tmp_path):
 # names the keys it rejected, which makes it a readout of exactly what the
 # launcher passed through.
 
-DECKS = ("default", "design", "overexpanded", "shocked", "converged", "contour")
+CASE_FILES = ("default", "design", "overexpanded", "shocked", "converged", "contour")
+CASE_DIR = ROOT / "cases"
 
 
-def test_the_shipped_decks_are_listed(tmp_path):
+def test_the_shipped_case_files_are_listed(tmp_path):
     out = run("list", cwd=tmp_path)
     assert out.returncode == 0, out.stderr
-    for name in DECKS:
-        assert f"@{name}" in out.stdout, f"{name} missing from `list`"
+    for name in CASE_FILES:
+        assert f"cases/{name}.json" in out.stdout, f"{name} missing from `list`"
 
 
-def test_every_shipped_deck_has_a_summary_line(tmp_path):
-    """The summary is the config's ``description``, so a config without one is silent."""
+def test_every_shipped_case_file_has_a_description(tmp_path):
+    """The description is what ``list`` shows, so a case file without one is silent."""
     out = run("list", cwd=tmp_path)
     for line in out.stdout.splitlines():
-        if line.strip().startswith("@"):
+        if line.strip().startswith("cases/"):
             name, _, summary = line.strip().partition(" ")
-            assert summary.strip(), f"{name} has no summary comment"
+            assert summary.strip(), f"{name} has no description"
 
 
-def test_a_deck_expands_to_the_values_it_holds(tmp_path):
-    """``geometry @contour`` must behave as if the lines had been typed."""
-    deck = run("geometry", "@contour", cwd=tmp_path)
+def test_a_case_file_expands_to_the_values_it_holds(tmp_path):
+    """``geometry cases/contour.json`` must behave as if the lines had been typed."""
+    deck = run("geometry", str(CASE_DIR / "contour.json"), cwd=tmp_path)
     typed = run("geometry", "contour=bell", "ar=2.5", "theta_initial_deg=30", cwd=tmp_path)
     assert deck.returncode == 0, deck.stderr
     assert deck.stdout == typed.stdout
 
 
-def test_a_later_argument_overrides_the_deck(tmp_path):
-    """The whole point of a deck is that it is a starting point, not a cage."""
-    deck = run("geometry", "@contour", "ar=4.0", cwd=tmp_path)
+def test_a_later_argument_overrides_the_case_file(tmp_path):
+    """A case file is a starting point, not a cage."""
+    deck = run("geometry", str(CASE_DIR / "contour.json"), "ar=4.0", cwd=tmp_path)
     typed = run("geometry", "contour=bell", "ar=4.0", "theta_initial_deg=30", cwd=tmp_path)
     assert deck.returncode == 0, deck.stderr
     assert deck.stdout == typed.stdout
     assert "AR=4.0" in deck.stdout
 
 
-def test_a_deck_can_include_another_deck(tmp_path):
-    """``overexpanded`` is ``design`` with one value changed."""
-    out = run("geometry", "@overexpanded", cwd=tmp_path)
-    # geometry rejects the solver keys, and in doing so lists what it was given
-    assert "--area-ratio" not in out.stderr  # geometry *does* take this one
+def test_a_case_file_with_solver_keys_is_refused_by_geometry(tmp_path):
+    """``geometry`` takes only the geometry keys, so it names the solver keys it cannot use."""
+    out = run("geometry", str(CASE_DIR / "overexpanded.json"), cwd=tmp_path)
     assert "--order" in out.stderr, out.stderr
     assert out.returncode != 0
 
 
-def test_a_deck_resolves_by_name_or_by_path(tmp_path):
-    by_name = run("geometry", "@contour", cwd=tmp_path)
-    by_path = run("geometry", f"@{ROOT / 'cases' / 'contour.json'}", cwd=tmp_path)
+def test_a_case_file_resolves_by_path(tmp_path):
+    by_name = run("geometry", str(CASE_DIR / "contour.json"), cwd=tmp_path)
+    by_path = run("geometry", str(CASE_DIR / "contour.json"), cwd=tmp_path)
     assert by_name.stdout == by_path.stdout
     assert by_name.returncode == 0, by_name.stderr
 
 
-def test_an_unknown_deck_names_the_ones_that_exist(tmp_path):
-    out = run("geometry", "@nosuchdeck", cwd=tmp_path)
+def test_an_unknown_case_file_names_the_ones_that_exist(tmp_path):
+    out = run("geometry", "nosuchcase.json", cwd=tmp_path)
     assert out.returncode == 2
-    assert "no config named nosuchdeck" in out.stderr
-    assert "@design" in out.stderr, "the error should list what is available"
+    assert "no case file nosuchcase.json" in out.stderr
+    assert "cases/design.json" in out.stderr, "the error should list what is available"
 
 
 def test_the_description_is_not_passed_on(tmp_path):
@@ -286,19 +278,19 @@ def test_the_description_is_not_passed_on(tmp_path):
         '{"description": "a summary for people", "contour": "bell", "area_ratio": 2.5}\n',
         encoding="utf-8",
     )
-    noisy = run("geometry", f"@{config}", cwd=tmp_path)
+    noisy = run("geometry", str(config), cwd=tmp_path)
     plain = run("geometry", "contour=bell", "ar=2.5", cwd=tmp_path)
     assert noisy.returncode == 0, noisy.stderr
     assert noisy.stdout == plain.stdout
 
 
-def test_a_pytest_node_id_is_not_mistaken_for_a_deck(tmp_path):
+def test_a_pytest_node_id_is_not_mistaken_for_a_case_file(tmp_path):
     """``test tests/x.py::name`` must not try to expand anything."""
     out = run(
         "test",
-        "tests/test_nozzle.py::test_the_shipped_decks_are_listed",
+        "tests/test_nozzle.py::test_the_shipped_case_files_are_listed",
         "--collect-only",
         "-q",
         cwd=tmp_path,
     )
-    assert "no deck named" not in out.stderr
+    assert "no case file" not in out.stderr

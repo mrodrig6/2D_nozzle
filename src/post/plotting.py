@@ -33,7 +33,7 @@ def _require_matplotlib():
     try:
         import matplotlib.pyplot as plt
     except ImportError as exc:  # pragma: no cover
-        raise ImportError("plotting needs matplotlib: pip install 'dgnozzle[plot]'") from exc
+        raise ImportError("plotting needs matplotlib: pip install 'nozzle[plot]'") from exc
     return plt
 
 

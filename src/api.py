@@ -335,7 +335,7 @@ def solve_nozzle(
 
     if verbose:
         q1d = solve_quasi1d(cs.geometry, flw)
-        print("=== dgnozzle ===")
+        print("=== nozzle ===")
         print(f"  {cs.geometry.describe()}")
         print(f"  {cs.topology.summary()}")
         print(

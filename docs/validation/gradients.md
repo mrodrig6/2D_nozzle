@@ -4,7 +4,7 @@ This comparison uses the smooth, shock-free case in `examples/03_sensitivity.py`
 
 ```bash
 # Print all five adjoint and central-difference columns.
-./nozzle.sh run sensitivity
+./nozzle.sh example sensitivity
 ```
 
 Captured numerical output:

@@ -1,4 +1,4 @@
-r"""**dgnozzle** — a 2D compressible Euler solver for nozzle design studies.
+r"""**nozzle** — a 2D compressible Euler solver for nozzle design studies.
 
 A discontinuous Galerkin solver for the two-dimensional Euler equations on a
 planar nozzle, built so that students *use* it rather than write it: change the

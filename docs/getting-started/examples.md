@@ -4,13 +4,13 @@ Run these scripts from the repository root with `[all]` installed. The scripts a
 
 | Script | Command | Additional requirements | Purpose |
 |---|---|---|---|
-| [01_solve.py](../../examples/01_solve.py) | `./nozzle.sh run solve` | plot | a single design point, start to finish. |
-| [02_sweep.py](../../examples/02_sweep.py) | `./nozzle.sh run sweep` | plot | sweeping the design space. |
-| [03_sensitivity.py](../../examples/03_sensitivity.py) | `./nozzle.sh run sensitivity` | jax | exact design sensitivities by the discrete adjoint. |
-| [04_optimise.py](../../examples/04_optimise.py) | `./nozzle.sh run optimise` | plot, jax, SciPy | gradient-based shape optimisation. |
-| [05_convergence.py](../../examples/05_convergence.py) | `./nozzle.sh run convergence` | plot | order-of-accuracy study. |
-| [06_shock.py](../../examples/06_shock.py) | `./nozzle.sh run shock` | plot | driving a shock through the nozzle with back pressure. |
-| [07_external.py](../../examples/07_external.py) | `./nozzle.sh run external` | plot | the flow outside the nozzle, where the waves actually are. |
+| [01_solve.py](../../examples/01_solve.py) | `./nozzle.sh example solve` | plot | a single design point, start to finish. |
+| [02_sweep.py](../../examples/02_sweep.py) | `./nozzle.sh example sweep` | plot | sweeping the design space. |
+| [03_sensitivity.py](../../examples/03_sensitivity.py) | `./nozzle.sh example sensitivity` | jax | exact design sensitivities by the discrete adjoint. |
+| [04_optimise.py](../../examples/04_optimise.py) | `./nozzle.sh example optimise` | plot, jax, SciPy | gradient-based shape optimisation. |
+| [05_convergence.py](../../examples/05_convergence.py) | `./nozzle.sh example convergence` | plot | order-of-accuracy study. |
+| [06_shock.py](../../examples/06_shock.py) | `./nozzle.sh example shock` | plot | driving a shock through the nozzle with back pressure. |
+| [07_external.py](../../examples/07_external.py) | `./nozzle.sh example external` | plot | the flow outside the nozzle, where the waves actually are. |
 
 ## Output and convergence
 

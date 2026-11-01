@@ -33,5 +33,5 @@ Scientific derivations, lab exercises, numerical tables and research retractions
 
 - The worked sweep records stalled AR=4.25 and AR=4.5 points at refine=1; nine of its eleven points converge. The study reports those failures and still exits zero.
 - Geometry reports still append `m` to nondimensional lengths (`NozzleGeometry.describe`). This is an application-output defect; values remain nondimensional.
-- `@shocked` does not add its own shock opt-in. Use the explicit CLI flag for an experiment, as documented in configuration.
+- `cases/shocked.json` does not add its own shock opt-in. Use the explicit CLI flag for an experiment, as documented in configuration.
 - Historic benchmark timings are hardware-specific; not every old image has a committed, byte-for-byte reproduction script.

@@ -5,7 +5,7 @@ Compute derivatives of a converged discrete solution with JAX. Check the forward
 ## 2. Sensitivity analysis
 
 ```bash
-./nozzle.sh run sensitivity    # examples/03_sensitivity.py
+./nozzle.sh example sensitivity    # examples/03_sensitivity.py
 ```
 
 Exact derivatives by the **discrete adjoint** — one solve, any number of design
