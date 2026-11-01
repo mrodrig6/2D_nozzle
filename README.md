@@ -31,11 +31,11 @@ See [installation](docs/getting-started/installation.md) for isolated environmen
 # Inspect a wall before solving it.
 ./nozzle.sh geometry contour=smooth
 # Solve a shock-free operating point and save an overview.
-./nozzle.sh solve --deck design figure=result.png
+./nozzle.sh run cases/design.json figure=result.png
 # Sweep area ratio and save the numerical table.
 ./nozzle.sh sweep area_ratio 2.0 4.0 5 contour=smooth order=1 refine=1 csv=sweep.csv
 # Compare adjoint gradients with finite differences.
-./nozzle.sh run sensitivity
+./nozzle.sh example sensitivity
 ```
 
 ```python

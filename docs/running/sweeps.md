@@ -5,7 +5,7 @@ Solve a sequence of design or operating points and record failures as well as co
 ## 1. Parameter sweeps
 
 ```bash
-./nozzle.sh run sweep          # examples/02_sweep.py
+./nozzle.sh example sweep          # examples/02_sweep.py
 ```
 
 Or from the command line, with no script at all:

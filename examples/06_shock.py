@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Example 6 --- driving a shock through the nozzle with back pressure.
 
-Run:  ./nozzle.sh run shock
+Run:  ./nozzle.sh example shock
 
 Sweeps the back pressure across all four operating regimes and tracks where the
 shock stands.

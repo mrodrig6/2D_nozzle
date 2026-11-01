@@ -8,7 +8,7 @@ Run this and make sure it works:
 
 ```bash
 ./nozzle.sh check              # what is installed and which backends work
-./nozzle.sh run solve          # one design point, start to finish
+./nozzle.sh example solve          # one design point, start to finish
 ```
 
 Nothing has to be installed first; `./nozzle.sh help` lists every command, and
@@ -221,7 +221,7 @@ divergence loss, and you can see it directly.
 limits it?
 
 ```bash
-./nozzle.sh run convergence
+./nozzle.sh example convergence
 ```
 
 **What to report.** Observed rates for `p=1` and `p=2` with `contour='smooth'`,
@@ -271,7 +271,7 @@ this operating point. Why? (Hint: look at the exit Mach number.)
 ## Exercise 7 — Optimise a shape
 
 ```bash
-./nozzle.sh run optimise
+./nozzle.sh example optimise
 ```
 
 **What to report.** The optimised wall against the initial one, the thrust

@@ -3,7 +3,7 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dgnozzle"
+name = "nozzle"
 version = "1.0.0"
 description = "2D discontinuous Galerkin Euler solver for planar nozzle design studies"
 readme = "README.md"
@@ -39,7 +39,7 @@ dev = ["pytest>=7.4", "pytest-cov", "ruff==0.16.10", "codespell>=2.2"]
 docs = ["mkdocs>=1.6,<2", "mkdocs-material>=9.6,<10", "pymdown-extensions>=10,<11", "pymupdf>=1.23"]
 
 [project.scripts]
-dgnozzle = "src.cli:main"
+nozzle = "src.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["src*"]

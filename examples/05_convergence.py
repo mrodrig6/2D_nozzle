@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Example 5 --- order-of-accuracy study.
 
-Run:  ./nozzle.sh run convergence
+Run:  ./nozzle.sh example convergence
 
 Measures the observed order of accuracy from the entropy error, which is a true
 error measure for shock-free flow (the exact solution is isentropic).

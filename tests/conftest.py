@@ -61,7 +61,7 @@ def pytest_addoption(parser):
 
     ``-m`` still works for anything finer.
     """
-    group = parser.getgroup("dgnozzle")
+    group = parser.getgroup("nozzle")
     group.addoption(
         "--fast",
         action="store_true",

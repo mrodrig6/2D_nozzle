@@ -7,7 +7,7 @@
 # and runs what you asked for from wherever you happen to be:
 #
 #     ./nozzle.sh run cases/design.json
-#     ./nozzle.sh solve area_ratio=3.0 back_pressure_ratio=0.12 order=1
+#     ./nozzle.sh run area_ratio=3.0 back_pressure_ratio=0.12 order=1
 #
 # `./nozzle.sh help` lists everything.  `./nozzle.sh install` is optional.
 
@@ -20,7 +20,7 @@ SELF="$(basename -- "${BASH_SOURCE[0]}")"
 # Python
 # --------------------------------------------------------------------------
 # Whatever environment you have loaded is the one used.  Set NOZZLE_PYTHON to
-# override, e.g. NOZZLE_PYTHON=python3.12 ./nozzle.sh solve
+# override, e.g. NOZZLE_PYTHON=python3.12 ./nozzle.sh run
 find_python() {
     if [[ -n ${NOZZLE_PYTHON:-} ]]; then
         command -v "$NOZZLE_PYTHON" >/dev/null 2>&1 || die \
@@ -59,60 +59,29 @@ setup_import_path() {
 }
 
 # --------------------------------------------------------------------------
-# Config files (cases/*.json)
+# Case files (cases/*.json)
 # --------------------------------------------------------------------------
-# A config is a JSON object of name: value pairs, using the names the Python API
-# uses.  `--deck name` (or `@name`) loads one as defaults, and any name=value
-# argument after it overrides that value.  The key "description" is for people
-# and is not passed on.
+# A case is a JSON object of name: value pairs, using the names the Python API
+# uses.  Pass its path where the arguments go, and any name=value after it
+# overrides that value.  The key "description" is for people and is not passed
+# on.
 #
-# A config does not include another config, so expansion is one level deep and
-# cannot loop.  Resolution accepts a name, a file path, or a directory holding
-# config.json or the first *.json in it.
-DECK_DIR="$ROOT/cases"
+#     ./nozzle.sh run cases/design.json pb=0.12
+#
+# A case file does not include another, so expansion is one level deep.
+CASE_DIR="$ROOT/cases"
 
-resolve_config() {
-    local want=$1 candidate first_json
-
-    if [[ -f $want ]]; then
-        printf '%s\n' "$want"
-        return 0
-    fi
-
-    if [[ -d $want ]]; then
-        if [[ -f "$want/config.json" ]]; then
-            printf '%s\n' "$want/config.json"
-            return 0
-        fi
-        first_json=$(find "$want" -maxdepth 1 -name "*.json" -print -quit 2>/dev/null)
-        if [[ -f $first_json ]]; then
-            printf '%s\n' "$first_json"
-            return 0
-        fi
-    fi
-
-    for candidate in "$want" "$want.json" "$DECK_DIR/$want" "$DECK_DIR/$want.json"; do
-        if [[ -f $candidate ]]; then
-            printf '%s\n' "$candidate"
-            return 0
-        fi
-    done
-    printf '%s: no config named %s.  Available:\n' "$SELF" "$want" >&2
-    list_configs >&2
-    return 1
-}
-
-# Output a config as 'name=value' lines, without "description".
-load_config() {
+# Output a case as 'name=value' lines, without "description".
+load_case() {
     "$PY" - "$1" <<'PYEOF'
 import json
 import sys
 
 with open(sys.argv[1]) as f:
-    config = json.load(f)
-if not isinstance(config, dict):
-    sys.exit("a config file holds one JSON object of name: value pairs")
-for key, value in config.items():
+    case = json.load(f)
+if not isinstance(case, dict):
+    sys.exit("a case file holds one JSON object of name: value pairs")
+for key, value in case.items():
     if key == "description":
         continue
     if isinstance(value, bool):
@@ -123,42 +92,35 @@ for key, value in config.items():
 PYEOF
 }
 
-list_configs() {
+list_case_files() {
     local path found=0
-    for path in "$DECK_DIR"/*.json; do
+    for path in "$CASE_DIR"/*.json; do
         [[ -e $path ]] || continue
         found=1
-        printf '  @%-12s %s\n' "$(basename "$path" .json)" "$(config_summary "$path")"
+        printf '  %-28s %s\n' "${path#"$ROOT"/}" "$(case_description "$path")"
     done
-    (( found )) || printf '  (none in %s)\n' "${DECK_DIR#"$ROOT"/}"
+    (( found )) || printf '  (none in %s)\n' "${CASE_DIR#"$ROOT"/}"
 }
 
-config_summary() {
+case_description() {
     local py=${PY:-$(find_python)}
     "$py" -c 'import json, sys; print(json.load(open(sys.argv[1])).get("description", ""))' "$1" \
         2>/dev/null || echo ""
 }
 
-# Replace every `@name` token and every `--deck name` pair with that config's
-# lines.  EXPANDED is set as a side effect; bash functions cannot return arrays.
-expand_decks() {
+# Replace every case-file argument with that file's name=value lines.  EXPANDED
+# is set as a side effect; bash functions cannot return arrays.
+expand_cases() {
     EXPANDED=()
-    local token text line path
-    local next_is_deck=0
+    local token text line
     for token in ${@+"$@"}; do
-        if (( next_is_deck )); then
-            next_is_deck=0
-            path=$(resolve_config "$token") || exit 2
-        elif [[ $token == --deck ]]; then
-            next_is_deck=1
-            continue
-        elif [[ $token == @* && $token != *::* ]]; then
-            path=$(resolve_config "${token#@}") || exit 2
-        else
+        if [[ $token == *=* || $token != *.json ]]; then
             EXPANDED+=("$token")
             continue
         fi
-        text=$(load_config "$path") || die "$path is not a readable config file"
+        [[ -f $token ]] || die "no case file $token.  Available cases:
+$(list_case_files)"
+        text=$(load_case "$token") || die "$token is not a readable case file"
         while IFS= read -r line; do EXPANDED+=("$line"); done <<< "$text"
     done
 }
@@ -173,7 +135,7 @@ expand_decks() {
 #
 # TRANSLATED is set as a side effect; bash functions cannot return arrays.
 translate() {
-    expand_decks ${@+"$@"}
+    expand_cases ${@+"$@"}
     set -- ${EXPANDED[@]+"${EXPANDED[@]}"}
     local out=() token key value
     for token in ${@+"$@"}; do
@@ -208,33 +170,33 @@ translate() {
     TRANSLATED=(${out[@]+"${out[@]}"})
 }
 
-# Run a dgnozzle subcommand with translated arguments.
-dgnozzle() {
+# Run a Python subcommand with translated arguments.
+python_command() {
     local subcommand=$1; shift
     translate "$@"
     exec "$PY" -m src "$subcommand" ${TRANSLATED[@]+"${TRANSLATED[@]}"}
 }
 
 # --------------------------------------------------------------------------
-# Cases
+# Examples
 # --------------------------------------------------------------------------
-# The runnable scripts in examples/.  Numbered for reading order; `run` matches
-# on the descriptive part, so `run sweep` and `run 02` both work.
-list_cases() {
+# The runnable scripts in examples/.  Numbered for reading order; `example`
+# matches on the descriptive part, so `example sweep` and `example 02` both work.
+list_examples() {
     local path stem
     for path in "$ROOT"/examples/[0-9][0-9]_*.py; do
         [[ -e $path ]] || continue
         stem=$(basename "$path" .py)
-        printf '  %-14s %s\n' "${stem#*_}" "$(case_summary "$path")"
+        printf '  %-14s %s\n' "${stem#*_}" "$(example_summary "$path")"
     done
 }
 
-case_summary() {
+example_summary() {
     # the one-line summary is the first docstring line, after the em dash
     sed -n '2{s/^"""//;s/ *$//;s/\.$//;s/.*--- *//;p;q;}' "$1"
 }
 
-resolve_case() {
+resolve_example() {
     local want=$1 matches=()
     # exact path, exact stem, then the descriptive suffix or the number
     if [[ -f $want ]]; then printf '%s\n' "$want"; return; fi
@@ -254,10 +216,10 @@ resolve_case() {
         return
     fi
     if (( ${#matches[@]} > 1 )); then
-        die "'$want' matches more than one case"
+        die "'$want' matches more than one example"
     fi
-    printf '%s: no case named %s.  Available:\n' "$SELF" "$want" >&2
-    list_cases >&2
+    printf '%s: no example named %s.  Available:\n' "$SELF" "$want" >&2
+    list_examples >&2
     exit 2
 }
 
@@ -273,15 +235,15 @@ Usage: ./$SELF <command> [arguments]
 Getting started
   install            install the package and its optional extras with pip
   check              report the Python, the version, and which backends work
-  list               list the cases 'run' can execute and available configs
+  list               list the case files in cases/, and the examples
 
 Running
-  run <config>       run with parameters from a config file or directory
-  solve [...]        solve one operating point
+  run CASE.json      solve the operating point in a case file and report it
   sweep <var> <lo> <hi> <n> [...]
                      sweep one design variable
   geometry [...]     inspect a contour; no flow solve
   bench [...]        time the backends against each other
+  example <name>     run one of the scripts in examples/
   test [...]         run the test suite
   verify [--fast]    everything the project checks about itself: tests, lint,
                      format and spelling.  '--fast' skips the full solves.
@@ -289,40 +251,36 @@ Running
 
 Arguments are 'name=value', using the same names as the Python API:
 
-  ./$SELF solve area_ratio=3.0 back_pressure_ratio=0.12 order=1
-  ./$SELF solve ar=3.0 pb=0.12 p=1 figure=result.png     # short aliases
+  ./$SELF run area_ratio=3.0 back_pressure_ratio=0.12 order=1
+  ./$SELF run ar=3.0 pb=0.12 p=1 figure=result.png     # short aliases
+  ./$SELF run cases/design.json figure=design.png
+  ./$SELF run cases/design.json pb=0.12                 # a case, one value changed
   ./$SELF sweep area_ratio 2.0 4.0 9 order=1 csv=sweep.csv
   ./$SELF geometry contour=bezier bezier_w1=0.7
-  ./$SELF run examples/01_sweep.py
+  ./$SELF example sweep
 
-A '--deck name' argument loads defaults from a config file, so a case you run
-often lives in a file rather than in your shell history.  Later arguments win,
-so a deck is a starting point you can override:
-
-  ./$SELF run cases/design.json              # run with design.json config
-  ./$SELF run cases/design                   # find design.json
-  ./$SELF solve --deck design pb=0.12        # deck, with one value changed
-  ./$SELF sweep area_ratio 2.0 4.0 9 --deck design
-
-A config is a JSON object of name: value pairs, such as cases/design.json.
+A case file is a JSON object of name: value pairs, and a name=value argument
+after it overrides that value.  The file goes where the arguments go.  A command
+reports any key it does not use, so geometry takes the geometry keys of a case
+and run takes the operating point as well.
 
 Aliases: p=order, Q=geometry_order, ref=refine, ar=area_ratio,
 pb=back_pressure_ratio, tvb=tvb_constant.  Ordinary --flags work too, so
 anything 'python -m src --help' documents is still available.
 'M' is deliberately NOT an alias: in this code M always means Mach number.
 
-Configs:
-$(list_configs)
+Cases (cases/*.json):
+$(list_case_files)
 
-Cases ('run <case>'):
-$(list_cases)
+Examples ('example <name>'):
+$(list_examples)
 
 Environment
   NOZZLE_PYTHON      the interpreter to use (default: python3, then python)
 
-No install is required: if the solver package is not importable, the repository root is
-put on PYTHONPATH automatically.  Documentation is in docs/ -- start with
-docs/theory.md for the formulation and docs/lab_guide.md for the exercises.
+No install is required: if the solver package is not importable, the repository root
+is put on PYTHONPATH automatically.  Documentation is in docs/ -- start with
+docs/README.md for the index.
 EOF
 }
 
@@ -351,7 +309,7 @@ import src
 from src.backends import available_backends
 
 where = Path(src.__file__).parent
-print(f"dgnozzle {src.__version__}  ({where})")
+print(f"nozzle {src.__version__}  ({where})")
 print(f"backends {', '.join(available_backends())}")
 
 for name, what in (("numba", "the fast solver"),
@@ -363,28 +321,15 @@ for name, what in (("numba", "the fast solver"),
 PYEOF
 }
 
-cmd_run() {
-    (( $# >= 1 )) || die "run needs a config path or case name.  Try: ./$SELF list"
-    local arg=$1
-    shift
-
-    # Try to resolve as a config file first; keep arg intact for the case fallback
-    local config_path
-    if config_path=$(resolve_config "$arg" 2>/dev/null); then
-        # Load config and merge with command-line args
-        local config_args=()
-        while IFS= read -r line; do
-            [[ -n $line ]] && config_args+=("$line")
-        done < <(load_config "$config_path")
-
-        printf '%s: running with config %s\n\n' "$SELF" "${config_path#"$ROOT"/}"
-        translate ${config_args[@]+"${config_args[@]}"} "$@"
-        exec "$PY" -m src solve ${TRANSLATED[@]+"${TRANSLATED[@]}"}
+cmd_example() {
+    if (( $# == 0 )); then
+        printf "Examples ('example <name>'):\n"
+        list_examples
+        return 0
     fi
-
-    # Fall back to running an example case script
     local case_path
-    case_path=$(resolve_case "$arg") || exit 2
+    case_path=$(resolve_example "$1") || exit 2
+    shift
     printf '%s: running %s\n\n' "$SELF" "${case_path#"$ROOT"/}"
     exec "$PY" "$case_path" "$@"
 }
@@ -463,12 +408,11 @@ cmd_verify() {
 
 cmd_docs() {
     cat <<EOF
-docs/theory.md      the formulation, the geometry definition and the
-                    verification evidence -- equations in LaTeX, renders on
-                    GitHub with nothing to build
-docs/lab_guide.md   the exercises, and what to report
-docs/tikz/          TikZ sources for every figure
-README.md           the quick start and the API tour
+docs/README.md                 the index of every documentation page
+docs/theory/euler.md           the formulation, the geometry definition and the verification evidence
+docs/running/lab-guide.md      the exercises, and what to report
+docs/figures/tikz/             TikZ sources for every figure
+README.md                      the quick start and the API tour
 EOF
 }
 
@@ -486,14 +430,15 @@ main() {
     case $command in
         install)   cmd_install ${1+"$1"} ;;
         check)     setup_import_path; cmd_check ;;
-        list)      printf "Configs:\n"; list_configs
-                   printf "\nCases ('run <name>'):\n"; list_cases ;;
+        list)      printf "Cases (cases/*.json):\n"; list_case_files
+                   printf "\nExamples ('example <name>'):\n"; list_examples ;;
         docs)      cmd_docs ;;
-        run)       setup_import_path; cmd_run "$@" ;;
+        run)       setup_import_path; python_command solve "$@" ;;
+        example)   setup_import_path; cmd_example "$@" ;;
         test)      setup_import_path; cmd_test "$@" ;;
         verify)    setup_import_path; cmd_verify ${1+"$1"} ;;
-        solve|sweep|geometry|bench)
-                   setup_import_path; dgnozzle "$command" "$@" ;;
+        sweep|geometry|bench)
+                   setup_import_path; python_command "$command" "$@" ;;
         *)         printf '%s: unknown command %s\n\n' "$SELF" "$command" >&2
                    cmd_help >&2
                    exit 2 ;;

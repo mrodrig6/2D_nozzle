@@ -53,7 +53,7 @@ def require_jax():
         import jax.numpy as jnp
     except ImportError as exc:  # pragma: no cover
         raise ImportError(
-            "the 'jax' backend needs JAX installed: pip install 'dgnozzle[jax]' "
+            "the 'jax' backend needs JAX installed: pip install 'nozzle[jax]' "
             "(or pip install 'jax[cpu]')"
         ) from exc
     enable_float64()
