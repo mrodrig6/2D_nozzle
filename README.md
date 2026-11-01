@@ -1,29 +1,32 @@
-# 2D DG nozzle solver
+# 2D discontinuous Galerkin nozzle solver
 
-[![CI](https://github.com/mrodrig6/2D_nozzle/actions/workflows/tests.yml/badge.svg)](https://github.com/mrodrig6/2D_nozzle/actions/workflows/tests.yml) [![Docs build](https://github.com/mrodrig6/2D_nozzle/actions/workflows/docs.yml/badge.svg)](https://github.com/mrodrig6/2D_nozzle/actions/workflows/docs.yml) [![Lint](https://github.com/mrodrig6/2D_nozzle/actions/workflows/lint.yml/badge.svg)](https://github.com/mrodrig6/2D_nozzle/actions/workflows/lint.yml) [![Formatting](https://github.com/mrodrig6/2D_nozzle/actions/workflows/format.yml/badge.svg)](https://github.com/mrodrig6/2D_nozzle/actions/workflows/format.yml) [![Spelling](https://github.com/mrodrig6/2D_nozzle/actions/workflows/spelling.yml/badge.svg)](https://github.com/mrodrig6/2D_nozzle/actions/workflows/spelling.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Tests](https://github.com/mrodrig6/2D_nozzle/actions/workflows/tests.yml/badge.svg)](https://github.com/mrodrig6/2D_nozzle/actions/workflows/tests.yml) [![Lint](https://github.com/mrodrig6/2D_nozzle/actions/workflows/lint.yml/badge.svg)](https://github.com/mrodrig6/2D_nozzle/actions/workflows/lint.yml) [![Formatting](https://github.com/mrodrig6/2D_nozzle/actions/workflows/format.yml/badge.svg)](https://github.com/mrodrig6/2D_nozzle/actions/workflows/format.yml) [![Spelling](https://github.com/mrodrig6/2D_nozzle/actions/workflows/spelling.yml/badge.svg)](https://github.com/mrodrig6/2D_nozzle/actions/workflows/spelling.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-This Python solver computes steady compressible Euler flow through a planar nozzle. Use it for nozzle design studies: change the wall shape, compare operating points, and measure how thrust responds.
+This Python program computes the steady flow of a gas through a nozzle: the duct that speeds gas up to supersonic speed in a rocket or jet engine. Students in the ENGN1700 course at Brown University use it to design nozzles: they change the wall shape or the back pressure and see how thrust and the exit conditions respond.
 
 ![Mach field, triangular mesh, and wall and exit profiles at a nozzle design point](docs/figures/overview_design.png)
 
-- Solve on triangles or quadrilaterals with nodal discontinuous Galerkin discretization.
-- Compare thrust, mass flow and exit conditions with quasi-1D theory.
-- Sweep geometry and back pressure, compute adjoint gradients, and optimize shapes.
-- Evaluate external lip waves and idealized jet cells from the converged exit state.
+- Wall shapes: bell, smooth, conical, method-of-characteristics, Bézier and analytic contours.
+- Discretisation: nodal discontinuous Galerkin on triangles or quadrilaterals, at several polynomial orders.
+- Results: thrust, mass flow and exit conditions, compared with quasi-one-dimensional theory.
+- Studies: parameter sweeps, order-of-accuracy checks, exact adjoint sensitivities, and shape optimisation.
+- Flow outside the nozzle: lip waves and idealised jet cells from the converged exit state.
 
-Add custom geometry or numerical components through the [documented extension points](docs/api/extending.md).
+To add your own contour or numerical component, see [extending the solver](docs/api/extending.md).
 
 ## Install
 
-From this checkout with Python **3.10 or newer**:
+Requires Python **3.10 or newer**. NumPy is installed automatically; Numba, JAX, Matplotlib and SciPy are optional.
 
 ```bash
 python -m pip install -e ".[all]"
 ```
 
-Full instructions, including isolated environments and developer tools: [installation](docs/getting-started/installation.md).
+For isolated environments, platform notes and developer tools, see the [installation guide](docs/getting-started/installation.md).
 
 ## Quick start
+
+The commands and the Python snippet below were run in this repository's development environment. Their output is not reproduced here.
 
 ```bash
 # Check installed dependencies and backends.
@@ -46,23 +49,26 @@ assert result.converged, result.message
 print(performance(result).summary())
 ```
 
-Full walkthrough with captured output: [quick start](docs/getting-started/quick-start.md).
+The command line and the Python API are two entry points to the same solver. The walkthrough, with output and how to read it, is in the [quick start](docs/getting-started/quick-start.md); the Python API is in [library usage](docs/api/package.md).
+
+## Testing
+
+From a fresh checkout, after the install step above:
+
+```bash
+python -m pytest
+```
+
+This runs every test, including the slow full solves. For the fast subset, use `python -m pytest --fast`. The suite stores no baseline or golden files, so no command regenerates or overwrites reference data, and there is no regression mode. For what the tests check and how to run a subset, see the [test-suite page](docs/validation/tests.md).
 
 ## Documentation
 
-| Section | Pages |
-|---|---|
-| Getting started | [Installation](docs/getting-started/installation.md) · [Quick start](docs/getting-started/quick-start.md) · [Examples](docs/getting-started/examples.md) |
-| Running | [Command line](docs/running/command-line.md) · [Configuration](docs/running/configuration.md) · [Solving a case](docs/running/solving.md) · [Reading results](docs/running/output.md) · [Parameter sweeps](docs/running/sweeps.md) · [Sensitivity analysis](docs/running/sensitivity.md) · [Shape optimization](docs/running/optimization.md) · [Troubleshooting](docs/running/troubleshooting.md) · [Nozzle contours](docs/running/contours.md) · [Postprocessing](docs/running/postprocessing.md) · [External flow](docs/running/external-flow.md) · [Nozzle design lab](docs/running/lab-guide.md) |
-| Python API | [Library usage](docs/api/package.md) · [Extending the solver](docs/api/extending.md) |
-| Background / Model | [Problem and assumptions](docs/model/problem.md) · [Parameters](docs/model/parameters.md) · [Units and reference scales](docs/model/units.md) |
-| Method | [Spatial discretization](docs/method/discretization.md) · [Numerical fluxes](docs/method/fluxes.md) · [Boundary conditions](docs/method/boundary-conditions.md) · [Backends and performance](docs/method/backends.md) · [Time stepping and convergence](docs/method/time-stepping.md) · [Limiters](docs/method/limiters.md) |
-| Theory | [Euler equations](docs/theory/euler.md) · [Discrete adjoint](docs/theory/adjoint.md) · [Quasi-one-dimensional nozzle flow](docs/theory/nozzle-flow.md) · [External waves](docs/theory/external-waves.md) |
-| Validation | [Test-suite claims](docs/validation/tests.md) · [Gradient comparisons](docs/validation/gradients.md) · [Quasi-1D and conservation comparisons](docs/validation/quasi-one-dimensional.md) · [Accuracy and curved geometry](docs/validation/accuracy.md) · [Reference-scale invariance](docs/validation/scaling.md) |
-| Reference | [Compatibility](docs/reference/compatibility.md) · [Code map](docs/reference/code-map.md) · [Repository map](docs/reference/repository.md) · [Continuous integration](docs/reference/ci.md) · [Figures](docs/reference/figures.md) · [Bibliography](docs/reference/bibliography.md) |
+The documentation index is [docs/README.md](docs/README.md). It is in-repo only; no hosted site is published.
 
-Written by Mauro Rodriguez for ENGN1700, High Reynolds Number Flows, at Brown University. The methods are referenced in the [bibliography](docs/reference/bibliography.md); a citation for the project itself is not yet specified.
+## Citation
+
+No paper describes this code and no citation file exists yet. The methods are referenced in the [bibliography](docs/reference/bibliography.md).
 
 ## License
 
-[MIT](LICENSE). Copyright © 2026 Mauro Rodriguez.
+[MIT](LICENSE). Copyright (c) 2026 Mauro Rodriguez.
