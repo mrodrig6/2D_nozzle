@@ -88,7 +88,7 @@ def test_cfl_keeps_its_traditional_meaning():
     """``cfl`` multiplies ``1/(2p+1)``, exactly as the textbook bound does.
 
     This is the property the default must not quietly break: a student who reads
-    the formula in ``docs/theory.md`` and passes ``cfl=1`` has to get the step
+    the formula in ``docs/theory/euler.md`` and passes ``cfl=1`` has to get the step
     that formula describes, not something the calibration rescaled.
     """
     from src.timestepping import step as ts

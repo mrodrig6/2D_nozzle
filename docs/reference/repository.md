@@ -25,14 +25,7 @@ The [code map](code-map.md) describes individual modules. The [figure inventory]
 |---|---|
 | `README.md` | [problem](../model/problem.md) · [quick-start](../getting-started/quick-start.md) · [bibliography](bibliography.md) |
 | `docs/README.md` | [figures](figures.md) |
-| `docs/lab_guide.md` | [lab-guide](../running/lab-guide.md) |
-| `docs/performance.md` | [backends](../method/backends.md) · [quasi-one-dimensional](../validation/quasi-one-dimensional.md) |
-| `docs/theory.md` | [output](../running/output.md) · [problem](../model/problem.md) · [discretization](../method/discretization.md) · [fluxes](../method/fluxes.md) · [boundary-conditions](../method/boundary-conditions.md) · [euler](../theory/euler.md) · [adjoint](../theory/adjoint.md) · [tests](../validation/tests.md) · [bibliography](bibliography.md) · [contours](../running/contours.md) · [time-stepping](../method/time-stepping.md) · [limiters](../method/limiters.md) · [nozzle-flow](../theory/nozzle-flow.md) · [accuracy](../validation/accuracy.md) |
-| `docs/usage.md` | [examples](../getting-started/examples.md) · [configuration](../running/configuration.md) · [solving](../running/solving.md) · [units](../model/units.md) · [postprocessing](../running/postprocessing.md) · [scaling](../validation/scaling.md) |
-| `docs/verification.md` | [troubleshooting](../running/troubleshooting.md) |
-| `docs/workflows.md` | [sweeps](../running/sweeps.md) · [sensitivity](../running/sensitivity.md) · [optimization](../running/optimization.md) · [external-flow](../running/external-flow.md) |
 | `examples/README.md` | [examples](../getting-started/examples.md) |
-| `src/hierarchy.md` | [extending](../api/extending.md) · [code-map](code-map.md) |
 
 Scientific derivations, lab exercises, numerical tables and research retractions were retained. Repeated introductions, manual tables of contents, duplicated parameter/gradient tables and obsolete present-tense status text were replaced by links or rewritten. Old documentation paths remain as pointer pages. No numerical implementation or existing tests were changed.
 

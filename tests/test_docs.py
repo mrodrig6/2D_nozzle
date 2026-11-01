@@ -1,6 +1,6 @@
 """The documentation's maths has to survive GitHub's Markdown, not just LaTeX.
 
-Every equation in ``docs/theory.md`` was valid LaTeX *and* accepted by KaTeX in
+Every equation in ``docs/theory/euler.md`` was valid LaTeX *and* accepted by KaTeX in
 strict mode while still displaying wrongly, so syntax checking is not the test
 that matters.  Two failure modes bit:
 
@@ -135,7 +135,7 @@ def test_every_text_file_is_read_as_utf_8():
     a failure mode invisible to anyone developing on Linux or macOS, which is
     exactly why it is worth a test rather than a habit.
 
-    Markdown is scanned as well as Python.  ``src/hierarchy.md`` carries
+    Markdown is scanned as well as Python.  ``docs/reference/code-map.md`` carries
     runnable snippets that a reader is invited to paste, and those escaped
     this check while it looked only at ``*.py`` -- they shipped with a bare
     ``read_text()`` telling the reader to do the one thing this test exists
